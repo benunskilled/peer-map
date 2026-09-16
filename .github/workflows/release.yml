@@ -1,0 +1,84 @@
+name: Build and publish multi-arch image
+
+# Triggers on every version tag. The last step prints the exact
+# ghcr.io/<owner>/peer-map:<version>@sha256:<digest> reference to pin in the
+# community app store (see RELEASING.md there).
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go vet ./...
+      - run: go test ./...
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only for the smoke test below: the build itself cross-compiles.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine image tag
+        id: vars
+        run: echo "tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.vars.outputs.tag }}
+          # latest only moves for a real release tag, never for a manual run.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/peer-map:${{ steps.vars.outputs.tag }}
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/peer-map:latest', github.repository_owner) || '' }}
+
+      # "It built" is not "it runs". Start both architectures and have the
+      # binary report its version and serve its health endpoint.
+      - name: Smoke-test both architectures
+        run: |
+          set -euo pipefail
+          IMG=ghcr.io/${{ github.repository_owner }}/peer-map:${{ steps.vars.outputs.tag }}
+          for arch in amd64 arm64; do
+            got=$(docker run --rm --platform linux/$arch "$IMG" version)
+            test "$got" = "${{ steps.vars.outputs.tag }}" || { echo "::error::$arch reports version '$got'"; exit 1; }
+            cid=$(docker run -d --platform linux/$arch -e PEERMAP_MOCK=1 "$IMG")
+            ok=0
+            for i in $(seq 1 30); do
+              if docker exec "$cid" /peermap healthcheck; then ok=1; break; fi
+              sleep 1
+            done
+            docker rm -f "$cid" >/dev/null
+            test "$ok" = 1 || { echo "::error::$arch image never became healthy"; exit 1; }
+            echo "$arch: version $got, healthcheck passes"
+          done
+
+      - name: Print pinned reference for the app package
+        run: |
+          echo "Paste this into the image: line in bitcoin-lab-community-store/bitcoinlab-peermap/docker-compose.yml:"
+          echo "ghcr.io/${{ github.repository_owner }}/peer-map:${{ steps.vars.outputs.tag }}@${{ steps.push.outputs.digest }}"
