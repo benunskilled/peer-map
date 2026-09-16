@@ -50,18 +50,19 @@ func TestHostOf(t *testing.T) {
 }
 
 func TestLocate(t *testing.T) {
-	for _, c := range []struct{ addr, network, want string }{
-		{"1.0.0.1:8333", "ipv4", "AU"},
-		{"[2001::1]:8333", "ipv6", "US"},
-		{"[::ffff:1.0.0.1]:8333", "ipv4", "AU"},
-		{"10.21.0.1:51234", "not_publicly_routable", ""},
-		{"10.21.0.1:51234", "ipv4", ""}, // private even if Core labelled it ipv4
-		{"127.0.0.1:50122", "onion", ""},
-		{"x.b32.i2p:0", "i2p", ""},
-		{"[fc00::1]:8333", "cjdns", ""},
+	for _, c := range []struct{ addr, network, cc, region string }{
+		{"1.0.0.1:8333", "ipv4", "AU", "Queensland"},
+		{"[2a01:4f8::1]:8333", "ipv6", "DE", "Bavaria"},
+		{"[::ffff:1.0.0.1]:8333", "ipv4", "AU", "Queensland"},
+		{"10.21.0.1:51234", "not_publicly_routable", "", ""},
+		{"10.21.0.1:51234", "ipv4", "", ""}, // private even if Core labelled it ipv4
+		{"127.0.0.1:50122", "onion", "", ""},
+		{"x.b32.i2p:0", "i2p", "", ""},
+		{"[fc00::1]:8333", "cjdns", "", ""},
 	} {
-		if got := locate(rawPeer{Addr: c.addr, Network: c.network}); got != c.want {
-			t.Errorf("%s/%s: got %q want %q", c.addr, c.network, got, c.want)
+		loc, ok := locate(rawPeer{Addr: c.addr, Network: c.network})
+		if ok != (c.cc != "") || loc.Country != c.cc || loc.Region != c.region {
+			t.Errorf("%s/%s: got %q/%q ok=%v want %q/%q", c.addr, c.network, loc.Country, loc.Region, ok, c.cc, c.region)
 		}
 	}
 }
@@ -70,7 +71,7 @@ func TestLocate(t *testing.T) {
 // real node sends for these connection types).
 const coreReply = `{"result":[
  {"id":0,"addr":"1.0.0.1:8333","network":"ipv4","connection_type":"manual","inbound":false,"subver":"/Satoshi:31.1.0/","pingtime":0.0421,"conntime":1757000000,"transport_protocol_type":"v2","bytessent":10,"bytesrecv":20},
- {"id":1,"addr":"[2001::1]:48222","network":"ipv6","connection_type":"inbound","inbound":true,"subver":"/Satoshi:30.0.0/","conntime":1757000001,"transport_protocol_type":"v1","bytessent":1,"bytesrecv":2},
+ {"id":1,"addr":"[2a01:4f8::1]:48222","network":"ipv6","connection_type":"inbound","inbound":true,"subver":"/Satoshi:30.0.0/","conntime":1757000001,"transport_protocol_type":"v1","bytessent":1,"bytesrecv":2},
  {"id":2,"addr":"1.0.2.200:8333","network":"ipv4","connection_type":"block-relay-only","inbound":false,"subver":"","pingtime":0.1,"conntime":1757000002},
  {"id":3,"addr":"1.0.2.201:8333","network":"ipv4","connection_type":"feeler","inbound":false}
 ],"error":null,"id":"peermap"}`
@@ -105,10 +106,11 @@ func TestRPCAndConvert(t *testing.T) {
 	if len(peers) != 3 {
 		t.Fatalf("want 3 peers (feeler dropped), got %d", len(peers))
 	}
-	want := []struct{ group, cc string }{{"manual", "AU"}, {"inbound", "US"}, {"outbound", "CN"}}
+	want := []struct{ group, cc, region string }{{"manual", "AU", "Queensland"}, {"inbound", "DE", "Bavaria"}, {"outbound", "CN", "Fujian"}}
 	for i, w := range want {
-		if peers[i].Group != w.group || peers[i].Country != w.cc {
-			t.Errorf("peer %d: got %s/%s want %s/%s", i, peers[i].Group, peers[i].Country, w.group, w.cc)
+		p := peers[i]
+		if p.Group != w.group || p.Country != w.cc || p.Region != w.region || p.RegionID == 0 || p.Lat == 0 {
+			t.Errorf("peer %d: got %s/%s/%s rid=%d lat=%v want %s/%s/%s", i, p.Group, p.Country, p.Region, p.RegionID, p.Lat, w.group, w.cc, w.region)
 		}
 	}
 	if peers[0].PingMs == nil || *peers[0].PingMs < 42 || *peers[0].PingMs > 42.2 {

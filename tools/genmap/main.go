@@ -166,7 +166,11 @@ func main() {
 		}
 	}
 
+	// Several features can share a code: in 1:50m, "AU" is Australia and also
+	// the Indian Ocean Territories and Ashmore and Cartier Islands. The
+	// marker belongs on the one people live in, so the most populous wins.
 	points := map[string][2]float64{}
+	pop := map[string]float64{}
 	for _, ft := range load(*labels).Features {
 		cc := code(ft.Properties)
 		lx, ok1 := ft.Properties["LABEL_X"].(float64)
@@ -174,6 +178,11 @@ func main() {
 		if cc == "" || !ok1 || !ok2 {
 			continue
 		}
+		pe, _ := ft.Properties["POP_EST"].(float64)
+		if prev, seen := pop[cc]; seen && prev >= pe {
+			continue
+		}
+		pop[cc] = pe
 		x, y := px(lx, ly)
 		points[cc] = [2]float64{math.Round(x*10) / 10, math.Round(y*10) / 10}
 	}

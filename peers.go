@@ -23,7 +23,7 @@ type rawPeer struct {
 	BytesSent      int64    `json:"bytessent"`
 	BytesRecv      int64    `json:"bytesrecv"`
 
-	mockCountry string // demo data only: documentation addresses have no location
+	mockLoc *geo.Location // demo data only: documentation addresses have no location
 }
 
 // Peer is what the dashboard receives.
@@ -34,6 +34,10 @@ type Peer struct {
 	Group     string   `json:"group"` // manual | inbound | outbound
 	Type      string   `json:"type"`  // Core's connection_type, verbatim
 	Country   string   `json:"cc"`    // "" when it cannot be placed
+	Region    string   `json:"region,omitempty"`
+	RegionID  uint16   `json:"rid,omitempty"` // groups peers per region; stable within one build
+	Lat       float64  `json:"lat,omitempty"`
+	Lon       float64  `json:"lon,omitempty"`
 	Subver    string   `json:"subver"`
 	PingMs    *float64 `json:"ping_ms"`
 	ConnTime  int64    `json:"conntime"`
@@ -84,26 +88,26 @@ func hostOf(addr string) string {
 	return addr // bare IPv6 without port, or no port at all
 }
 
-// locate returns the country for a peer, or "" when the address is not a
+// locate returns where a peer is, or ok=false when the address is not a
 // public IP (Tor, I2P, CJDNS, or a private address such as the 10.21.0.1 that
 // docker-proxy puts in front of inbound IPv6 on umbrelOS).
-func locate(p rawPeer) string {
-	if p.mockCountry != "" {
-		return p.mockCountry
+func locate(p rawPeer) (geo.Location, bool) {
+	if p.mockLoc != nil {
+		return *p.mockLoc, true
 	}
 	switch p.Network {
 	case "onion", "i2p", "cjdns", "not_publicly_routable":
-		return ""
+		return geo.Location{}, false
 	}
 	a, err := netip.ParseAddr(hostOf(p.Addr))
 	if err != nil {
-		return ""
+		return geo.Location{}, false
 	}
 	a = a.Unmap()
 	if !a.IsGlobalUnicast() || a.IsPrivate() {
-		return ""
+		return geo.Location{}, false
 	}
-	return geo.Country(a)
+	return geo.Lookup(a)
 }
 
 func convert(raw []rawPeer) []Peer {
@@ -115,8 +119,15 @@ func convert(raw []rawPeer) []Peer {
 		}
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
-			Country: locate(r), Subver: r.Subver, ConnTime: r.ConnTime, Transport: r.Transport,
+			Subver: r.Subver, ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
+		}
+		if loc, ok := locate(r); ok {
+			p.Country = loc.Country
+			if loc.Region != "" {
+				p.Region, p.RegionID = loc.Region, loc.ID
+				p.Lat, p.Lon = loc.Lat, loc.Lon
+			}
 		}
 		if r.PingTime != nil {
 			ms := *r.PingTime * 1000

@@ -194,11 +194,9 @@ func newHandler(src *source) http.Handler {
 		json.NewEncoder(w).Encode(snap)
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/world.json" {
-			w.Header().Set("Cache-Control", "public, max-age=86400")
-		} else {
-			w.Header().Set("Cache-Control", "no-cache")
-		}
+		// no-cache for everything, world.json included: it changes between
+		// releases, and a day-long cache kept showing the old map after an update.
+		w.Header().Set("Cache-Control", "no-cache")
 		files.ServeHTTP(w, r)
 	})
 
@@ -262,13 +260,13 @@ func main() {
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	v4, v6 := geo.Ranges()
+	regions, v4, v6 := geo.Sizes()
 	mode := "rpc " + cfg.rpcURL
 	if cfg.mock {
 		mode = "DEMO DATA (PEERMAP_MOCK=1)"
 	}
-	log.Printf("peer-map %s listening on :%s, %s, geo table %d/%d ranges (v4/v6), Core polled at most every %s and only while the dashboard is open",
-		Version, cfg.port, mode, v4, v6, interval)
+	log.Printf("peer-map %s listening on :%s, %s, geo table %d regions, %d/%d ranges (v4/v6), Core polled at most every %s and only while the dashboard is open",
+		Version, cfg.port, mode, regions, v4, v6, interval)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
