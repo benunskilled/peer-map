@@ -22,28 +22,40 @@ type rawPeer struct {
 	Transport      string   `json:"transport_protocol_type"`
 	BytesSent      int64    `json:"bytessent"`
 	BytesRecv      int64    `json:"bytesrecv"`
+	// What the peer offers and whether Core knows its chain. Pointers and a
+	// nil slice on purpose: "Core did not report this field" and "the peer
+	// offers nothing" are different answers and must not collapse into one.
+	ServicesNames []string `json:"servicesnames"`
+	RelayTxes     *bool    `json:"relaytxes"`
+	SyncedHeaders *int64   `json:"synced_headers"`
 
 	mockLoc *geo.Location // demo data only: documentation addresses have no location
 }
 
 // Peer is what the dashboard receives.
 type Peer struct {
-	ID        int64    `json:"id"`
-	Addr      string   `json:"addr"`
-	Network   string   `json:"network"`
-	Group     string   `json:"group"` // manual | inbound | outbound
-	Type      string   `json:"type"`  // Core's connection_type, verbatim
-	Country   string   `json:"cc"`    // "" when it cannot be placed
-	Region    string   `json:"region,omitempty"`
-	RegionID  uint16   `json:"rid,omitempty"` // groups peers per region; stable within one build
-	Lat       float64  `json:"lat,omitempty"`
-	Lon       float64  `json:"lon,omitempty"`
-	Subver    string   `json:"subver"`
-	PingMs    *float64 `json:"ping_ms"`
-	ConnTime  int64    `json:"conntime"`
-	Transport string   `json:"transport,omitempty"`
-	BytesSent int64    `json:"bytes_sent"`
-	BytesRecv int64    `json:"bytes_recv"`
+	ID       int64   `json:"id"`
+	Addr     string  `json:"addr"`
+	Network  string  `json:"network"`
+	Group    string  `json:"group"` // manual | inbound | outbound
+	Type     string  `json:"type"`  // Core's connection_type, verbatim
+	Country  string  `json:"cc"`    // "" when it cannot be placed
+	Region   string  `json:"region,omitempty"`
+	RegionID uint16  `json:"rid,omitempty"` // groups peers per region; stable within one build
+	Lat      float64 `json:"lat,omitempty"`
+	Lon      float64 `json:"lon,omitempty"`
+	Subver   string  `json:"subver"`
+	Kind     string  `json:"kind"` // what the user agent claims; see kinds.go
+	// Observed rather than claimed, and omitted when false so the common peer
+	// carries none of them.
+	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
+	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
+	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
+	PingMs       *float64 `json:"ping_ms"`
+	ConnTime     int64    `json:"conntime"`
+	Transport    string   `json:"transport,omitempty"`
+	BytesSent    int64    `json:"bytes_sent"`
+	BytesRecv    int64    `json:"bytes_recv"`
 }
 
 // group sorts a connection into one of the three buckets the map shows.
@@ -119,9 +131,14 @@ func convert(raw []rawPeer) []Peer {
 		}
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
-			Subver: r.Subver, ConnTime: r.ConnTime, Transport: r.Transport,
+			Subver: r.Subver, Kind: kindOf(r.Subver), ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 		}
+		// An empty list is the peer saying it offers nothing; a missing field
+		// is Core saying nothing. Only the first is worth showing.
+		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
+		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
+		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
 		if loc, ok := locate(r); ok {
 			p.Country = loc.Country
 			if loc.Region != "" {
