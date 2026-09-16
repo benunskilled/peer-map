@@ -541,11 +541,34 @@
   }
 
   // ---------- tables ----------
+
+  // The kind is what the peer calls itself, the flags are what Core observed.
+  // They are shown in one cell on purpose: a peer claiming to be Bitcoin Core
+  // while offering nothing and having no known chain is only obvious when the
+  // claim and the observation sit next to each other.
+  function kindLabel(p) {
+    const flags = [];
+    if (p.no_services) flags.push("no services");
+    if (p.no_tx_relay) flags.push("no tx");
+    if (p.chain_unknown) flags.push("chain unknown");
+    return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
+  }
+
+  function kindMix(peers) {
+    const n = new Map();
+    for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
+    return [...n]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([k, v]) => v + " " + k)
+      .join(" \u00b7 ");
+  }
+
   const COLS = [
     { key: "addr", label: "Address", cls: "addr", val: (p) => p.addr },
     { key: "loc", label: "Location", cls: "loc", val: locLabel },
     { key: "network", label: "Network", val: (p) => netLabel(p.network) },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
+    { key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel },
     { key: "subver", label: "Client", val: (p) => p.subver || "" },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
     { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },
@@ -584,6 +607,11 @@
         root.appendChild(card);
         continue;
       }
+
+      const mix = document.createElement("p");
+      mix.className = "kinds";
+      mix.textContent = kindMix(peers);
+      card.appendChild(mix);
 
       const cols = COLS.filter((c) => !c.only || c.only === g);
       const s = state.sort[g] || { key: "conntime", dir: 1 };

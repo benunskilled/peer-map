@@ -43,7 +43,16 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 			locs = append(locs, geo.Location{Country: pl[0]})
 		}
 	}
-	clients := []string{"/Satoshi:31.1.0/", "/Satoshi:31.1.0/", "/Satoshi:30.0.0/", "/Satoshi:29.0.0/", "/Satoshi:28.1.0/", "/Knots:20250305/"}
+	// A real node hears from more than Bitcoin Core. The spread here is taken
+	// from one evening on an actual node, so the demo shows the Kind column
+	// doing its job instead of a wall of "Core".
+	clients := []string{
+		"/Satoshi:31.1.0/", "/Satoshi:31.1.0/", "/Satoshi:31.1.0/", "/Satoshi:30.0.0/",
+		"/Satoshi:29.0.0/", "/Satoshi:28.1.0/", "/Satoshi:29.3.0/Knots:20260507/",
+		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", "/breadwallet:1.3.5/",
+		"/btcwire:0.5.0/neutrino:0.17.1/", "/electrs:0.11.1/", "/Metrika-Bitnodes:0.1/",
+		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
+	}
 
 	var out []rawPeer
 	id := int64(1)
@@ -59,11 +68,28 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 	}
 	add := func(typ string, inbound bool, network, a string, loc *geo.Location) {
 		ping := 0.02 + r.Float64()*0.3
+		subver := clients[r.Intn(len(clients))]
+		// The observed flags follow the software rather than a coin toss,
+		// because that is how they behave on a real node: a wallet or a
+		// crawler offers nothing and Core never learns its chain, while a
+		// full node does both. The rare last case is the interesting one -
+		// something calling itself Core that behaves like neither.
+		services, relay, headers := []string{"NETWORK", "WITNESS"}, true, int64(967000+r.Intn(400))
+		switch kindOf(subver) {
+		case "Wallet", "Light client", "Crawler", "Research", "Indexer":
+			services, headers = []string{}, -1
+			relay = r.Intn(3) > 0
+		case "Core":
+			if r.Intn(20) == 0 {
+				services, relay, headers = []string{}, false, -1
+			}
+		}
 		out = append(out, rawPeer{
 			ID: id, Addr: a, Network: network, ConnectionType: typ, Inbound: inbound,
-			Subver: clients[r.Intn(len(clients))], PingTime: &ping,
+			Subver: subver, PingTime: &ping,
 			ConnTime: now - int64(r.Intn(86400*3)), Transport: []string{"v1", "v2"}[r.Intn(2)],
 			BytesSent: int64(r.Intn(50 << 20)), BytesRecv: int64(r.Intn(200 << 20)),
+			ServicesNames: services, RelayTxes: &relay, SyncedHeaders: &headers,
 			mockLoc: loc,
 		})
 		id++
