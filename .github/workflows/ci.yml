@@ -1,0 +1,66 @@
+name: Tests
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*.*.*']
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::run gofmt -w ."; exit 1; }
+      - run: go vet ./...
+      - run: go test ./...
+
+  # The unit tests prove the code does what it was written to do, against a
+  # getpeerinfo reply shaped by hand. This proves Bitcoin Core really reports
+  # what that reply assumes: four real regtest nodes, one connection of each
+  # type the map separates, read back through the same code the app runs.
+  # Only on tags and on demand - it downloads Core.
+  integration:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    name: Against real Bitcoin Core
+    env:
+      CORE_VERSION: '31.1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Cache Bitcoin Core
+        id: core-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/bitcoin-core
+          key: bitcoin-core-${{ env.CORE_VERSION }}-x86_64-linux-gnu
+
+      - name: Fetch and verify Bitcoin Core
+        if: steps.core-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          BASE="https://bitcoincore.org/bin/bitcoin-core-${CORE_VERSION}"
+          TARBALL="bitcoin-${CORE_VERSION}-x86_64-linux-gnu.tar.gz"
+          mkdir -p ~/bitcoin-core && cd ~/bitcoin-core
+          curl -fsSLO "${BASE}/${TARBALL}"
+          curl -fsSLO "${BASE}/SHA256SUMS"
+          # Guards against a truncated or corrupted download, not against the
+          # host itself: the sums come from the same server as the file.
+          sha256sum --ignore-missing --check SHA256SUMS
+          tar -xzf "${TARBALL}" --strip-components=2 "bitcoin-${CORE_VERSION}/bin/bitcoind"
+          rm -f "${TARBALL}" SHA256SUMS
+
+      - name: Run the integration test
+        run: |
+          export PATH="$HOME/bitcoin-core:$PATH"
+          bitcoind -version | head -1
+          go test -tags integration -run TestAgainstBitcoinCore -v -count=1 .
