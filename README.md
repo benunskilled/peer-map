@@ -10,9 +10,17 @@ and **outbound** connections kept apart.
   Australia becomes New South Wales, Victoria, Queensland and so on.
 - Toggle each type on and off; click a country or region to filter the tables
   below to it.
-- A table per type: address, location, network, client, P2P transport, ping,
-  and how long the connection has been up. Outbound also shows whether a peer
-  is full-relay or block-relay-only.
+- A table per type: address, location, network, **kind**, client, P2P
+  transport, ping, and how long the connection has been up. Outbound also
+  shows whether a peer is full-relay or block-relay-only.
+- **What kind of peer it is** - Core, Knots, Wallet, Light client, Indexer,
+  Crawler, Research, Pool, another chain - with the mix summarised under each
+  heading. That comes from the user agent, which the peer writes itself, so
+  next to it stand three things it cannot write: whether it advertises any
+  services, whether it asked for transactions, and whether Core has ever
+  learned which chain it is on. A peer calling itself Bitcoin Core while
+  offering nothing and having no known chain is worth a second look, and it
+  only reads as odd when the claim and the behaviour sit in the same cell.
 - Peers that cannot be placed are counted in a panel beside the map (collapsed
   by default) instead of being dropped: Tor, I2P and CJDNS have no location,
   and on umbrelOS inbound IPv6 arrives through docker-proxy and shows up as a
