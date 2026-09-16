@@ -3,7 +3,11 @@
   const GROUPS = ["manual", "inbound", "outbound"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
+  const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
+  const IDLE_PAUSE_MS = 30 * 60 * 1000;    // stop asking Core after 30 min without input
+  const SIDE_KEY = "peermap.sideOpen";
   const $ = (id) => document.getElementById(id);
+
   const regionName = (() => {
     try {
       const dn = new Intl.DisplayNames(["en"], { type: "region" });
@@ -12,22 +16,56 @@
   })();
 
   const state = {
-    data: null,          // last /api/peers reply
-    world: null,         // world.json
+    data: null,           // last /api/peers reply
+    world: null,          // world.json
     show: { manual: true, inbound: true, outbound: true },
-    country: "",         // country filter from clicking a marker
-    sort: {},            // per group: { key, dir }
+    place: null,          // location filter from clicking a marker: { key, label }
+    sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
+    paused: false,
+    lastInput: Date.now(),
+    open: { manual: true, inbound: true, outbound: true }, // table sections
   };
 
-  // ---------- polling: only while the page is visible ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
+  };
+
+  // ---------- projection: same Natural Earth polynomial as tools/genmap ----------
+  function nePoly(lon, lat) {
+    const l = lon * Math.PI / 180, p = lat * Math.PI / 180;
+    const p2 = p * p, p4 = p2 * p2;
+    return [
+      l * (0.8707 - 0.131979 * p2 + p4 * (-0.013791 + p4 * (0.003971 * p2 - 0.001529 * p4))),
+      p * (1.007226 + p2 * (0.015085 + p4 * (-0.044475 + 0.028874 * p2 - 0.005916 * p4))),
+    ];
+  }
+  const X_MAX = nePoly(180, 0)[0];
+  const Y_MAX = nePoly(0, 84)[1];
+  function project(lon, lat) {
+    const [x, y] = nePoly(lon, lat);
+    const s = 1000 / (2 * X_MAX);
+    return [(x + X_MAX) * s, (Y_MAX - y) * s];
+  }
+
+  // ---------- polling: only while visible, and not after 30 min idle ----------
   let pollTimer = 0;
   let tickTimer = 0;
+  let inFlight = false;
 
+  // Exactly one polling chain at a time. Without the inFlight guard, a tab
+  // that became visible again while a request was still running started a
+  // second chain next to the first, and every such moment added another.
   async function refresh() {
     clearTimeout(pollTimer);
-    if (document.hidden) return;
+    if (inFlight || document.hidden || state.paused) return;
+    if (Date.now() - state.lastInput > IDLE_PAUSE_MS) {
+      setPaused(true);
+      return;
+    }
     let next = 10;
+    inFlight = true;
     try {
       const r = await fetch("api/peers", { cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
@@ -36,9 +74,35 @@
       render();
     } catch (e) {
       showError("Peer Map backend not reachable: " + e.message);
+    } finally {
+      inFlight = false;
     }
-    if (!document.hidden) pollTimer = setTimeout(refresh, next * 1000 + 250);
+    clearTimeout(pollTimer);
+    if (!document.hidden && !state.paused) pollTimer = setTimeout(refresh, next * 1000 + 250);
   }
+
+  function setPaused(p) {
+    state.paused = p;
+    $("paused").hidden = !p;
+    if (p) clearTimeout(pollTimer);
+    renderStatus();
+  }
+
+  let inputStamp = 0;
+  const noteInput = () => {
+    const now = Date.now();
+    if (now - inputStamp < 1000) return; // cheap throttle
+    inputStamp = now;
+    state.lastInput = now;
+  };
+  for (const ev of ["pointerdown", "pointermove", "keydown", "wheel", "touchstart", "scroll"]) {
+    window.addEventListener(ev, noteInput, { passive: true, capture: true });
+  }
+  $("resume").addEventListener("click", () => {
+    state.lastInput = Date.now();
+    setPaused(false);
+    refresh();
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
@@ -77,11 +141,11 @@
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
     not_publicly_routable: "Private",
   }[n] || n || "-");
+  const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
   // ---------- render ----------
-  function visiblePeers() {
-    return state.data ? state.data.peers.filter((p) => state.show[p.group]) : [];
-  }
+  const visiblePeers = () => (state.data ? state.data.peers.filter((p) => state.show[p.group]) : []);
+  const regionMode = () => state.view.k >= REGION_ZOOM;
 
   function render() {
     const d = state.data;
@@ -102,44 +166,62 @@
   function renderStatus() {
     const d = state.data;
     if (!d) return;
-    const total = d.peers.length;
     const since = d.fetched_at ? ago(Date.now() / 1000 - d.fetched_at) + " ago" : "never";
-    $("status").textContent = `${total} peers · updated ${since} · refresh every ${d.interval}s while open`;
+    const mode = state.paused ? "paused" : `every ${d.interval}s while open`;
+    $("status").textContent = `${d.peers.length} peers · updated ${since} · ${mode}`;
   }
 
   // ---------- map ----------
   async function loadWorld() {
     const r = await fetch("world.json");
     state.world = await r.json();
-    const svg = $("map");
-    svg.setAttribute("viewBox", `0 0 ${state.world.w} ${state.world.h}`);
-    const g = $("countries");
+    $("map").setAttribute("viewBox", `0 0 ${state.world.w} ${state.world.h}`);
     const frag = document.createDocumentFragment();
-    for (const [cc, d] of Object.entries(state.world.paths)) {
+    const addPath = (d, cc) => {
       const p = document.createElementNS(NS, "path");
       p.setAttribute("d", d);
       p.setAttribute("class", "land");
       p.setAttribute("vector-effect", "non-scaling-stroke");
-      p.dataset.cc = cc;
+      if (cc) p.dataset.cc = cc;
       frag.appendChild(p);
-    }
-    if (state.world.unnamed) {
-      const p = document.createElementNS(NS, "path");
-      p.setAttribute("d", state.world.unnamed);
-      p.setAttribute("class", "land");
-      p.setAttribute("vector-effect", "non-scaling-stroke");
-      frag.appendChild(p);
-    }
-    g.appendChild(frag);
+    };
+    for (const [cc, d] of Object.entries(state.world.paths)) addPath(d, cc);
+    if (state.world.unnamed) addPath(state.world.unnamed, "");
+    $("countries").appendChild(frag);
     applyView();
   }
 
-  function countryBuckets() {
+  // A bucket is one marker: a country (world view) or a region (zoomed in).
+  // Peers whose region is unknown stay on their country's point.
+  function placeKey(p, byRegion) {
+    return byRegion && p.rid ? "r" + p.rid : "c" + p.cc;
+  }
+  function peerMatchesPlace(p) {
+    if (!state.place) return true;
+    const k = state.place.key;
+    return k[0] === "r" ? "r" + p.rid === k : p.cc === k.slice(1);
+  }
+
+  function buckets() {
+    const byRegion = regionMode();
     const by = new Map();
     for (const p of visiblePeers()) {
       if (!p.cc) continue;
-      let b = by.get(p.cc);
-      if (!b) by.set(p.cc, (b = { cc: p.cc, manual: 0, inbound: 0, outbound: 0, total: 0 }));
+      const key = placeKey(p, byRegion);
+      let b = by.get(key);
+      if (!b) {
+        let pt = state.world.points[p.cc];
+        let title = regionName(p.cc), sub = "";
+        if (key[0] === "r") {
+          pt = project(p.lon, p.lat);
+          title = p.region;
+          sub = regionName(p.cc);
+        } else if (byRegion) {
+          sub = "region unknown";
+        }
+        if (!pt) continue;
+        by.set(key, (b = { key, title, sub, pt, cc: p.cc, manual: 0, inbound: 0, outbound: 0, total: 0 }));
+      }
       b[p.group]++;
       b.total++;
     }
@@ -158,27 +240,29 @@
     return `M0 0L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
   }
 
+  let renderedMode = null;
   function renderMarkers() {
     if (!state.world || !state.data) return;
+    renderedMode = regionMode();
+    $("mapLevel").textContent = renderedMode ? "Regions" : "Countries";
+    $("mapLevelHint").hidden = renderedMode;
     const layer = $("markers");
     layer.textContent = "";
-    const buckets = countryBuckets();
-    const hot = new Set(buckets.map((b) => b.cc));
+    const bs = buckets();
+    const hot = new Set(bs.map((b) => b.cc));
     for (const el of $("countries").children) el.classList.toggle("hot", hot.has(el.dataset.cc));
 
     // Largest first, so small markers are drawn on top and stay clickable.
-    for (const b of buckets) {
-      const pt = state.world.points[b.cc];
-      if (!pt) continue;
+    for (const b of bs) {
       const r = radius(b.total);
       const g = document.createElementNS(NS, "g");
-      g.setAttribute("class", "marker" + (state.country === b.cc ? " selected" : ""));
-      g.dataset.cc = b.cc;
-      g.dataset.x = pt[0];
-      g.dataset.y = pt[1];
+      const selected = state.place && state.place.key === b.key;
+      g.setAttribute("class", "marker" + (selected ? " selected" : ""));
+      g.dataset.x = b.pt[0];
+      g.dataset.y = b.pt[1];
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
-      g.setAttribute("aria-label", `${regionName(b.cc)}: ${GROUPS.map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
+      g.setAttribute("aria-label", `${b.title}${b.sub ? ", " + b.sub : ""}: ${GROUPS.map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
 
       const ring = document.createElementNS(NS, "circle");
       ring.setAttribute("class", "ring");
@@ -207,9 +291,9 @@
       g.addEventListener("pointerleave", hideTip);
       g.addEventListener("focus", () => showTip(b, null, g));
       g.addEventListener("blur", hideTip);
-      g.addEventListener("click", (e) => { e.stopPropagation(); toggleCountry(b.cc); });
+      g.addEventListener("click", (e) => { e.stopPropagation(); togglePlace(b); });
       g.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCountry(b.cc); }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePlace(b); }
       });
       layer.appendChild(g);
     }
@@ -230,22 +314,36 @@
     }
   }
 
-  function toggleCountry(cc) {
-    state.country = state.country === cc ? "" : cc;
-    $("countryFilter").hidden = !state.country;
-    $("countryFilterName").textContent = state.country ? regionName(state.country) : "";
+  function togglePlace(b) {
+    state.place = state.place && state.place.key === b.key ? null : { key: b.key, label: b.sub && b.key[0] === "r" ? `${b.title}, ${b.sub}` : b.title };
+    renderPlaceFilter();
     renderMarkers();
     renderTables();
   }
-  $("countryFilterClear").addEventListener("click", () => toggleCountry(state.country));
+  function renderPlaceFilter() {
+    $("placeFilter").hidden = !state.place;
+    $("placeFilterName").textContent = state.place ? state.place.label : "";
+  }
+  $("placeFilterClear").addEventListener("click", () => {
+    state.place = null;
+    renderPlaceFilter();
+    renderMarkers();
+    renderTables();
+  });
 
   // ---------- tooltip ----------
   const tip = $("tooltip");
   function showTip(b, e, el) {
     tip.textContent = "";
     const h = document.createElement("h3");
-    h.textContent = regionName(b.cc);
+    h.textContent = b.title;
     tip.appendChild(h);
+    if (b.sub) {
+      const s = document.createElement("div");
+      s.className = "sub";
+      s.textContent = b.sub;
+      tip.appendChild(s);
+    }
     for (const k of GROUPS) {
       if (!state.show[k]) continue;
       const row = document.createElement("div");
@@ -282,7 +380,7 @@
   function hideTip() { tip.hidden = true; }
 
   // ---------- pan & zoom ----------
-  const MAX_K = 16;
+  const MAX_K = 24;
   function clampView() {
     const v = state.view, W = state.world.w, H = state.world.h;
     v.k = Math.min(MAX_K, Math.max(1, v.k));
@@ -290,10 +388,17 @@
     v.y = Math.min(0, Math.max(H - H * v.k, v.y));
   }
   function applyView() {
+    if (!state.world) return;
     clampView();
     const { k, x, y } = state.view;
     $("countries").setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
-    if (state.data) placeMarkers();
+    if (!state.data) return;
+    if (renderedMode !== regionMode()) {
+      hideTip();
+      renderMarkers(); // crossing the region threshold regroups the markers
+    } else {
+      placeMarkers();
+    }
   }
   function toSvg(clientX, clientY) {
     const svg = $("map");
@@ -361,7 +466,14 @@
       const p = toSvg(e.clientX, e.clientY);
       zoomAt(2, p.x, p.y);
     });
-    svg.addEventListener("click", () => { if (!moved && state.country) toggleCountry(state.country); });
+    svg.addEventListener("click", () => {
+      if (!moved && state.place) {
+        state.place = null;
+        renderPlaceFilter();
+        renderMarkers();
+        renderTables();
+      }
+    });
 
     const center = () => [state.world.w / 2, state.world.h / 2];
     $("zoomIn").addEventListener("click", () => zoomAt(1.6, ...center()));
@@ -380,9 +492,19 @@
     });
   }
 
-  // ---------- not on the map ----------
+  // ---------- not on the map (collapsible side panel) ----------
+  function setSide(open) {
+    $("unplaced").hidden = !open;
+    $("sideToggle").setAttribute("aria-expanded", String(open));
+    store.set(SIDE_KEY, open ? "1" : "0");
+    if (state.world && state.data) placeMarkers(); // map width changed
+  }
+  $("sideToggle").addEventListener("click", () => setSide($("unplaced").hidden));
+  setSide(store.get(SIDE_KEY) === "1"); // collapsed unless opened before
+
   function renderUnplaced() {
     const rows = new Map();
+    let total = 0;
     for (const p of state.data.peers) {
       if (p.cc) continue;
       let key = netLabel(p.network);
@@ -390,7 +512,9 @@
       let r = rows.get(key);
       if (!r) rows.set(key, (r = { manual: 0, inbound: 0, outbound: 0 }));
       r[p.group]++;
+      if (state.show[p.group]) total++;
     }
+    $("unplacedCount").textContent = total;
     const body = $("unplacedBody");
     body.textContent = "";
     if (!rows.size) {
@@ -419,12 +543,12 @@
   // ---------- tables ----------
   const COLS = [
     { key: "addr", label: "Address", cls: "addr", val: (p) => p.addr },
-    { key: "cc", label: "Country", val: (p) => (p.cc ? regionName(p.cc) : "") , show: (p) => (p.cc ? regionName(p.cc) : "–"), dim: (p) => !p.cc },
+    { key: "loc", label: "Location", cls: "loc", val: locLabel },
     { key: "network", label: "Network", val: (p) => netLabel(p.network) },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
     { key: "subver", label: "Client", val: (p) => p.subver || "" },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
-    { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "–" : Math.round(p.ping_ms) + " ms") },
+    { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
   ];
 
@@ -435,23 +559,27 @@
       if (!state.show[g]) continue;
       let peers = state.data.peers.filter((p) => p.group === g);
       const all = peers.length;
-      if (state.country) peers = peers.filter((p) => p.cc === state.country);
+      if (state.place) peers = peers.filter(peerMatchesPlace);
 
-      const card = document.createElement("section");
+      const card = document.createElement("details");
       card.className = "card group-card";
+      card.open = state.open[g];
+      card.addEventListener("toggle", () => { state.open[g] = card.open; });
+      const summary = document.createElement("summary");
       const h = document.createElement("h2");
       const sw = document.createElement("span");
       sw.className = "swatch s-" + g;
       const n = document.createElement("span");
       n.className = "n";
-      n.textContent = state.country ? `${peers.length} of ${all}` : String(all);
+      n.textContent = state.place ? `${peers.length} of ${all}` : String(all);
       h.append(sw, LABEL[g] + " ", n);
-      card.appendChild(h);
+      summary.appendChild(h);
+      card.appendChild(summary);
 
       if (!peers.length) {
         const p = document.createElement("p");
         p.className = "empty";
-        p.textContent = state.country ? "None in this country." : "No " + LABEL[g].toLowerCase() + " peers.";
+        p.textContent = state.place ? "None here." : "No " + LABEL[g].toLowerCase() + " peers.";
         card.appendChild(p);
         root.appendChild(card);
         continue;
@@ -495,8 +623,8 @@
           if (c.cls) td.className = c.cls;
           const text = c.show ? c.show(p) : c.val(p);
           td.textContent = text === "" ? "–" : text;
-          if ((c.dim && c.dim(p)) || text === "") td.classList.add("dim");
-          if (c.key === "addr") td.title = p.addr;
+          if (text === "") td.classList.add("dim");
+          if (c.key === "addr" || c.key === "loc") td.title = text;
           tr.appendChild(td);
         }
         tbody.appendChild(tr);

@@ -3,40 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>Peer Map</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
-      <img src="icon.svg" alt="" width="28" height="28">
-      <h1>Peer Map</h1>
-    </div>
-    <p class="status" id="status" aria-live="polite">Loading peers…</p>
+  <header class="topbar">
+    <h1>Peer Map</h1>
+    <span class="status-pill" id="status" aria-live="polite">Loading peers…</span>
   </header>
 
   <main>
     <p class="banner banner-demo" id="demo" hidden>Demo data - this instance runs with <code>PEERMAP_MOCK=1</code> and is not connected to a node.</p>
     <p class="banner banner-error" id="error" hidden></p>
+    <div class="banner banner-paused" id="paused" hidden>
+      <span>Paused after 30 minutes without activity - Bitcoin Core is not being asked for peers.</span>
+      <button class="btn" id="resume">Resume</button>
+    </div>
 
     <div class="filters" role="group" aria-label="Show connection types">
       <button class="chip" data-group="manual" aria-pressed="true"><span class="swatch"></span>Manual <b data-count="manual">0</b></button>
       <button class="chip" data-group="inbound" aria-pressed="true"><span class="swatch"></span>Inbound <b data-count="inbound">0</b></button>
       <button class="chip" data-group="outbound" aria-pressed="true"><span class="swatch"></span>Outbound <b data-count="outbound">0</b></button>
-      <span class="country-filter" id="countryFilter" hidden>
-        Country: <b id="countryFilterName"></b>
-        <button class="linkish" id="countryFilterClear" aria-label="Clear country filter">×</button>
+      <span class="place-filter" id="placeFilter" hidden>
+        Showing <b id="placeFilterName"></b>
+        <button class="linkish" id="placeFilterClear" aria-label="Clear location filter">×</button>
       </span>
     </div>
 
-    <section class="card map-card">
+    <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
-        <svg id="map" role="img" aria-label="World map of connected peers, one marker per country">
+        <svg id="map" role="img" aria-label="World map of connected peers">
           <g id="countries"></g>
           <g id="markers"></g>
         </svg>
+        <span class="map-level"><span id="mapLevel">Countries</span><span class="map-level-hint" id="mapLevelHint"> · zoom in for regions</span></span>
         <div class="zoom" role="group" aria-label="Zoom">
           <button id="zoomIn" aria-label="Zoom in">+</button>
           <button id="zoomOut" aria-label="Zoom out">−</button>
@@ -44,17 +47,21 @@
         </div>
         <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
       </div>
-      <div class="unplaced" id="unplaced">
+
+      <button class="side-tab" id="sideToggle" aria-expanded="false" aria-controls="unplaced">
+        <span class="side-tab-label">Not on the map <b id="unplacedCount">0</b></span>
+      </button>
+      <aside class="unplaced" id="unplaced" hidden>
         <h2>Not on the map</h2>
         <p class="hint">Tor, I2P and CJDNS peers have no location. Inbound IPv6 on umbrelOS arrives through docker-proxy and shows up as a private address.</p>
         <table class="mini">
-          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-manual"></span>Manual</th><th scope="col"><span class="swatch s-inbound"></span>Inbound</th><th scope="col"><span class="swatch s-outbound"></span>Outbound</th></tr></thead>
+          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-manual"></span>Man.</th><th scope="col"><span class="swatch s-inbound"></span>In</th><th scope="col"><span class="swatch s-outbound"></span>Out</th></tr></thead>
           <tbody id="unplacedBody"></tbody>
         </table>
-      </div>
+      </aside>
     </section>
 
-    <section class="tables" id="tables"></section>
+    <div class="tables" id="tables"></div>
   </main>
 
   <footer class="foot">
