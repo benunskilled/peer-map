@@ -46,6 +46,10 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .topbar h1 { font-size: 18px; margin: 0; color: var(--accent); }
+/* The link to the other app in the pair. Quiet on purpose: it is an offer, not
+   a part of this dashboard. Hidden until the other side has answered. */
+.sibling-link { margin-right: auto; font-size: 13px; color: var(--muted); text-decoration: none; }
+.sibling-link:hover { color: var(--text); }
 .status-pill { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 main {
@@ -203,6 +207,14 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
 .peers td.loc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
 .peers .dim { color: var(--muted); }
+/* The address doubles as the way over to Bitcoin Lab; it should read as a link
+   without turning the table into a wall of blue. */
+.peer-jump { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); }
+.peer-jump:hover { color: var(--accent); text-decoration-color: var(--accent); }
+/* The peer another app pointed at. Marked, not filtered - and it stays marked
+   so you can still find it after scrolling away. */
+.peers tr.focus td { background: rgba(247,147,26,.10); }
+.peers tr.focus td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .empty { color: var(--muted); margin: 0 20px 8px; }
 /* The mix of peer kinds under a group heading: a summary, not a heading of
    its own, so it stays quiet enough to skip over. */

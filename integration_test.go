@@ -102,7 +102,7 @@ func fetchSnapshot(t *testing.T, n *node) snapshot {
 	rpc := &rpcClient{url: n.url, user: "u", pass: "p", http: http.DefaultClient}
 	src := &source{now: time.Now, fetch: rpc.getPeerInfo}
 	rec := httptest.NewRecorder()
-	newHandler(src).ServeHTTP(rec, httptest.NewRequest("GET", "/api/peers", nil))
+	newHandler(src, offSibling()).ServeHTTP(rec, httptest.NewRequest("GET", "/api/peers", nil))
 	var s snapshot
 	if err := json.Unmarshal(rec.Body.Bytes(), &s); err != nil {
 		t.Fatal(err)

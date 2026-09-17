@@ -23,6 +23,10 @@
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
     paused: false,
+    // A peer another app pointed at, via ?peer=<address>. Highlighted once and
+    // scrolled to, then left alone - it is a starting point, not a filter.
+    focus: new URLSearchParams(location.search).get("peer") || null,
+    focusDone: false,
     lastInput: Date.now(),
     open: { manual: true, inbound: true, outbound: true }, // table sections
   };
@@ -158,9 +162,38 @@
     for (const g of GROUPS) document.querySelector(`[data-count="${g}"]`).textContent = counts[g];
 
     renderStatus();
+    renderSiblingLink();
     renderMarkers();
     renderUnplaced();
     renderTables();
+    focusOnce();
+  }
+
+  // Somebody arrived from Bitcoin Lab asking about one peer. Put it in front of
+  // them once. Not a filter and not sticky: the rest of the node is the reason
+  // they are looking at a map, and a row that keeps jumping under the cursor on
+  // every ten-second refresh would be its own kind of rude.
+  function focusOnce() {
+    if (!state.focus || state.focusDone) return;
+    const row = document.querySelector("tr.focus");
+    if (!row) return;
+    state.focusDone = true;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  // Bitcoin Lab measures which of these peers actually delivers each block
+  // first. The server says whether it is installed; the port is the one its
+  // store manifest publishes, and the host is this one.
+  const SIBLING_PORT = 8790;
+  function siblingURL(peerAddress) {
+    const base = `${location.protocol}//${location.hostname}:${SIBLING_PORT}/`;
+    return peerAddress ? base + "?peer=" + encodeURIComponent(peerAddress) : base;
+  }
+  function renderSiblingLink() {
+    const a = $("sibling-link");
+    if (!a || !state.data) return;
+    a.hidden = !state.data.sibling;
+    if (state.data.sibling) a.href = siblingURL(null);
   }
 
   function renderStatus() {
@@ -564,7 +597,22 @@
   }
 
   const COLS = [
-    { key: "addr", label: "Address", cls: "addr", val: (p) => p.addr },
+    {
+      key: "addr", label: "Address", cls: "addr", val: (p) => p.addr,
+      // With Bitcoin Lab installed the address becomes the way over: same peer,
+      // the other question. Without it, a plain cell - no dead links.
+      cell: (td, p) => {
+        if (!state.data || !state.data.sibling) { td.textContent = p.addr; return; }
+        const a = document.createElement("a");
+        a.className = "peer-jump";
+        a.href = siblingURL(p.addr);
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = p.addr;
+        a.title = "Open this peer in Bitcoin Lab";
+        td.appendChild(a);
+      },
+    },
     { key: "loc", label: "Location", cls: "loc", val: locLabel },
     { key: "network", label: "Network", val: (p) => netLabel(p.network) },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
@@ -646,12 +694,17 @@
       const tbody = document.createElement("tbody");
       for (const p of peers) {
         const tr = document.createElement("tr");
+        if (state.focus && p.addr === state.focus) tr.className = "focus";
         for (const c of cols) {
           const td = document.createElement("td");
           if (c.cls) td.className = c.cls;
           const text = c.show ? c.show(p) : c.val(p);
-          td.textContent = text === "" ? "–" : text;
-          if (text === "") td.classList.add("dim");
+          if (c.cell) {
+            c.cell(td, p);
+          } else {
+            td.textContent = text === "" ? "–" : text;
+            if (text === "") td.classList.add("dim");
+          }
           if (c.key === "addr" || c.key === "loc") td.title = text;
           tr.appendChild(td);
         }
@@ -663,6 +716,7 @@
       root.appendChild(card);
     }
   }
+
 
   // ---------- start ----------
   setupPanZoom();

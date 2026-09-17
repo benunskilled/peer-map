@@ -129,6 +129,7 @@ type snapshot struct {
 	Interval  int    `json:"interval"`
 	Error     string `json:"error,omitempty"`
 	Demo      bool   `json:"demo,omitempty"`
+	Sibling   bool   `json:"sibling,omitempty"` // Bitcoin Lab is installed on this node
 	Version   string `json:"version"`
 }
 
@@ -178,7 +179,7 @@ func (s *source) get(ctx context.Context) snapshot {
 
 // ---- HTTP -------------------------------------------------------------------
 
-func newHandler(src *source) http.Handler {
+func newHandler(src *source, sib *siblingCheck) http.Handler {
 	static, _ := fs.Sub(webFS, "web")
 	files := http.FileServer(http.FS(static))
 	mux := http.NewServeMux()
@@ -189,6 +190,7 @@ func newHandler(src *source) http.Handler {
 	})
 	mux.HandleFunc("GET /api/peers", func(w http.ResponseWriter, r *http.Request) {
 		snap := src.get(r.Context())
+		snap.Sibling = sib.installed(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		json.NewEncoder(w).Encode(snap)
@@ -255,7 +257,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.port,
-		Handler:           newHandler(src),
+		Handler:           newHandler(src, newSiblingCheck()),
 		ReadHeaderTimeout: 10 * time.Second,
 		WriteTimeout:      60 * time.Second,
 		IdleTimeout:       120 * time.Second,
