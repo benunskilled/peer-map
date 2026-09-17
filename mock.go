@@ -54,6 +54,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
 	}
 
+	nodeClients := []string{}
+	for _, c := range clients {
+		if relaysBlocks(c) {
+			nodeClients = append(nodeClients, c)
+		}
+	}
+
 	var out []rawPeer
 	id := int64(1)
 	v4, v6 := 0, 0
@@ -68,7 +75,14 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 	}
 	add := func(typ string, inbound bool, network, a string, loc *geo.Location) {
 		ping := 0.02 + r.Float64()*0.3
-		subver := clients[r.Intn(len(clients))]
+		// Only inbound gets the full spread. You never dial OUT to a phone
+		// wallet or a crawler - an outbound or manual connection is one this
+		// node chose, and it chooses nodes.
+		pool := clients
+		if !inbound {
+			pool = nodeClients
+		}
+		subver := pool[r.Intn(len(pool))]
 		// The observed flags follow the software rather than a coin toss,
 		// because that is how they behave on a real node: a wallet or a
 		// crawler offers nothing and Core never learns its chain, while a
