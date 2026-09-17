@@ -614,6 +614,17 @@
       },
     },
     { key: "loc", label: "Location", cls: "loc", val: locLabel },
+    {
+      // Where a peer sits and whose machine it is are two questions, and the
+      // second is the one that catches three peers in three countries sitting
+      // with the same company. Sorting by this column puts them next to each
+      // other. Empty for Tor, I2P and anything without a public address.
+      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "",
+      cell: (td, p) => {
+        td.textContent = p.operator || "";
+        if (p.asn) td.title = "AS" + p.asn;
+      },
+    },
     { key: "network", label: "Network", val: (p) => netLabel(p.network) },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
     {

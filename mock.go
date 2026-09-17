@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
 )
 
@@ -26,22 +27,61 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 
 	// Weighted roughly like a real node's peer list: heavy on Germany, the US
 	// and the big hosting countries, with several regions each.
-	places := [][2]string{
-		{"DE", "Hesse"}, {"DE", "Bavaria"}, {"DE", "Berlin"}, {"DE", "North Rhine-Westphalia"}, {"DE", "Saxony"},
-		{"US", "Virginia"}, {"US", "California"}, {"US", "Oregon"}, {"US", "New York"}, {"US", "Texas"},
-		{"NL", "North Holland"}, {"NL", "North Holland"}, {"FR", "Ile-de-France"}, {"FI", "Uusimaa"},
-		{"GB", "England"}, {"CA", "Quebec"}, {"CA", "Ontario"}, {"CH", "Zurich"}, {"AT", "Vienna"},
-		{"SE", "Stockholm"}, {"PL", "Mazovia"}, {"CZ", "Prague"}, {"ES", "Madrid"}, {"IT", "Lombardy"},
-		{"JP", "Tokyo"}, {"SG", ""}, {"HK", "Kowloon"}, {"AU", "New South Wales"}, {"AU", "Victoria"},
-		{"AU", "Queensland"}, {"AU", "Western Australia"}, {"BR", "Sao Paulo"}, {"ZA", "Gauteng"}, {"IN", "Maharashtra"},
+	//
+	// Each place carries the operator a machine there plausibly sits with, and
+	// every number and name below is the one the ASN table itself holds. Three
+	// of them repeat across countries on purpose - Amazon in Frankfurt,
+	// Virginia and Singapore, Hetzner in Saxony and Helsinki - because that is
+	// the case the column exists for: different flags, one company.
+	op := func(number uint32, name string) asn.Info { return asn.Info{Number: number, Name: name} }
+	places := []struct {
+		cc, region string
+		net        asn.Info
+	}{
+		{"DE", "Hesse", op(16509, "Amazon.com, Inc.")},
+		{"DE", "Bavaria", op(24940, "Hetzner Online GmbH")},
+		{"DE", "Berlin", op(3320, "Deutsche Telekom AG")},
+		{"DE", "North Rhine-Westphalia", op(8560, "IONOS SE")},
+		{"DE", "Saxony", op(24940, "Hetzner Online GmbH")},
+		{"US", "Virginia", op(16509, "Amazon.com, Inc.")},
+		{"US", "California", op(15169, "Google LLC")},
+		{"US", "Oregon", op(20473, "The Constant Company, LLC")},
+		{"US", "New York", op(14061, "DigitalOcean, LLC")},
+		{"US", "Texas", op(7922, "Comcast Cable Communications, LLC")},
+		{"NL", "North Holland", op(60781, "LeaseWeb Netherlands B.V.")},
+		{"NL", "North Holland", op(1136, "KPN B.V.")},
+		{"FR", "Ile-de-France", op(12876, "Scaleway SAS")},
+		{"FI", "Uusimaa", op(24940, "Hetzner Online GmbH")},
+		{"GB", "England", op(2856, "British Telecommunications PLC")},
+		{"CA", "Quebec", op(16276, "OVH SAS")},
+		{"CA", "Ontario", op(812, "Rogers Communications Canada Inc.")},
+		{"CH", "Zurich", op(13030, "Init7 (Switzerland) Ltd.")},
+		{"AT", "Vienna", op(8447, "A1 Telekom Austria AG")},
+		{"SE", "Stockholm", op(3301, "Telia Company AB")},
+		{"PL", "Mazovia", op(5617, "Orange Polska Spolka Akcyjna")},
+		{"CZ", "Prague", op(5610, "O2 Czech Republic, a.s.")},
+		{"ES", "Madrid", op(3352, "TELEFONICA DE ESPANA S.A.U.")},
+		{"IT", "Lombardy", op(3269, "Telecom Italia S.p.A.")},
+		{"JP", "Tokyo", op(2516, "KDDI CORPORATION")},
+		{"SG", "", op(16509, "Amazon.com, Inc.")},
+		{"HK", "Kowloon", op(4760, "PCCW IMS Limited")},
+		{"AU", "New South Wales", op(1221, "Telstra Limited")},
+		{"AU", "Victoria", op(9009, "M247 Europe SRL")},
+		{"AU", "Queensland", op(1221, "Telstra Limited")},
+		{"AU", "Western Australia", op(1221, "Telstra Limited")},
+		{"BR", "Sao Paulo", op(28573, "Claro NXT Telecomunicacoes Ltda")},
+		{"ZA", "Gauteng", op(37457, "Telkom SA Ltd.")},
+		{"IN", "Maharashtra", op(55836, "Reliance Jio Infocomm Limited")},
 	}
 	locs := make([]geo.Location, 0, len(places))
+	nets := make([]asn.Info, 0, len(places))
 	for _, pl := range places {
-		if loc, ok := geo.FindRegion(pl[0], pl[1]); ok {
+		if loc, ok := geo.FindRegion(pl.cc, pl.region); ok {
 			locs = append(locs, loc)
 		} else {
-			locs = append(locs, geo.Location{Country: pl[0]})
+			locs = append(locs, geo.Location{Country: pl.cc})
 		}
+		nets = append(nets, pl.net)
 	}
 	// A real node hears from more than Bitcoin Core. The spread here is taken
 	// from one evening on an actual node, so the demo shows the Kind column
@@ -73,7 +113,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		nets := []string{"192.0.2", "198.51.100", "203.0.113"}
 		return fmt.Sprintf("%s.%d:%d", nets[v4%3], 1+(v4*37)%253, port), "ipv4"
 	}
-	add := func(typ string, inbound bool, network, a string, loc *geo.Location) {
+	add := func(typ string, inbound bool, network, a string, loc *geo.Location, net *asn.Info) {
 		ping := 0.02 + r.Float64()*0.3
 		// Only inbound gets the full spread. You never dial OUT to a phone
 		// wallet or a crawler - an outbound or manual connection is one this
@@ -104,7 +144,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 			ConnTime: now - int64(r.Intn(86400*3)), Transport: []string{"v1", "v2"}[r.Intn(2)],
 			BytesSent: int64(r.Intn(50 << 20)), BytesRecv: int64(r.Intn(200 << 20)),
 			ServicesNames: services, RelayTxes: &relay, SyncedHeaders: &headers,
-			mockLoc: loc,
+			mockLoc: loc, mockASN: net,
 		})
 		id++
 	}
@@ -114,8 +154,9 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 			port = 40000 + rr.Intn(20000)
 		}
 		a, n := addr(rr, port)
-		loc := locs[rr.Intn(len(locs))]
-		add(typ, inbound, n, a, &loc)
+		i := rr.Intn(len(locs))
+		loc, net := locs[i], nets[i]
+		add(typ, inbound, n, a, &loc, &net)
 	}
 
 	for i := 0; i < 8; i++ {
@@ -125,7 +166,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		public(r, "outbound-full-relay", false)
 	}
 	public(r, "block-relay-only", false)
-	add("block-relay-only", false, "onion", "vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion:8333", nil)
+	add("block-relay-only", false, "onion", "vww6ybal4bd7szmgncyruucpgfkqahzddi37ktceo3ah7ngmcopnpyyd.onion:8333", nil, nil)
 	for i := 0; i < 22; i++ {
 		src := r
 		if i >= 19 {
@@ -133,10 +174,10 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		}
 		public(src, "inbound", true)
 	}
-	add("inbound", true, "not_publicly_routable", "10.21.0.1:51234", nil)
-	add("inbound", true, "not_publicly_routable", "10.21.0.1:51980", nil)
-	add("inbound", true, "onion", "127.0.0.1:50122", nil)
-	add("inbound", true, "i2p", "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p:0", nil)
-	add("feeler", false, "ipv4", "192.0.2.250:8333", &locs[0]) // must be hidden
+	add("inbound", true, "not_publicly_routable", "10.21.0.1:51234", nil, nil)
+	add("inbound", true, "not_publicly_routable", "10.21.0.1:51980", nil, nil)
+	add("inbound", true, "onion", "127.0.0.1:50122", nil, nil)
+	add("inbound", true, "i2p", "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p:0", nil, nil)
+	add("feeler", false, "ipv4", "192.0.2.250:8333", &locs[0], &nets[0]) // must be hidden
 	return out, nil
 }

@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
 )
 
@@ -30,6 +31,7 @@ type rawPeer struct {
 	SyncedHeaders *int64   `json:"synced_headers"`
 
 	mockLoc *geo.Location // demo data only: documentation addresses have no location
+	mockASN *asn.Info     // demo data only, same reason
 }
 
 // Peer is what the dashboard receives.
@@ -44,9 +46,14 @@ type Peer struct {
 	RegionID uint16  `json:"rid,omitempty"` // groups peers per region; stable within one build
 	Lat      float64 `json:"lat,omitempty"`
 	Lon      float64 `json:"lon,omitempty"`
-	Subver   string  `json:"subver"`
-	Kind     string  `json:"kind"`               // what the user agent claims; see kinds.go
-	NoRelay  bool    `json:"no_relay,omitempty"` // software that passes no blocks on
+	// Where a peer is and whose machine it is are two questions. The second is
+	// the one that catches three peers in three countries that all sit with the
+	// same provider. Empty for an address no network announces.
+	ASN      uint32 `json:"asn,omitempty"`
+	Operator string `json:"operator,omitempty"`
+	Subver   string `json:"subver"`
+	Kind     string `json:"kind"`               // what the user agent claims; see kinds.go
+	NoRelay  bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
 	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
@@ -123,6 +130,24 @@ func locate(p rawPeer) (geo.Location, bool) {
 	return geo.Lookup(a)
 }
 
+// operator returns the network announcing this peer's address. Same exclusions
+// as locate: an onion or I2P address belongs to no network anybody announces,
+// and a Docker-relayed inbound peer carries our own address, not the peer's.
+func operator(p rawPeer) (asn.Info, bool) {
+	if p.mockASN != nil {
+		return *p.mockASN, true
+	}
+	switch p.Network {
+	case "onion", "i2p", "cjdns", "not_publicly_routable":
+		return asn.Info{}, false
+	}
+	a, err := netip.ParseAddr(hostOf(p.Addr))
+	if err != nil {
+		return asn.Info{}, false
+	}
+	return asn.Lookup(a)
+}
+
 func convert(raw []rawPeer) []Peer {
 	out := make([]Peer, 0, len(raw))
 	for _, r := range raw {
@@ -141,6 +166,9 @@ func convert(raw []rawPeer) []Peer {
 		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
+		if net, ok := operator(r); ok {
+			p.ASN, p.Operator = net.Number, net.Name
+		}
 		if loc, ok := locate(r); ok {
 			p.Country = loc.Country
 			if loc.Region != "" {
