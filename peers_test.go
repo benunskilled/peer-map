@@ -177,7 +177,7 @@ func TestAtMostOneCallPerInterval(t *testing.T) {
 
 func TestHTTP(t *testing.T) {
 	s := &source{now: time.Now, fetch: mockPeers}
-	h := newHandler(s)
+	h := newHandler(s, offSibling())
 	for _, path := range []string{"/", "/world.json", "/app.js", "/style.css", "/api/health"} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
