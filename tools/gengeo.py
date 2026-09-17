@@ -3,8 +3,9 @@
 "IP to City Lite" database (CC BY 4.0, https://db-ip.com).
 
     pip install maxminddb
-    npm pack @ip-location-db/dbip-city-mmdb && tar xzf ip-location-db-dbip-city-mmdb-*.tgz
-    python3 tools/gengeo.py package/dbip-city-ipv4.mmdb package/dbip-city-ipv6.mmdb geo/geo.bin
+    base=https://github.com/sapics/ip-location-db/releases/download/latest
+    curl -sLO $base/dbip-city-ipv4.mmdb -O $base/dbip-city-ipv6.mmdb
+    python3 tools/gengeo.py dbip-city-ipv4.mmdb dbip-city-ipv6.mmdb geo/geo.bin
 
 The app only needs "which region, of which country, and roughly where", so
 the city data is reduced to one entry per region (state / province, the
@@ -76,11 +77,17 @@ def main(v4path, v6path, outpath):
     tables = {}
     samples = []
     rnd = random.Random(7)
+    # IPv6 is keyed on the upper 64 bits, so two regions inside one /64 cannot
+    # both survive - the later one wins. Those keys are collected here and left
+    # out of the test vectors: a test that allows a few wrong answers stops
+    # noticing when the number grows.
+    contested = set()
 
     for fam, path in (("v4", v4path), ("v6", v6path)):
         reader = maxminddb.open_database(path)
         starts, idxs = [], []
         last_end = None
+        prev_e, prev_gi = -1, None
         for net, rec in reader:
             cc = rec.get("country_code") or "--"
             name = (rec.get("state1") or "").strip()
@@ -97,12 +104,17 @@ def main(v4path, v6path, outpath):
             if fam == "v6":
                 s >>= 64
                 e >>= 64
+                # This range shares a /64 with the one before it and says
+                # something else: one of the two answers is about to be lost.
+                if prev_gi is not None and s <= prev_e and gi != prev_gi:
+                    contested.add(s)
+                prev_e, prev_gi = max(prev_e, e), gi
             if last_end is not None and s > last_end + 1:
                 starts.append(last_end + 1); idxs.append(0)          # hole: no data
             if starts and idxs[-1] == gi:
                 pass                                                 # same region continues
             elif starts and starts[-1] == s:
-                idxs[-1] = gi                                        # v6 collapse onto one /64
+                idxs[-1] = gi                                        # v6 collapse: the later one wins
             else:
                 starts.append(s); idxs.append(gi)
             last_end = e if last_end is None else max(last_end, e)
@@ -147,11 +159,16 @@ def main(v4path, v6path, outpath):
     print(f"regions={len(info)} -> {outpath} ({len(out)} bytes)", file=sys.stderr)
 
     vectors = []
+    dropped = 0
     for addr, fam, cc, name in samples:
+        if fam == "v6" and (int(ipaddress.ip_address(addr)) >> 64) in contested:
+            dropped += 1
+            continue
         want = names_by_index[groups[(cc, region_key(cc, name) if name else "")]]
         vectors.append([addr, cc, want])
     json.dump(vectors, open("geo/testdata/vectors.json", "w"), ensure_ascii=False)
-    print(f"{len(vectors)} test vectors", file=sys.stderr)
+    print(f"{len(vectors)} test vectors "
+          f"({len(contested):,} contested /64 keys, {dropped} samples dropped)", file=sys.stderr)
 
 
 if __name__ == "__main__":

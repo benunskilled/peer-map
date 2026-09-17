@@ -211,9 +211,9 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers th[aria-sort="ascending"] button::after { content: " ↑"; }
 .peers th[aria-sort="descending"] button::after { content: " ↓"; }
 .peers .num { text-align: right; }
-.peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.loc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.op { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.loc { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.op { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 .peers .dim { color: var(--muted); }
 /* The address doubles as the way over to Bitcoin Lab; it should read as a link
    without turning the table into a wall of blue. */
