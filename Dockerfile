@@ -1,7 +1,7 @@
 # The build stage runs on the build machine's own architecture and
 # cross-compiles, so the arm64 image needs no QEMU to build - Go does it
 # natively with CGO off. The result is one static binary with the dashboard,
-# the world map and the country table embedded.
+# the world map and the region and network tables embedded.
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
 ARG TARGETOS
 ARG TARGETARCH
@@ -10,6 +10,7 @@ WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
 COPY geo ./geo
+COPY asn ./asn
 COPY web ./web
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o /out/peermap .
