@@ -45,7 +45,8 @@ type Peer struct {
 	Lat      float64 `json:"lat,omitempty"`
 	Lon      float64 `json:"lon,omitempty"`
 	Subver   string  `json:"subver"`
-	Kind     string  `json:"kind"` // what the user agent claims; see kinds.go
+	Kind     string  `json:"kind"`               // what the user agent claims; see kinds.go
+	NoRelay  bool    `json:"no_relay,omitempty"` // software that passes no blocks on
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
 	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
@@ -131,7 +132,8 @@ func convert(raw []rawPeer) []Peer {
 		}
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
-			Subver: r.Subver, Kind: kindOf(r.Subver), ConnTime: r.ConnTime, Transport: r.Transport,
+			Subver: r.Subver, Kind: kindOf(r.Subver), NoRelay: !relaysBlocks(r.Subver),
+			ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field

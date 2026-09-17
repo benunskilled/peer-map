@@ -616,7 +616,20 @@
     { key: "loc", label: "Location", cls: "loc", val: locLabel },
     { key: "network", label: "Network", val: (p) => netLabel(p.network) },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
-    { key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel },
+    {
+      key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,
+      // Red for software that passes no blocks on - the same rule and the same
+      // colour Bitcoin Lab uses in its peer list. It is not a fault: a wallet
+      // is doing exactly what a wallet does. It only means this connection was
+      // never going to hand your node a block.
+      cell: (td, p) => {
+        td.textContent = kindLabel(p);
+        if (p.no_relay) {
+          td.className = (td.className ? td.className + " " : "") + "norelay";
+          td.title = "Software that does not pass blocks on - this peer can never deliver one first.";
+        }
+      },
+    },
     { key: "subver", label: "Client", val: (p) => p.subver || "" },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
     { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },

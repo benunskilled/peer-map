@@ -4,8 +4,8 @@ import "testing"
 
 func TestKindOf(t *testing.T) {
 	for subver, want := range map[string]string{
-		"/Satoshi:31.1.0/":                      "Core",
-		"/Satoshi:29.3.0/Knots:20260507/":       "Knots",
+		"/Satoshi:31.1.0/":                      "Node (Core)",
+		"/Satoshi:29.3.0/Knots:20260507/":       "Node (Knots)",
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/": "Wallet",
 		"/breadwallet:1.3.5/":                   "Wallet",
 		"/btcwire:0.5.0/neutrino:0.17.1/":       "Light client",
@@ -13,8 +13,8 @@ func TestKindOf(t *testing.T) {
 		"/Metrika-Bitnodes:0.1/":                "Crawler",
 		"/bitnodes.io:0.3/":                     "Crawler",
 		"/GlobalNodeMap:2.1/":                   "Crawler",
-		"/dsn.tm.kit.edu/bitcoin:0.9.99/":       "Research",
-		"/ckp2p:2.0/":                           "Pool",
+		"/dsn.tm.kit.edu/bitcoin:0.9.99/":       "Research scanner",
+		"/ckp2p:2.0/":                           "Pool node",
 		"/Bitcoin ABC:0.14.5(EB8.0)/":           "Other chain",
 		"/Floresta:0.9.1/":                      "Other",
 		"/btcwire:0.5.0/hemi-soak:1.0/":         "Other",
@@ -34,8 +34,8 @@ func TestKindOf(t *testing.T) {
 // Knots contains "Satoshi" as well, so the order of the rules decides this
 // one. A rule moved above Knots would break it silently.
 func TestKnotsBeatsCore(t *testing.T) {
-	if got := kindOf("/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/"); got != "Knots" {
-		t.Errorf("got %q, want Knots", got)
+	if got := kindOf("/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/"); got != "Node (Knots)" {
+		t.Errorf("got %q, want Node (Knots)", got)
 	}
 }
 
@@ -68,6 +68,30 @@ func TestObservedFlags(t *testing.T) {
 		if p.NoServices != c.noServices || p.NoTxRelay != c.noTxRelay || p.ChainUnknown != c.chainUnknown {
 			t.Errorf("%s: got no_services=%v no_tx=%v chain_unknown=%v, want %v/%v/%v",
 				c.name, p.NoServices, p.NoTxRelay, p.ChainUnknown, c.noServices, c.noTxRelay, c.chainUnknown)
+		}
+	}
+}
+
+// The red mark in the table, and the red pill in Bitcoin Lab, come from this
+// one answer. It has to stay the same in both apps.
+func TestRelaysBlocks(t *testing.T) {
+	for subver, want := range map[string]bool{
+		"/Satoshi:31.1.0/":                      true,
+		"/Satoshi:29.3.0/Knots:20260507/":       true,
+		"/ckp2p:2.0/":                           true,
+		"/Floresta:0.9.1/":                      true,
+		"/Sat0shi:31.0.0/":                      true, // unrecognised is not the same as known bad
+		"":                                      true, // no user agent at all: we do not know
+		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/": false,
+		"/breadwallet:1.3.5/":                   false,
+		"/btcwire:0.5.0/neutrino:0.17.1/":       false,
+		"/electrs:0.11.1/":                      false,
+		"/Metrika-Bitnodes:0.1/":                false,
+		"/dsn.tm.kit.edu/bitcoin:0.9.99/":       false,
+		"/Bitcoin ABC:0.14.5(EB8.0)/":           false,
+	} {
+		if got := relaysBlocks(subver); got != want {
+			t.Errorf("%q: relaysBlocks = %v, want %v", subver, got, want)
 		}
 	}
 }

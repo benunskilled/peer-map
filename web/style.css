@@ -17,11 +17,18 @@
   --land-hot: #2c3b4a;
   --land-edge: #131a22;
 
-  /* Connection types. Validated as a categorical set against --panel:
-     all-pairs CVD dE >= 9.4, normal-vision dE >= 20.9, contrast >= 3:1. */
+  /* Connection types. One set for both apps of this pair: a peer has the same
+     colour in Peer Map and in Bitcoin Lab, because it is the same peer.
+     Validated as a categorical set against --panel: worst pair CVD dE 12.6
+     (protanopia), normal-vision dE 15.1, contrast >= 3:1.
+     Inbound used to be an orange-red, which read as a warning - an inbound peer
+     is not a problem - and left no room for any other meaning in red. The
+     yellow leans green on purpose, to keep its distance from the Bitcoin orange
+     the title and the buttons wear. Nothing here is red: "cannot relay" is
+     carried by a strikethrough, not by a hue. */
   --manual: #3987e5;
-  --inbound: #d95926;
-  --outbound: #199e70;
+  --inbound: #9e9a28;
+  --outbound: #1a9e8f;
 }
 
 * { box-sizing: border-box; }
@@ -213,6 +220,11 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peer-jump:hover { color: var(--accent); text-decoration-color: var(--accent); }
 /* The peer another app pointed at. Marked, not filtered - and it stays marked
    so you can still find it after scrolling away. */
+/* Software that passes no blocks on. Struck through rather than coloured: every
+   hue in this window already means a connection type, and a fourth meaning on
+   the same axis is one a colour-blind reader cannot separate - measured, not
+   assumed. It is not a fault either; a wallet is doing what a wallet does. */
+.peers td.norelay { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
 .peers tr.focus td { background: rgba(247,147,26,.10); }
 .peers tr.focus td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .empty { color: var(--muted); margin: 0 20px 8px; }
