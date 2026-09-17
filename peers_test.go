@@ -67,6 +67,34 @@ func TestLocate(t *testing.T) {
 	}
 }
 
+// Same exclusions as locate, and one case the two answer differently: geo puts
+// 1.0.2.200 in China, no network announces it. Where a peer is and whose
+// machine it is really are two lookups.
+func TestOperator(t *testing.T) {
+	for _, c := range []struct {
+		addr, network string
+		asn           uint32
+	}{
+		{"1.0.0.1:8333", "ipv4", 13335},       // Cloudflare
+		{"[2a01:4f8::1]:8333", "ipv6", 24940}, // Hetzner
+		{"[::ffff:1.0.0.1]:8333", "ipv4", 13335},
+		{"1.0.2.200:8333", "ipv4", 0}, // located, but announced by nobody
+		{"10.21.0.1:51234", "not_publicly_routable", 0},
+		{"10.21.0.1:51234", "ipv4", 0},
+		{"127.0.0.1:50122", "onion", 0},
+		{"x.b32.i2p:0", "i2p", 0},
+		{"[fc00::1]:8333", "cjdns", 0},
+	} {
+		net, ok := operator(rawPeer{Addr: c.addr, Network: c.network})
+		if ok != (c.asn != 0) || net.Number != c.asn {
+			t.Errorf("%s/%s: got AS%d (%q, ok=%v) want AS%d", c.addr, c.network, net.Number, net.Name, ok, c.asn)
+		}
+		if ok && net.Name == "" {
+			t.Errorf("%s: operator name missing", c.addr)
+		}
+	}
+}
+
 // A getpeerinfo reply shaped like Bitcoin Core's (fields trimmed to what a
 // real node sends for these connection types).
 const coreReply = `{"result":[

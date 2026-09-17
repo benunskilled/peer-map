@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
 )
 
@@ -263,12 +264,13 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 	}
 	regions, v4, v6 := geo.Sizes()
+	networks, a4, a6 := asn.Size()
 	mode := "rpc " + cfg.rpcURL
 	if cfg.mock {
 		mode = "DEMO DATA (PEERMAP_MOCK=1)"
 	}
-	log.Printf("peer-map %s listening on :%s, %s, geo table %d regions, %d/%d ranges (v4/v6), Core polled at most every %s and only while the dashboard is open",
-		Version, cfg.port, mode, regions, v4, v6, interval)
+	log.Printf("peer-map %s listening on :%s, %s, geo table %d regions, %d/%d ranges (v4/v6), network table %d operators, %d/%d ranges (v4/v6), Core polled at most every %s and only while the dashboard is open",
+		Version, cfg.port, mode, regions, v4, v6, networks, a4, a6, interval)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
