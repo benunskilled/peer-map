@@ -10,7 +10,7 @@ and **outbound** connections kept apart.
   Australia becomes New South Wales, Victoria, Queensland and so on.
 - Toggle each type on and off; click a country or region to filter the tables
   below to it.
-- A table per type: address, location, network, **kind**, client, P2P
+- A table per type: address, location, **operator**, network, **kind**, P2P
   transport, ping, and how long the connection has been up. Outbound also
   shows whether a peer is full-relay or block-relay-only.
 - **What kind of peer it is** - Core, Knots, Wallet, Light client, Indexer,
@@ -21,6 +21,11 @@ and **outbound** connections kept apart.
   learned which chain it is on. A peer calling itself Bitcoin Core while
   offering nothing and having no known chain is worth a second look, and it
   only reads as odd when the claim and the behaviour sit in the same cell.
+- **Whose machine it is**, not only where it stands: the network that announces
+  the address, with the AS number in the cell's title. Sorting by that column
+  puts three peers in three countries at the same company next to each other,
+  which is the moment they stop being diversity. Empty for Tor, I2P and
+  anything else without a public address.
 - Peers that cannot be placed are counted in a panel beside the map (collapsed
   by default) instead of being dropped: Tor, I2P and CJDNS have no location,
   and on umbrelOS inbound IPv6 arrives through docker-proxy and shows up as a
@@ -29,6 +34,11 @@ and **outbound** connections kept apart.
 
 Regions come from IP geolocation and are less certain than countries: a server
 is placed where its provider registers it.
+
+Peer Map answers who is out there. **[Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab)**,
+from the same app store, answers the other half: which of these peers actually
+delivers each new block first, and which of your eight manual slots are worth
+spending on them. Neither needs the other.
 
 ## Built to cost nothing when nobody looks
 
@@ -48,11 +58,12 @@ peers with random public addresses:
 
 | | |
 |---|---|
-| Binary | 41.5 MB (34.9 MB of it is the region table) |
+| Binary | 46.4 MB (39.7 MB of it the region and network tables) |
 | Memory, idle (20 s, no dashboard open) | 6.3 MB RSS, 0 ms CPU |
 | Memory, 70 dashboard requests over 35 s | 21.4 MB RSS, of which 16.7 MB is table pages the kernel can drop again; 50 ms CPU |
 | 24 h simulated, 8,640 refreshes | heap 513 KB before, 511 KB after |
 | Region lookup | ~39 ns, no allocation |
+| Operator lookup | ~30 ns, no allocation |
 
 The table is searched in place, so only the pages a lookup touches are read;
 random addresses touch more of it than a real node's peers do.
@@ -89,9 +100,11 @@ every release tag.
 ## Data
 
 - IP geolocation: [IP Geolocation by DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0
+- Networks and operators: DB-IP, IP to ASN Lite, CC BY 4.0
 - Map: Natural Earth, public domain
 
-See [geo/SOURCE.md](geo/SOURCE.md) for versions and how to refresh them.
+See [geo/SOURCE.md](geo/SOURCE.md) and [asn/SOURCE.md](asn/SOURCE.md) for
+versions and how to refresh them.
 
 ## License
 

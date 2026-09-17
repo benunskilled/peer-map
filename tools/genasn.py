@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build asn/asn.bin - the network-operator table Peer Map embeds - from
-ip-location-db's ASN database (RouteViews + DB-IP, see LICENSES in the package).
+ip-location-db's DB-IP ASN database (CC BY 4.0, see geo/SOURCE.md).
 
     pip install maxminddb
-    npm pack @ip-location-db/asn-mmdb && tar xzf ip-location-db-asn-mmdb-*.tgz
-    python3 tools/genasn.py package/asn-ipv4.mmdb package/asn-ipv6.mmdb asn/asn.bin
+    base=https://github.com/sapics/ip-location-db/releases/download/latest
+    curl -sLO $base/dbip-asn-ipv4.mmdb -O $base/dbip-asn-ipv6.mmdb
+    python3 tools/genasn.py dbip-asn-ipv4.mmdb dbip-asn-ipv6.mmdb asn/asn.bin
 
 The map answers "where", this answers "whose". They are different questions and
 the second is often the more useful one for a node: three peers can sit in three
@@ -14,9 +15,9 @@ in three different /16 networks, in the same country, all at the same operator.
 Only the AS number showed it.
 
 What the app needs is the number and a name, so the database is reduced to
-exactly that. Adjacent ranges belonging to the same AS are merged, which takes
-564,579 IPv4 ranges down to 395,480; gaps between assigned ranges get an
-explicit "unknown" entry so a lookup cannot fall through into the next range.
+exactly that. Adjacent ranges belonging to the same AS are merged, and the gaps
+between assigned ranges get an explicit "unknown" entry so a lookup cannot fall
+through into the next range and answer with somebody else's network.
 
 Layout (big-endian), the same shape as geo.bin so the two readers stay familiar:
     "PMASN1"
@@ -117,11 +118,10 @@ def contested(path):
     """Upper-64 keys that more than one AS shares.
 
     The table keys IPv6 on the upper 64 bits, so where two networks live inside
-    one /64 only one of them survives. Measured on the June 2026 database that
-    is 47 of 166,518 keys - 0.03% - and there is no address in those that the
-    app could answer correctly. They are left out of the test vectors rather
-    than papered over with a tolerance: a test that allows a few wrong answers
-    stops noticing when the number grows.
+    one /64 only one of them survives, and there is no address in those that
+    the app could answer correctly. They are left out of the test vectors
+    rather than papered over with a tolerance: a test that allows a few wrong
+    answers stops noticing when the number grows.
     """
     db = maxminddb.open_database(path)
     seen = {}

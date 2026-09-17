@@ -602,6 +602,9 @@
       // With Bitcoin Lab installed the address becomes the way over: same peer,
       // the other question. Without it, a plain cell - no dead links.
       cell: (td, p) => {
+        // A long onion or I2P address is cut off by the column, so the full one
+        // lives in the title either way.
+        td.title = p.addr;
         if (!state.data || !state.data.sibling) { td.textContent = p.addr; return; }
         const a = document.createElement("a");
         a.className = "peer-jump";
@@ -609,7 +612,7 @@
         a.target = "_blank";
         a.rel = "noopener";
         a.textContent = p.addr;
-        a.title = "Open this peer in Bitcoin Lab";
+        a.title = p.addr + "\nOpen this peer in Bitcoin Lab";
         td.appendChild(a);
       },
     },
@@ -629,19 +632,23 @@
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
     {
       key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,
-      // Red for software that passes no blocks on - the same rule and the same
-      // colour Bitcoin Lab uses in its peer list. It is not a fault: a wallet
-      // is doing exactly what a wallet does. It only means this connection was
-      // never going to hand your node a block.
+      // Struck through for software that passes no blocks on. It is not a
+      // fault: a wallet is doing exactly what a wallet does. It only means this
+      // connection was never going to hand your node a block.
+      //
+      // The user agent itself lives in this cell's title rather than in a
+      // column of its own. It is the raw material this class is derived from -
+      // worth having, not worth the width, and it was the widest column in the
+      // table by a distance.
       cell: (td, p) => {
         td.textContent = kindLabel(p);
-        if (p.no_relay) {
-          td.className = (td.className ? td.className + " " : "") + "norelay";
-          td.title = "Software that does not pass blocks on - this peer can never deliver one first.";
-        }
+        const note = p.no_relay
+          ? "Software that does not pass blocks on - this peer can never deliver one first."
+          : "";
+        td.title = [p.subver, note].filter(Boolean).join("\n");
+        if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
       },
     },
-    { key: "subver", label: "Client", val: (p) => p.subver || "" },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
     { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
