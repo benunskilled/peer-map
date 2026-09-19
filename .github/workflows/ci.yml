@@ -20,6 +20,31 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  # go build, go vet and go test all pass in a checkout that has every file.
+  # The image is built from a smaller set: the Dockerfile copies the source by
+  # hand - go.mod, the root .go files, geo, asn, web - so a new package beside
+  # those is invisible to it and nothing notices until a tag is already pushed
+  # and the release build stops. That happened once, with asn/.
+  #
+  # So build the image here too, both architectures, and push nothing. The
+  # build stage cross-compiles with CGO off, so this needs no QEMU and costs
+  # about a minute.
+  image:
+    runs-on: ubuntu-latest
+    name: The image builds
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            VERSION=ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # The unit tests prove the code does what it was written to do, against a
   # getpeerinfo reply shaped by hand. This proves Bitcoin Core really reports
   # what that reply assumes: four real regtest nodes, one connection of each
