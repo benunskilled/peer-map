@@ -20,6 +20,7 @@
     world: null,          // world.json
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
+    kind: null,           // kind filter from clicking an entry in a group's kind line
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
     paused: false,
@@ -207,7 +208,9 @@
   }
 
   // ---------- render ----------
-  const visiblePeers = () => (state.data ? state.data.peers.filter((p) => state.show[p.group]) : []);
+  const matchesKind = (p) => !state.kind || p.kind === state.kind;
+  const visiblePeers = () =>
+    (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
 
   function render() {
@@ -430,12 +433,32 @@
   function renderPlaceFilter() {
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
+    $("kindFilter").hidden = !state.kind;
+    $("kindFilterName").textContent = state.kind || "";
   }
-  $("placeFilterClear").addEventListener("click", () => {
-    state.place = null;
+
+  // Both filters redraw the same three things, and the map is in that list on
+  // purpose: after clicking "5 Pool node" the next question is where those
+  // five are, and the map answers it without a second click.
+  function applyFilters() {
     renderPlaceFilter();
+    renderUnplaced();
     renderMarkers();
     renderTables();
+  }
+
+  function setKind(kind) {
+    state.kind = state.kind === kind ? null : kind;
+    applyFilters();
+  }
+
+  $("placeFilterClear").addEventListener("click", () => {
+    state.place = null;
+    applyFilters();
+  });
+  $("kindFilterClear").addEventListener("click", () => {
+    state.kind = null;
+    applyFilters();
   });
 
   // ---------- tooltip ----------
@@ -576,9 +599,7 @@
     svg.addEventListener("click", () => {
       if (!moved && state.place) {
         state.place = null;
-        renderPlaceFilter();
-        renderMarkers();
-        renderTables();
+        applyFilters();
       }
     });
 
@@ -613,7 +634,7 @@
     const rows = new Map();
     let total = 0;
     for (const p of state.data.peers) {
-      if (p.cc) continue;
+      if (p.cc || !matchesKind(p)) continue;
       let key = netLabel(p.network);
       if (p.network === "ipv4" || p.network === "ipv6") key = "No geo data";
       let r = rows.get(key);
@@ -661,13 +682,25 @@
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
-  function kindMix(peers) {
+  // The mix under a heading counts what is in the table - and each count is
+  // the way to those peers. Clicking "5 Pool node" shows exactly those five,
+  // here and on the map; clicking it again puts everyone back.
+  function renderKindMix(el, peers) {
     const n = new Map();
     for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
-    return [...n]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([k, v]) => v + " " + k)
-      .join(" \u00b7 ");
+    const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    el.textContent = "";
+    entries.forEach(([kind, count], i) => {
+      if (i) el.appendChild(document.createTextNode(" \u00b7 "));
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "kind-pick" + (state.kind === kind ? " on" : "");
+      b.textContent = count + " " + kind;
+      b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
+      b.setAttribute("aria-pressed", String(state.kind === kind));
+      b.addEventListener("click", () => setKind(kind));
+      el.appendChild(b);
+    });
   }
 
   const COLS = [
@@ -697,7 +730,15 @@
         td.appendChild(a);
       },
     },
-    { key: "loc", label: "Location", cls: "loc", val: locLabel },
+    {
+      // Shown as "Region, Country", sorted by country first - otherwise
+      // Bavaria and Hesse end up on either side of England and the column
+      // looks like it cannot do the one thing it obviously should. Peers
+      // without a place sort last rather than first, where an empty string
+      // would have put them.
+      key: "loc", label: "Location", cls: "loc", show: locLabel,
+      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff"),
+    },
     {
       // Where a peer sits and whose machine it is are two questions, and the
       // second is the one that catches three peers in three countries sitting
@@ -743,6 +784,8 @@
       let peers = state.data.peers.filter((p) => p.group === g);
       const all = peers.length;
       if (state.place) peers = peers.filter(peerMatchesPlace);
+      const kindPool = peers;
+      if (state.kind) peers = peers.filter(matchesKind);
 
       const card = document.createElement("details");
       card.className = "card group-card";
@@ -754,24 +797,31 @@
       sw.className = "swatch s-" + g;
       const n = document.createElement("span");
       n.className = "n";
-      n.textContent = state.place ? `${peers.length} of ${all}` : String(all);
+      n.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
       h.append(sw, LABEL[g] + " ", n);
       summary.appendChild(h);
       card.appendChild(summary);
 
+      if (kindPool.length) {
+        const mix = document.createElement("p");
+        mix.className = "kinds";
+        // Counted before this group's own kind filter and drawn before the
+        // empty check, so a group the filter emptied still offers the way
+        // back - and switching from one kind to another is one click.
+        renderKindMix(mix, kindPool);
+        card.appendChild(mix);
+      }
+
       if (!peers.length) {
         const p = document.createElement("p");
         p.className = "empty";
-        p.textContent = state.place ? "None here." : "No " + LABEL[g].toLowerCase() + " peers.";
+        p.textContent = state.place || state.kind
+          ? "None here."
+          : "No " + LABEL[g].toLowerCase() + " peers.";
         card.appendChild(p);
         root.appendChild(card);
         continue;
       }
-
-      const mix = document.createElement("p");
-      mix.className = "kinds";
-      mix.textContent = kindMix(peers);
-      card.appendChild(mix);
 
       const cols = COLS.filter((c) => !c.only || c.only === g);
       const s = state.sort[g] || { key: "conntime", dir: 1 };
