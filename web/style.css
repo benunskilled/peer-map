@@ -55,9 +55,22 @@ body {
 .topbar h1 { font-size: 18px; margin: 0; color: var(--accent); }
 /* The link to the other app in the pair. Quiet on purpose: it is an offer, not
    a part of this dashboard. Hidden until the other side has answered. */
-.sibling-link { margin-right: auto; font-size: 13px; color: var(--muted); text-decoration: none; }
+.sibling-link { font-size: 13px; color: var(--muted); text-decoration: none; }
 .sibling-link:hover { color: var(--text); }
-.status-pill { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* The star in the header and the star on the map are the same mark: one says
+   who mined the block, the other who brought it here. Both last two minutes. */
+.block-mark { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.block-mark .star { color: var(--accent); margin-right: 4px; }
+.block-mark.raw .name { font-style: italic; }
+.sibling-link + .block-mark { margin-left: -4px; }
+
+.peers td .star { color: var(--accent); margin-right: 4px; }
+/* On the map the same star sits above the marker that holds the peer, and the
+   ring underneath it picks the marker out of a crowded cluster. */
+.marker.delivered .ring { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.marker .delivered-star { fill: var(--accent); font-size: 13px; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
+
+.status-pill { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 main {
   padding: 20px 24px 40px;

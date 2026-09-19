@@ -28,6 +28,12 @@
     focus: new URLSearchParams(location.search).get("peer") || null,
     focusDone: false,
     lastInput: Date.now(),
+    // When the current snapshot arrived here. The block's age comes from the
+    // node's clock; how long it has been sitting in this browser is added on
+    // top, so the two-minute mark never depends on the browser's own clock
+    // agreeing with the node's.
+    receivedAt: 0,
+    markShown: false,
     open: { manual: true, inbound: true, outbound: true }, // table sections
   };
 
@@ -74,6 +80,7 @@
       const r = await fetch("api/peers", { cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
       state.data = await r.json();
+      state.receivedAt = Date.now();
       next = state.data.next_in || state.data.interval || 10;
       render();
     } catch (e) {
@@ -120,7 +127,15 @@
   });
 
   function startTicker() {
-    if (!tickTimer) tickTimer = setInterval(renderStatus, 1000);
+    if (!tickTimer) {
+      tickTimer = setInterval(() => {
+        renderStatus();
+        // Two minutes are up between two polls, and a paused dashboard never
+        // polls again at all - so the mark takes itself off rather than
+        // waiting for the next answer.
+        if (state.markShown && !liveBlock()) render();
+      }, 1000);
+    }
   }
 
   function showError(msg) {
@@ -147,6 +162,50 @@
   }[n] || n || "-");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
+  // ---------- the block that just landed ----------
+
+  // Bitcoin Lab next door says which block arrived last, who mined it, and
+  // which peer here delivered it. The mark lasts two minutes - long enough to
+  // see on a dashboard somebody just opened, short enough that a star stays a
+  // piece of news instead of turning into decoration.
+  function liveBlock() {
+    const b = state.data && state.data.last_block;
+    if (!b || !b.mark_for_ms) return null;
+    const age = b.age_ms + Math.max(0, Date.now() - state.receivedAt);
+    return age < b.mark_for_ms ? b : null;
+  }
+
+  // Refreshed once per render and read by the table and the map, so both
+  // always show the same peers starred.
+  let deliveredNow = new Set();
+
+  function deliveredSet() {
+    const b = liveBlock();
+    return new Set(b && b.first_peers ? b.first_peers : []);
+  }
+
+  function renderBlockMark() {
+    const el = $("block-mark");
+    if (!el) return;
+    const b = liveBlock();
+    const name = b ? b.pool || b.pool_tag : null;
+    state.markShown = Boolean(name);
+    el.hidden = !name;
+    el.textContent = "";
+    el.classList.toggle("raw", Boolean(b && !b.pool && b.pool_tag));
+    if (!name) return;
+    const star = document.createElement("span");
+    star.className = "star";
+    star.textContent = "\u2605";
+    const label = document.createElement("span");
+    label.className = "name";
+    label.textContent = b.pool ? name : `"${name}"`;
+    el.append(star, label);
+    el.title = b.pool
+      ? `Block ${b.height ? b.height.toLocaleString() : ""} was mined by ${b.pool_name || name}. The starred peers delivered it to your node.`
+      : `Block ${b.height ? b.height.toLocaleString() : ""} is from a miner we cannot name; this is the text in its coinbase. The starred peers delivered it to your node.`;
+  }
+
   // ---------- render ----------
   const visiblePeers = () => (state.data ? state.data.peers.filter((p) => state.show[p.group]) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
@@ -162,7 +221,9 @@
     for (const g of GROUPS) document.querySelector(`[data-count="${g}"]`).textContent = counts[g];
 
     renderStatus();
+    deliveredNow = deliveredSet();
     renderSiblingLink();
+    renderBlockMark();
     renderMarkers();
     renderUnplaced();
     renderTables();
@@ -237,6 +298,7 @@
 
   function buckets() {
     const byRegion = regionMode();
+    const delivered = deliveredNow;
     const by = new Map();
     for (const p of visiblePeers()) {
       if (!p.cc) continue;
@@ -257,6 +319,7 @@
       }
       b[p.group]++;
       b.total++;
+      if (delivered.has(p.addr)) b.delivered = true;
     }
     return [...by.values()].sort((a, b) => b.total - a.total);
   }
@@ -285,12 +348,14 @@
     const hot = new Set(bs.map((b) => b.cc));
     for (const el of $("countries").children) el.classList.toggle("hot", hot.has(el.dataset.cc));
 
-    // Largest first, so small markers are drawn on top and stay clickable.
-    for (const b of bs) {
+    // Largest first, so small markers are drawn on top and stay clickable -
+    // and the one that delivered the block last of all, so a star is never
+    // hidden under a neighbouring country.
+    for (const b of [...bs].sort((x, y) => Number(Boolean(x.delivered)) - Number(Boolean(y.delivered)))) {
       const r = radius(b.total);
       const g = document.createElementNS(NS, "g");
       const selected = state.place && state.place.key === b.key;
-      g.setAttribute("class", "marker" + (selected ? " selected" : ""));
+      g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : ""));
       g.dataset.x = b.pt[0];
       g.dataset.y = b.pt[1];
       g.setAttribute("tabindex", "0");
@@ -318,6 +383,15 @@
         t.setAttribute("y", 4);
         t.textContent = b.total;
         g.appendChild(t);
+      }
+      if (b.delivered) {
+        const star = document.createElementNS(NS, "text");
+        star.setAttribute("class", "delivered-star");
+        star.setAttribute("x", 0);
+        star.setAttribute("y", -(r + 5));
+        star.setAttribute("text-anchor", "middle");
+        star.textContent = "\u2605";
+        g.appendChild(star);
       }
       g.addEventListener("pointerenter", (e) => showTip(b, e));
       g.addEventListener("pointermove", (e) => moveTip(e));
@@ -605,6 +679,13 @@
         // A long onion or I2P address is cut off by the column, so the full one
         // lives in the title either way.
         td.title = p.addr;
+        if (deliveredNow.has(p.addr)) {
+          const star = document.createElement("span");
+          star.className = "star";
+          star.textContent = "\u2605";
+          star.title = "Delivered the block that just landed";
+          td.appendChild(star);
+        }
         if (!state.data || !state.data.sibling) { td.textContent = p.addr; return; }
         const a = document.createElement("a");
         a.className = "peer-jump";
