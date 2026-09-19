@@ -131,7 +131,11 @@ type snapshot struct {
 	Error     string `json:"error,omitempty"`
 	Demo      bool   `json:"demo,omitempty"`
 	Sibling   bool   `json:"sibling,omitempty"` // Bitcoin Lab is installed on this node
-	Version   string `json:"version"`
+	// The newest block Bitcoin Lab has seen, when it is installed: who mined
+	// it, and which peer here delivered it. Absent otherwise, and absent
+	// while it has not seen one.
+	LastBlock *lastBlock `json:"last_block,omitempty"`
+	Version   string     `json:"version"`
 }
 
 type source struct {
@@ -192,6 +196,7 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 	mux.HandleFunc("GET /api/peers", func(w http.ResponseWriter, r *http.Request) {
 		snap := src.get(r.Context())
 		snap.Sibling = sib.installed(r.Context())
+		snap.LastBlock = sib.latest(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		json.NewEncoder(w).Encode(snap)
