@@ -58,8 +58,13 @@ func TestSiblingLatestBlock(t *testing.T) {
 		}
 		calls++
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"height":967724,"detectedAt":%d,"pool":"Foundry","poolName":"Foundry USA",
-			"poolTag":"Foundry USA Pool","poolSource":"address","firstPeers":["1.2.3.4:8333"]}`, detected)
+		fmt.Fprintf(w, `{"hash":"00beef","height":967724,"detectedAt":%d,"pool":"Foundry",
+			"poolName":"Foundry USA","poolTag":"Foundry USA Pool","poolSource":"address",
+			"firstPeers":["1.2.3.4:8333"],"eligible":204,
+			"stratum":{"createdAt":%d,"entries":[
+				{"label":"Public A","own":false,"latencyMs":0,"rank":1,"miss":false},
+				{"label":"My pool","own":true,"latencyMs":412.5,"rank":2,"miss":false},
+				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]}}`, detected, detected)
 	}))
 	defer srv.Close()
 
@@ -88,6 +93,20 @@ func TestSiblingLatestBlock(t *testing.T) {
 	}
 	if got.MarkForMs != blockMarkFor.Milliseconds() {
 		t.Errorf("mark window %d ms", got.MarkForMs)
+	}
+	// The three roles arrive separately and stay separate: mined, delivered,
+	// and turned into work.
+	if got.Eligible != 204 {
+		t.Errorf("eligible %d, want 204", got.Eligible)
+	}
+	if got.Stratum == nil || len(got.Stratum.Entries) != 3 {
+		t.Fatalf("stratum race not carried through: %+v", got.Stratum)
+	}
+	if !got.Stratum.Entries[1].Own {
+		t.Error("the owner's own pool must stay marked as his")
+	}
+	if got.Stratum.Entries[2].LatencyMs != nil || !got.Stratum.Entries[2].Miss {
+		t.Error("a pool that reported nothing must stay in the list as a miss")
 	}
 
 	// Inside the poll interval the answer is cached - but it must age while it
