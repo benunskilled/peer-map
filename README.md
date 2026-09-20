@@ -34,9 +34,15 @@ The software labels come from each peer's reported user agent. Alongside them, P
 
 The map uses approximate IP locations, with country labels generally more reliable than regional positions. It is a useful view of your connections' geographic spread.
 
+## Follow a block through your node
+
+With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it, which of your peers delivered it first, and — if you run Stratum Race — how quickly each pool turned it into fresh work. The peers that delivered it are starred on the map for two minutes, so you can see where your blocks come in from.
+
+Open the card for the detail: every delivering peer with its location and hosting provider, and the race order with your own pool marked. Times there are relative to the first job seen, not to the moment the block was found. Without Bitcoin Lab the card does not appear.
+
 ## Local data, quiet operation
 
-Peer Map reads your current connections. The map, geolocation and ASN data are bundled with the app, so looking up a peer does not send its address to an external service.
+Peer Map reads your current connections. The map, geolocation and ASN data are bundled with the app, so looking up a peer does not send its address to an external service. Block details come from Bitcoin Lab on the same node, fetched alongside the peer list rather than on a schedule of their own.
 
 The dashboard requests updates only while it is visible. Background tabs stop polling, and a dashboard with no mouse or keyboard activity for 30 minutes pauses until you resume it.
 

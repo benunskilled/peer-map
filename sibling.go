@@ -49,17 +49,38 @@ type siblingCheck struct {
 	block           *lastBlock
 }
 
+type stratumRace struct {
+	CreatedAt int64          `json:"created_at,omitempty"`
+	Entries   []stratumEntry `json:"entries,omitempty"`
+}
+
+type stratumEntry struct {
+	Label     string   `json:"label"`
+	Own       bool     `json:"own,omitempty"` // a pool the owner added, not one of the public ones
+	LatencyMs *float64 `json:"latency_ms"`    // null means it sent nothing in time
+	Rank      *int     `json:"rank"`
+	Miss      bool     `json:"miss,omitempty"`
+}
+
 // What the neighbour says about the newest block. Its own fields are the
 // short pool name, the full one, and the addresses Bitcoin Lab credited with
 // delivering it - the same strings Core reports here, ports and all, so they
 // match this app's peers without any guessing.
 type lastBlock struct {
+	Hash       string   `json:"hash,omitempty"`
 	Height     int64    `json:"height,omitempty"`
 	Pool       string   `json:"pool,omitempty"`
 	PoolName   string   `json:"pool_name,omitempty"`
 	PoolTag    string   `json:"pool_tag,omitempty"`
 	PoolSource string   `json:"pool_source,omitempty"`
 	FirstPeers []string `json:"first_peers,omitempty"`
+	// How many peers were connected when it arrived - the number the one that
+	// delivered it was up against.
+	Eligible int `json:"eligible,omitempty"`
+	// The same block from the mining side: which pool turned it into fresh
+	// work first, and how far behind the others were. Absent when Bitcoin Lab
+	// recorded no race for it, which is the normal case with Stratum Race off.
+	Stratum *stratumRace `json:"stratum,omitempty"`
 	// Age at the moment this snapshot was built, from the clock both apps
 	// share - the browser adds however long its copy has been sitting there
 	// rather than comparing two clocks that may disagree.
@@ -147,6 +168,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	// Bitcoin Lab's own shape, which is not this app's: decoded here and
 	// handed on in this app's vocabulary.
 	var got struct {
+		Hash       string   `json:"hash"`
 		Height     int64    `json:"height"`
 		DetectedAt int64    `json:"detectedAt"`
 		Pool       string   `json:"pool"`
@@ -154,6 +176,17 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		PoolTag    string   `json:"poolTag"`
 		PoolSource string   `json:"poolSource"`
 		FirstPeers []string `json:"firstPeers"`
+		Eligible   int      `json:"eligible"`
+		Stratum    *struct {
+			CreatedAt int64 `json:"createdAt"`
+			Entries   []struct {
+				Label     string   `json:"label"`
+				Own       bool     `json:"own"`
+				LatencyMs *float64 `json:"latencyMs"`
+				Rank      *int     `json:"rank"`
+				Miss      bool     `json:"miss"`
+			} `json:"entries"`
+		} `json:"stratum"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&got); err != nil || got.DetectedAt == 0 {
 		s.block = nil
@@ -163,13 +196,25 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	if age < 0 {
 		age = 0
 	}
+	var race *stratumRace
+	if got.Stratum != nil {
+		race = &stratumRace{CreatedAt: got.Stratum.CreatedAt}
+		for _, e := range got.Stratum.Entries {
+			race.Entries = append(race.Entries, stratumEntry{
+				Label: e.Label, Own: e.Own, LatencyMs: e.LatencyMs, Rank: e.Rank, Miss: e.Miss,
+			})
+		}
+	}
 	s.block = &lastBlock{
+		Hash:       got.Hash,
 		Height:     got.Height,
 		Pool:       got.Pool,
 		PoolName:   got.PoolName,
 		PoolTag:    got.PoolTag,
 		PoolSource: got.PoolSource,
 		FirstPeers: got.FirstPeers,
+		Eligible:   got.Eligible,
+		Stratum:    race,
 		AgeMs:      age,
 		MarkForMs:  blockMarkFor.Milliseconds(),
 	}

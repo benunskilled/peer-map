@@ -185,6 +185,127 @@
     return new Set(b && b.first_peers ? b.first_peers : []);
   }
 
+  // The card under the filters: one block, and the three roles it has here.
+  // Mined by (from Bitcoin Lab's coinbase reading), delivered by (the peers
+  // Core credited), raced by (the pools that turned it into work). Each of the
+  // three can be missing, and then it says so rather than leaving a gap.
+  function renderBlockCard() {
+    const card = $("blockCard");
+    if (!card) return;
+    const b = state.data && state.data.last_block;
+    card.hidden = !b;
+    if (!b) return;
+
+    const sum = $("blockSummary");
+    sum.textContent = "";
+    const add = (cls, text, title) => {
+      const el = document.createElement("span");
+      if (cls) el.className = cls;
+      el.textContent = text;
+      if (title) el.title = title;
+      sum.appendChild(el);
+      return el;
+    };
+    const sep = () => add("b-sep", "\u00b7");
+
+    add("b-height", b.height ? "Block " + b.height.toLocaleString() : "Last block", b.hash || "");
+    if (b.pool || b.pool_tag) {
+      sep();
+      add("b-label", "mined by");
+      add("b-pool" + (b.pool ? "" : " raw"), b.pool || `"${b.pool_tag}"`,
+        b.pool ? b.pool_name : "No pool we know of - this is the text in its coinbase");
+    } else {
+      sep();
+      add("miss", "miner unknown", "Neither the payout address nor the coinbase text matched a known pool");
+    }
+    const n = (b.first_peers || []).length;
+    sep();
+    add(null, n === 0 ? "nobody credited" : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
+      b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
+    sep();
+    add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
+
+    renderBlockBody(b);
+  }
+
+  const blockAgeMs = (b) => b.age_ms + Math.max(0, Date.now() - state.receivedAt);
+
+  function renderBlockBody(b) {
+    const body = $("blockBody");
+    body.textContent = "";
+
+    // --- who brought it here -------------------------------------------
+    const peers = document.createElement("div");
+    const h1 = document.createElement("h3");
+    h1.textContent = "Delivered first";
+    peers.appendChild(h1);
+    if (!(b.first_peers || []).length) {
+      const p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "No peer was credited for this block.";
+      peers.appendChild(p);
+    } else {
+      const known = new Map((state.data.peers || []).map((p) => [p.addr, p]));
+      const t = document.createElement("table");
+      for (const addr of b.first_peers) {
+        const peer = known.get(addr);
+        const tr = document.createElement("tr");
+        const a = document.createElement("td");
+        a.className = "mono";
+        a.textContent = addr;
+        const where = document.createElement("td");
+        where.textContent = peer ? locLabel(peer) || "\u2013" : "";
+        const who = document.createElement("td");
+        who.textContent = peer ? peer.operator || "\u2013" : "no longer connected";
+        if (!peer) who.className = "miss";
+        if (peer && peer.asn) who.title = "AS" + peer.asn;
+        tr.append(a, where, who);
+        t.appendChild(tr);
+      }
+      peers.appendChild(t);
+    }
+    body.appendChild(peers);
+
+    // --- who turned it into work ---------------------------------------
+    const race = document.createElement("div");
+    const h2 = document.createElement("h3");
+    h2.textContent = "Stratum race";
+    race.appendChild(h2);
+    if (!b.stratum || !(b.stratum.entries || []).length) {
+      const p = document.createElement("p");
+      p.className = "note";
+      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off, or it was not running.";
+      race.appendChild(p);
+    } else {
+      const t = document.createElement("table");
+      for (const e of b.stratum.entries) {
+        const tr = document.createElement("tr");
+        const rank = document.createElement("td");
+        rank.className = "num miss";
+        rank.textContent = e.rank ? e.rank + "." : "\u2013";
+        const label = document.createElement("td");
+        label.textContent = e.label;
+        if (e.own) {
+          label.className = "own";
+          label.title = "Your own pool";
+        }
+        const delta = document.createElement("td");
+        delta.className = "num" + (e.miss ? " miss" : "");
+        delta.textContent = e.miss
+          ? "no job"
+          : e.latency_ms === 0 ? "first" : "+" + Math.round(e.latency_ms) + " ms";
+        tr.append(rank, label, delta);
+        t.appendChild(tr);
+      }
+      race.appendChild(t);
+      const note = document.createElement("p");
+      note.className = "note";
+      note.textContent = "Times are relative to the first job seen here, not to the moment the block was found.";
+      race.appendChild(note);
+    }
+    body.appendChild(race);
+  }
+
   function renderBlockMark() {
     const el = $("block-mark");
     if (!el) return;
@@ -227,6 +348,7 @@
     deliveredNow = deliveredSet();
     renderSiblingLink();
     renderBlockMark();
+    renderBlockCard();
     renderMarkers();
     renderUnplaced();
     renderTables();
