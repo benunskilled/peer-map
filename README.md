@@ -34,13 +34,13 @@ The software labels come from each peer's reported user agent. Alongside them, P
 
 The map uses approximate IP locations, with country labels generally more reliable than regional positions. It is a useful view of your connections' geographic spread.
 
+![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png)
+
 ## Follow a block through your node
 
 With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it, which of your peers delivered it first, and — if you run Stratum Race — how quickly each pool turned it into fresh work. The peers that delivered it are starred on the map for two minutes, so you can see where your blocks come in from.
 
 Open the card for the detail: every delivering peer with its location and hosting provider, and the race order with your own pool marked. Times there are relative to the first job seen, not to the moment the block was found. Without Bitcoin Lab the card does not appear.
-
-![The block card, opened](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png)
 
 ## Local data, quiet operation
 
