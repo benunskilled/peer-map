@@ -40,6 +40,8 @@ With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the
 
 Open the card for the detail: every delivering peer with its location and hosting provider, and the race order with your own pool marked. Times there are relative to the first job seen, not to the moment the block was found. Without Bitcoin Lab the card does not appear.
 
+![The block card, opened](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png)
+
 ## Local data, quiet operation
 
 Peer Map reads your current connections. The map, geolocation and ASN data are bundled with the app, so looking up a peer does not send its address to an external service. Block details come from Bitcoin Lab on the same node, fetched alongside the peer list rather than on a schedule of their own.
