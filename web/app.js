@@ -200,7 +200,12 @@
     // point, and only the full pool list folds away. Without one - Stratum
     // Race off, or no race recorded for this block - it is today's card, a
     // single line that opens onto who delivered it.
-    const stops = routeStops(b);
+    const own = routeStops(b);
+    const typical = medianStops(b);
+    const view = state.routeView === "median" && typical ? "median" : "block";
+    // The card is open whenever there is any route to show - this block's,
+    // or the typical one if this block happens to have no race.
+    const stops = own || typical ? (view === "median" ? typical : own || typical) : null;
     const more = $("blockMore");
     const line = stops ? $("blockSummary") : $("blockMoreLabel");
     $("blockSummary").hidden = !stops;
@@ -208,11 +213,21 @@
     more.classList.toggle("minor", Boolean(stops));
     fillSummary(line, b);
     if (stops) {
-      const n = b.stratum.entries.length;
-      $("blockMoreLabel").textContent = `All ${n} ${n === 1 ? "pool" : "pools"}`;
-      renderRoute($("blockRoute"), b, stops);
+      // This block may have no race of its own while the typical route
+      // exists - Stratum Race was off for a moment, say. Then the fold holds
+      // what this block does have: who delivered it.
+      const entries = (b.stratum && b.stratum.entries) || [];
+      $("blockMoreLabel").textContent = entries.length
+        ? `All ${entries.length} ${entries.length === 1 ? "pool" : "pools"}`
+        : "Delivered first";
+      renderRoute($("blockRoute"), b, stops, {
+        view: stops === typical ? "median" : "block",
+        canSwitch: Boolean(own && typical),
+        noRaceHere: !own,
+      });
     }
-    renderBlockBody(b, Boolean(stops));
+    // "Delivered first" is on the route only when this block's own route is.
+    renderBlockBody(b, Boolean(own) && stops === own);
   }
 
   function fillSummary(sum, b) {
@@ -268,6 +283,16 @@
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
   const signedMs = (t) => (Math.round(t) === 0 ? "0" : (t > 0 ? "+" : "−") + Math.abs(Math.round(t)) + " ms");
 
+  // Which route the card shows: this block, or the typical one. Remembered
+  // per browser, because somebody tuning a setup wants the median every time.
+  const ROUTE_VIEW_KEY = "peermap.routeView";
+  state.routeView = (() => { try { return localStorage.getItem(ROUTE_VIEW_KEY) || "block"; } catch { return "block"; } })();
+  function setRouteView(v) {
+    state.routeView = v;
+    try { localStorage.setItem(ROUTE_VIEW_KEY, v); } catch { /* private window: fine */ }
+    renderBlockCard();
+  }
+
   function routeStops(b) {
     const s = b.stratum;
     if (!s || s.core_ms == null || !(s.entries || []).length) return null;
@@ -282,28 +307,50 @@
 
     const known = new Map(((state.data && state.data.peers) || []).map((p) => [p.addr, p]));
     const credited = (b.first_peers || []).map((addr) => ({ addr, peer: known.get(addr) }));
+    // The ping Bitcoin Lab took from the snapshot that credited the peer is
+    // the right one - it is from the moment the block arrived. Only a block
+    // from before the Lab stored it falls back to what Core says now.
     const pingOf = (c) => (c.peer ? (c.peer.min_ping_ms != null ? c.peer.min_ping_ms : c.peer.ping_ms) : null);
-    // Two credited is the rare case; the one with the shorter line sets the dot.
-    const lead = credited.filter((c) => pingOf(c) != null).sort((x, y) => pingOf(x) - pingOf(y))[0];
-    if (lead) {
+    const lead = credited.filter((c) => pingOf(c) != null).sort((x, y) => pingOf(x) - pingOf(y))[0]
+      || (credited.length && b.first_ping_ms != null ? credited[0] : null);
+    const ping = b.first_ping_ms != null ? b.first_ping_ms : (lead ? pingOf(lead) : null);
+    if (lead && ping != null) {
       const p = lead.peer;
-      const where = p.region || (p.cc ? regionName(p.cc) : "");
+      const where = p ? p.region || (p.cc ? regionName(p.cc) : "") : "";
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
-        kind: "peer", group: p.group, t: s.core_ms - pingOf(lead),
+        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping,
         name: hostOf(lead.addr) + more,
-        sub: [where, p.operator].filter(Boolean),
+        sub: p ? [where, p.operator].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
       });
     }
     stops.push({
       kind: "core", t: s.core_ms, name: "Core",
-      // Credited, but gone before this was drawn: there is no ping to place
-      // it by, so it is named rather than drawn.
-      sub: [!lead && credited.length ? "via " + hostOf(credited[0].addr) : "your node"],
+      // Credited, but with no ping to place it by: named rather than drawn.
+      sub: [!(lead && ping != null) && credited.length ? "via " + hostOf(credited[0].addr) : "your node"],
     });
+    if (b.template_ms != null) {
+      stops.push({ kind: "tpl", t: s.core_ms + b.template_ms, name: "Template", sub: ["ready in Core"] });
+    }
     if (own) stops.push({ kind: "own", t: own.latency_ms, name: own.label, sub: ["your job"] });
     for (const st of stops) if (typeof st.sub === "string") st.sub = [st.sub];
+    return stops.sort((x, y) => x.t - y.t);
+  }
+
+  // The typical block: every stop at its median over the last hundred, each
+  // counted from its own first job. Stops are medians of their own, so they
+  // are not one real block - they are where each stop usually is, which is
+  // the thing that moves when something is changed.
+  function medianStops(b) {
+    const m = b.route_median;
+    if (!m || !m.core) return null;
+    const n = (st) => `median of ${st.n} ${st.n === 1 ? "block" : "blocks"}`;
+    const stops = [{ kind: "win", t: 0, name: "First pool", sub: ["first job"] }];
+    if (m.peer) stops.push({ kind: "peer", t: m.peer.ms, name: "Your peer", sub: ["has the block"], title: n(m.peer), plain: true });
+    stops.push({ kind: "core", t: m.core.ms, name: "Core", sub: ["your node"], title: n(m.core) });
+    if (m.template) stops.push({ kind: "tpl", t: m.template.ms, name: "Template", sub: ["ready in Core"], title: n(m.template) });
+    if (m.own) stops.push({ kind: "own", t: m.own.ms, name: m.own_label || "Your pool", sub: ["your job"], title: n(m.own) });
     return stops.sort((x, y) => x.t - y.t);
   }
 
@@ -324,9 +371,13 @@
     const d = Math.round(z.t - a.t) + " ms";
     if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · ping"];
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
-    // Not only the template: measured on one node, getblocktemplate itself
-    // took 50 to 92 ms. The rest is the pool noticing the block and turning
-    // the template into a job - which is why the label names both.
+    if (a.kind === "core" && z.kind === "tpl") {
+      return [d + " · template", "Core builds a new block template (getblocktemplate)"];
+    }
+    if (a.kind === "tpl" && z.kind === "own") {
+      return [d + " · job", "Your pool notices the block and turns the template into a job"];
+    }
+    // No template timing for this block: the two are one stretch.
     if (a.kind === "core" && z.kind === "own") {
       return [d + " · template + job",
         "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
@@ -334,9 +385,24 @@
     return [d];
   }
 
-  function renderRoute(box, b, stops) {
+  function renderRoute(box, b, stops, { view, canSwitch, noRaceHere }) {
     box.textContent = "";
-    const miner = b.pool || (b.pool_tag ? `"${b.pool_tag}"` : "unknown miner");
+    const median = view === "median";
+    const n = (b.route_median && b.route_median.blocks) || 0;
+    if (canSwitch) {
+      const sw = document.createElement("div");
+      sw.className = "rt-switch";
+      for (const [v, label] of [["block", "This block"], ["median", `Typical \u00b7 last ${n}`]]) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.className = v === view ? "on" : "";
+        btn.addEventListener("click", () => setRouteView(v));
+        sw.appendChild(btn);
+      }
+      box.appendChild(sw);
+    }
+    const miner = median ? "Miner" : b.pool || (b.pool_tag ? `"${b.pool_tag}"` : "unknown miner");
     const W = box.clientWidth - 12;
     // The last label is right-aligned on its dot, so the dot keeps a margin.
     const left = ROUTE_STUB, right = W - 14;
@@ -389,7 +455,7 @@
       stops.forEach((s, i) => {
         el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
         const last = i === stops.length - 1;
-        const lab = el("rt-lab " + s.kind + (last ? " last" : ""), xs[i],
+        const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : "") + (last ? " last" : ""), xs[i],
           [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
         if (s.title) lab.title = s.title;
         if (i > 0) {
@@ -401,8 +467,14 @@
     }
     const note = document.createElement("p");
     note.className = "note";
-    note.textContent = "0 is the first new job any pool sent here. When the block was found cannot be measured; "
-      + "the hop into your node is estimated from the peer's ping.";
+    note.textContent = (noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
+      + (median
+      ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
+      : "0 is the first new job any pool sent here. When the block was found cannot be measured; "
+        + "the hop into your node is estimated from the peer's ping. ")
+      + (stops.some((st) => st.kind === "tpl")
+        ? "The template is requested by Bitcoin Lab itself as the block arrives, which can only make your pool faster, never slower."
+        : "");
     box.appendChild(note);
   }
 

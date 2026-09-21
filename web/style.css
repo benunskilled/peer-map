@@ -99,6 +99,14 @@ body {
 .rt-dot.peer.inbound { background: var(--inbound); }
 .rt-dot.peer.outbound { background: var(--outbound); }
 .rt-dot.own { background: var(--accent); box-shadow: 0 0 0 4px rgba(247, 147, 26, .22); }
+.rt-dot.tpl { width: 8px; height: 8px; top: 28px; margin-left: -6px; background: var(--panel); border: 2px solid var(--text); }
+.rt-lab.peer.plain b { font-family: inherit; font-size: 14px; }
+.rt-switch { display: inline-flex; gap: 2px; margin: 0 0 10px; padding: 2px; border: 1px solid var(--border); border-radius: 999px; }
+.rt-switch button {
+  border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px;
+  padding: 3px 12px; border-radius: 999px; cursor: pointer;
+}
+.rt-switch button.on { background: var(--land-hot); color: var(--text); }
 .rt-seg {
   position: absolute; top: 6px; transform: translateX(-50%); white-space: nowrap;
   font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
