@@ -64,7 +64,7 @@ func TestSiblingLatestBlock(t *testing.T) {
 			"stratum":{"createdAt":%d,"entries":[
 				{"label":"Public A","own":false,"latencyMs":0,"rank":1,"miss":false},
 				{"label":"My pool","own":true,"latencyMs":412.5,"rank":2,"miss":false},
-				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]}}`, detected, detected)
+				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]}}`, detected, detected-225)
 	}))
 	defer srv.Close()
 
@@ -108,6 +108,11 @@ func TestSiblingLatestBlock(t *testing.T) {
 	if got.Stratum.Entries[2].LatencyMs != nil || !got.Stratum.Entries[2].Miss {
 		t.Error("a pool that reported nothing must stay in the list as a miss")
 	}
+	// The first job came 225 ms before Core announced the block, so on the
+	// route Core stands 225 ms after the zero.
+	if got.Stratum.CoreMs == nil || *got.Stratum.CoreMs != 225 {
+		t.Errorf("core_ms = %v, want 225", got.Stratum.CoreMs)
+	}
 
 	// Inside the poll interval the answer is cached - but it must age while it
 	// sits there, or a cached copy would claim the block is younger than it is.
@@ -136,3 +141,47 @@ func TestSiblingLatestWithoutNeighbour(t *testing.T) {
 		t.Error("an unreachable neighbour must not produce a block")
 	}
 }
+
+// Where Core stands on the route, counted from the first job. Negative is a
+// real answer - Core can have the block before any pool sends a job - and a
+// race with no start instant has no zero to count from at all.
+func TestSiblingCoreOffset(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		createdAt string
+		want      *int64
+	}{
+		{"core after the first job", "1789900000000", ptr(int64(300))},
+		{"core before any job", "1789900000500", ptr(int64(-200))},
+		{"no start instant", "0", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/health" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				fmt.Fprintf(w, `{"hash":"00beef","height":1,"detectedAt":1789900000300,
+					"stratum":{"createdAt":%s,"entries":[{"label":"A","latencyMs":0,"rank":1}]}}`, tc.createdAt)
+			}))
+			defer srv.Close()
+			s := &siblingCheck{
+				url: srv.URL + "/api/health", blockURL: srv.URL + "/api/blocks/latest",
+				client: srv.Client(), every: time.Minute,
+				now: func() time.Time { return time.UnixMilli(1789900010000) },
+			}
+			got := s.latest(context.Background())
+			if got == nil || got.Stratum == nil {
+				t.Fatal("no block or no race")
+			}
+			switch {
+			case tc.want == nil && got.Stratum.CoreMs != nil:
+				t.Errorf("core_ms = %d, want none", *got.Stratum.CoreMs)
+			case tc.want != nil && (got.Stratum.CoreMs == nil || *got.Stratum.CoreMs != *tc.want):
+				t.Errorf("core_ms = %v, want %d", got.Stratum.CoreMs, *tc.want)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

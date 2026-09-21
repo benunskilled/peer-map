@@ -52,6 +52,16 @@ type siblingCheck struct {
 type stratumRace struct {
 	CreatedAt int64          `json:"created_at,omitempty"`
 	Entries   []stratumEntry `json:"entries,omitempty"`
+	// When this node's Core had the block, counted from the first new job any
+	// pool sent here - the race's zero. Both instants come from Bitcoin Lab,
+	// taken on one machine by one clock: the ZMQ announcement and the first
+	// notify. Negative when Core had the block before any pool sent a job,
+	// which does happen. A pointer because zero is a real answer.
+	//
+	// When the block was found cannot be known - the header's time is set by
+	// the miner, in whole seconds - which is exactly why the first job is the
+	// zero: it is the earliest moment the block is visible from here.
+	CoreMs *int64 `json:"core_ms,omitempty"`
 }
 
 type stratumEntry struct {
@@ -199,6 +209,10 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	var race *stratumRace
 	if got.Stratum != nil {
 		race = &stratumRace{CreatedAt: got.Stratum.CreatedAt}
+		if got.Stratum.CreatedAt > 0 {
+			ms := got.DetectedAt - got.Stratum.CreatedAt
+			race.CoreMs = &ms
+		}
 		for _, e := range got.Stratum.Entries {
 			race.Entries = append(race.Entries, stratumEntry{
 				Label: e.Label, Own: e.Own, LatencyMs: e.LatencyMs, Rank: e.Rank, Miss: e.Miss,
