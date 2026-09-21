@@ -6,7 +6,7 @@ Peer Map puts your live peers on a world map and shows their locations, hosting 
 
 For anyone who has opened a peer list and wondered “who are all these connections?”, this is a place to start exploring.
 
-![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/1.png)
+![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png)
 
 ## Explore your node's neighbourhood
 
