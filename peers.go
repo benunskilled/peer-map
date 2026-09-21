@@ -19,6 +19,7 @@ type rawPeer struct {
 	Inbound        bool     `json:"inbound"`
 	Subver         string   `json:"subver"`
 	PingTime       *float64 `json:"pingtime"`
+	MinPing        *float64 `json:"minping"`
 	ConnTime       int64    `json:"conntime"`
 	Transport      string   `json:"transport_protocol_type"`
 	BytesSent      int64    `json:"bytessent"`
@@ -60,10 +61,15 @@ type Peer struct {
 	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
 	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
 	PingMs       *float64 `json:"ping_ms"`
-	ConnTime     int64    `json:"conntime"`
-	Transport    string   `json:"transport,omitempty"`
-	BytesSent    int64    `json:"bytes_sent"`
-	BytesRecv    int64    `json:"bytes_recv"`
+	// The lowest round trip Core has ever measured to this peer. Closer to
+	// the line itself than the last ping, which also carries whatever was
+	// queued on either side at that moment - so it is the one a block's last
+	// hop is estimated from.
+	MinPingMs *float64 `json:"min_ping_ms,omitempty"`
+	ConnTime  int64    `json:"conntime"`
+	Transport string   `json:"transport,omitempty"`
+	BytesSent int64    `json:"bytes_sent"`
+	BytesRecv int64    `json:"bytes_recv"`
 }
 
 // group sorts a connection into one of the three buckets the map shows.
@@ -179,6 +185,10 @@ func convert(raw []rawPeer) []Peer {
 		if r.PingTime != nil {
 			ms := *r.PingTime * 1000
 			p.PingMs = &ms
+		}
+		if r.MinPing != nil {
+			ms := *r.MinPing * 1000
+			p.MinPingMs = &ms
 		}
 		out = append(out, p)
 	}

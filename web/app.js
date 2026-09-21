@@ -196,7 +196,26 @@
     card.hidden = !b;
     if (!b) return;
 
-    const sum = $("blockSummary");
+    // With a route the card stays open: the summary and the route are the
+    // point, and only the full pool list folds away. Without one - Stratum
+    // Race off, or no race recorded for this block - it is today's card, a
+    // single line that opens onto who delivered it.
+    const stops = routeStops(b);
+    const more = $("blockMore");
+    const line = stops ? $("blockSummary") : $("blockMoreLabel");
+    $("blockSummary").hidden = !stops;
+    $("blockRoute").hidden = !stops;
+    more.classList.toggle("minor", Boolean(stops));
+    fillSummary(line, b);
+    if (stops) {
+      const n = b.stratum.entries.length;
+      $("blockMoreLabel").textContent = `All ${n} ${n === 1 ? "pool" : "pools"}`;
+      renderRoute($("blockRoute"), b, stops);
+    }
+    renderBlockBody(b, Boolean(stops));
+  }
+
+  function fillSummary(sum, b) {
     sum.textContent = "";
     const add = (cls, text, title) => {
       const el = document.createElement("span");
@@ -206,7 +225,7 @@
       sum.appendChild(el);
       return el;
     };
-    const sep = () => add("b-sep", "\u00b7");
+    const sep = () => add("b-sep", "·");
 
     add("b-height", b.height ? "Block " + b.height.toLocaleString() : "Last block", b.hash || "");
     if (b.pool || b.pool_tag) {
@@ -224,47 +243,195 @@
       b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
     sep();
     add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
-
-    renderBlockBody(b);
   }
 
   const blockAgeMs = (b) => b.age_ms + Math.max(0, Date.now() - state.receivedAt);
 
-  function renderBlockBody(b) {
+  // ---------- the route of one block ----------
+  //
+  // Where the time between "this block exists" and "your pool has a job for
+  // it" goes, drawn to scale. The zero is the first new job any pool sent
+  // here: when the block was found cannot be known - the header's time is the
+  // miner's own, in whole seconds - and the first job is the earliest moment
+  // it is visible from this node. After that everything is measured by one
+  // clock on one machine, except the last hop into Core, which is estimated
+  // as the delivering peer's ping.
+  //
+  // A whole ping rather than half: half is only the floor. A compact block
+  // that arrives complete costs half a round trip; one that is missing a few
+  // transactions costs another full one to ask for them. Which happened is not
+  // visible from here, and a whole ping sits in the middle. It only moves the
+  // peer's dot - Core and the pools stand where they were measured.
+  const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
+  const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
+
+  const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
+  const signedMs = (t) => (Math.round(t) === 0 ? "0" : (t > 0 ? "+" : "−") + Math.abs(Math.round(t)) + " ms");
+
+  function routeStops(b) {
+    const s = b.stratum;
+    if (!s || s.core_ms == null || !(s.entries || []).length) return null;
+    const winner = s.entries.find((e) => e.rank === 1 && e.latency_ms != null);
+    if (!winner) return null;
+    const own = s.entries.find((e) => e.own && e.latency_ms != null) || null;
+
+    const stops = [];
+    // The winner is the zero. When it is the owner's own pool the two are one
+    // stop, and it is drawn as his.
+    if (own !== winner) stops.push({ kind: "win", t: 0, name: winner.label, sub: "first job" });
+
+    const known = new Map(((state.data && state.data.peers) || []).map((p) => [p.addr, p]));
+    const credited = (b.first_peers || []).map((addr) => ({ addr, peer: known.get(addr) }));
+    const pingOf = (c) => (c.peer ? (c.peer.min_ping_ms != null ? c.peer.min_ping_ms : c.peer.ping_ms) : null);
+    // Two credited is the rare case; the one with the shorter line sets the dot.
+    const lead = credited.filter((c) => pingOf(c) != null).sort((x, y) => pingOf(x) - pingOf(y))[0];
+    if (lead) {
+      const p = lead.peer;
+      const where = p.region || (p.cc ? regionName(p.cc) : "");
+      const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
+      stops.push({
+        kind: "peer", group: p.group, t: s.core_ms - pingOf(lead),
+        name: hostOf(lead.addr) + more,
+        sub: [where, p.operator].filter(Boolean),
+        title: credited.map((c) => c.addr).join("\n"),
+      });
+    }
+    stops.push({
+      kind: "core", t: s.core_ms, name: "Core",
+      // Credited, but gone before this was drawn: there is no ping to place
+      // it by, so it is named rather than drawn.
+      sub: [!lead && credited.length ? "via " + hostOf(credited[0].addr) : "your node"],
+    });
+    if (own) stops.push({ kind: "own", t: own.latency_ms, name: own.label, sub: ["your job"] });
+    for (const st of stops) if (typeof st.sub === "string") st.sub = [st.sub];
+    return stops.sort((x, y) => x.t - y.t);
+  }
+
+  // To scale, but never so close that two labels touch: a stop that would
+  // sit nearer than ROUTE_GAP to the one before is pushed along, and the
+  // whole row pulled back in from the right. Too narrow for that at all - a
+  // phone - and it is a list instead, which says the same thing.
+  function placeStops(stops, left, right) {
+    const t0 = stops[0].t, span = Math.max(1, stops[stops.length - 1].t - t0);
+    const x = stops.map((s) => left + ((s.t - t0) / span) * (right - left));
+    for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + ROUTE_GAP);
+    x[x.length - 1] = Math.min(x[x.length - 1], right);
+    for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - ROUTE_GAP);
+    return x;
+  }
+
+  function segLabel(a, z) {
+    const d = Math.round(z.t - a.t) + " ms";
+    if (a.kind === "peer" && z.kind === "core") return "~" + d + " · ping";
+    if (a.kind === "win" && z.kind === "peer") return "reaches your peer · " + d;
+    return d;
+  }
+
+  function renderRoute(box, b, stops) {
+    box.textContent = "";
+    const miner = b.pool || (b.pool_tag ? `"${b.pool_tag}"` : "unknown miner");
+    const W = box.clientWidth - 12;
+    // The last label is right-aligned on its dot, so the dot keeps a margin.
+    const left = ROUTE_STUB, right = W - 14;
+
+    if ((stops.length - 1) * ROUTE_GAP > right - left) {
+      // Narrow: the same stops as rows.
+      const t = document.createElement("table");
+      t.className = "rt-list";
+      const row = (cls, name, time, sub) => {
+        const tr = document.createElement("tr");
+        tr.className = cls;
+        for (const [c, v] of [["n", name], ["num", time], ["miss", sub]]) {
+          const td = document.createElement("td");
+          td.className = c;
+          td.textContent = v;
+          tr.appendChild(td);
+        }
+        t.appendChild(tr);
+      };
+      row("pool", miner, "", "mined it");
+      for (const s of stops) row(s.kind, s.name, signedMs(s.t), s.sub.join(" · "));
+      box.appendChild(t);
+    } else {
+      const rt = document.createElement("div");
+      rt.className = "rt";
+      box.appendChild(rt);
+      const el = (cls, x, html) => {
+        const e = document.createElement("div");
+        e.className = cls;
+        if (x != null) e.style.left = x + "px"; // CSSOM, which the CSP allows
+        if (html) e.append(...html);
+        rt.appendChild(e);
+        return e;
+      };
+      const txt = (tag, text, cls) => {
+        const e = document.createElement(tag);
+        e.textContent = text;
+        if (cls) e.className = cls;
+        return e;
+      };
+      const xs = placeStops(stops, left, right);
+
+      const stub = el("rt-stub", 6);
+      stub.style.width = (xs[0] - 6) + "px";
+      const track = el("rt-track", xs[0]);
+      track.style.width = (xs[xs.length - 1] - xs[0]) + "px";
+      el("rt-dot pool", 6);
+      el("rt-lab pool first", 0, [txt("b", miner), txt("small", "mined it")]);
+
+      stops.forEach((s, i) => {
+        el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
+        const last = i === stops.length - 1;
+        const lab = el("rt-lab " + s.kind + (last ? " last" : ""), xs[i],
+          [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
+        if (s.title) lab.title = s.title;
+        if (i > 0) el("rt-seg", (xs[i - 1] + xs[i]) / 2, [txt("span", segLabel(stops[i - 1], s))]);
+      });
+    }
+    const note = document.createElement("p");
+    note.className = "note";
+    note.textContent = "0 is the first new job any pool sent here. When the block was found cannot be measured; "
+      + "the hop into your node is estimated from the peer's ping.";
+    box.appendChild(note);
+  }
+
+  function renderBlockBody(b, routed) {
     const body = $("blockBody");
     body.textContent = "";
 
-    // --- who brought it here -------------------------------------------
-    const peers = document.createElement("div");
-    const h1 = document.createElement("h3");
-    h1.textContent = "Delivered first";
-    peers.appendChild(h1);
-    if (!(b.first_peers || []).length) {
-      const p = document.createElement("p");
-      p.className = "note";
-      p.textContent = "No peer was credited for this block.";
-      peers.appendChild(p);
-    } else {
-      const known = new Map((state.data.peers || []).map((p) => [p.addr, p]));
-      const t = document.createElement("table");
-      for (const addr of b.first_peers) {
-        const peer = known.get(addr);
-        const tr = document.createElement("tr");
-        const a = document.createElement("td");
-        a.className = "mono";
-        a.textContent = addr;
-        const where = document.createElement("td");
-        where.textContent = peer ? locLabel(peer) || "\u2013" : "";
-        const who = document.createElement("td");
-        who.textContent = peer ? peer.operator || "\u2013" : "no longer connected";
-        if (!peer) who.className = "miss";
-        if (peer && peer.asn) who.title = "AS" + peer.asn;
-        tr.append(a, where, who);
-        t.appendChild(tr);
+    // --- who brought it here - on the route when there is one ------------
+    if (!routed) {
+      const peers = document.createElement("div");
+      const h1 = document.createElement("h3");
+      h1.textContent = "Delivered first";
+      peers.appendChild(h1);
+      if (!(b.first_peers || []).length) {
+        const p = document.createElement("p");
+        p.className = "note";
+        p.textContent = "No peer was credited for this block.";
+        peers.appendChild(p);
+      } else {
+        const known = new Map((state.data.peers || []).map((p) => [p.addr, p]));
+        const t = document.createElement("table");
+        for (const addr of b.first_peers) {
+          const peer = known.get(addr);
+          const tr = document.createElement("tr");
+          const a = document.createElement("td");
+          a.className = "mono";
+          a.textContent = addr;
+          const where = document.createElement("td");
+          where.textContent = peer ? locLabel(peer) || "–" : "";
+          const who = document.createElement("td");
+          who.textContent = peer ? peer.operator || "–" : "no longer connected";
+          if (!peer) who.className = "miss";
+          if (peer && peer.asn) who.title = "AS" + peer.asn;
+          tr.append(a, where, who);
+          t.appendChild(tr);
+        }
+        peers.appendChild(t);
       }
-      peers.appendChild(t);
+      body.appendChild(peers);
     }
-    body.appendChild(peers);
 
     // --- who turned it into work ---------------------------------------
     const race = document.createElement("div");
@@ -730,6 +897,13 @@
     $("zoomOut").addEventListener("click", () => zoomAt(1 / 1.6, ...center()));
     $("zoomReset").addEventListener("click", () => { state.view = { k: 1, x: 0, y: 0 }; applyView(); });
     window.addEventListener("resize", () => { if (state.data) placeMarkers(); });
+    // The route is laid out in pixels from the card's width, so a new width
+    // needs a new layout - and a narrow one may need the list instead.
+    let routeResize = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(routeResize);
+      routeResize = setTimeout(() => { if (state.data) renderBlockCard(); }, 150);
+    });
   }
 
   // ---------- filters ----------

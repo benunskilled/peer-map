@@ -115,6 +115,9 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 	}
 	add := func(typ string, inbound bool, network, a string, loc *geo.Location, net *asn.Info) {
 		ping := 0.02 + r.Float64()*0.3
+		// The lowest ping Core ever saw sits below the current one, the way it
+		// does on a real node: the current value carries whatever was queued.
+		minPing := ping * (0.55 + r.Float64()*0.35)
 		// Only inbound gets the full spread. You never dial OUT to a phone
 		// wallet or a crawler - an outbound or manual connection is one this
 		// node chose, and it chooses nodes.
@@ -140,7 +143,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		}
 		out = append(out, rawPeer{
 			ID: id, Addr: a, Network: network, ConnectionType: typ, Inbound: inbound,
-			Subver: subver, PingTime: &ping,
+			Subver: subver, PingTime: &ping, MinPing: &minPing,
 			ConnTime: now - int64(r.Intn(86400*3)), Transport: []string{"v1", "v2"}[r.Intn(2)],
 			BytesSent: int64(r.Intn(50 << 20)), BytesRecv: int64(r.Intn(200 << 20)),
 			ServicesNames: services, RelayTxes: &relay, SyncedHeaders: &headers,

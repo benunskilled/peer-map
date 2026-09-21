@@ -45,11 +45,20 @@
 
     <!-- One block, in the three roles that must not be confused: who mined
          it, which of your peers brought it here first, and which pool turned
-         it into fresh work first. Only there when Bitcoin Lab is next door. -->
-    <details class="card block-card" id="blockCard" hidden>
-      <summary id="blockSummary"></summary>
-      <div class="block-body" id="blockBody"></div>
-    </details>
+         it into fresh work first. Only there when Bitcoin Lab is next door.
+
+         With a Stratum race for the block, the summary and the route stay
+         open and only the full pool list folds away. Without one, the card is
+         a single line that opens onto who delivered it: then the summary is
+         the fold's own label and #blockSummary stays hidden. -->
+    <section class="card block-card" id="blockCard" hidden>
+      <div class="block-summary" id="blockSummary" hidden></div>
+      <div class="block-route" id="blockRoute" hidden></div>
+      <details class="block-more" id="blockMore">
+        <summary id="blockMoreLabel"></summary>
+        <div class="block-body" id="blockBody"></div>
+      </details>
+    </section>
 
     <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
