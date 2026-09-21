@@ -458,12 +458,26 @@
         const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : "") + (last ? " last" : ""), xs[i],
           [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
         if (s.title) lab.title = s.title;
-        if (i > 0) {
-          const [label, why] = segLabel(stops[i - 1], s);
-          const seg = el("rt-seg", (xs[i - 1] + xs[i]) / 2, [txt("span", label)]);
-          if (why) seg.title = why;
-        }
       });
+
+      // Stretches run between the stations the block actually passes -
+      // peer, Core, template, your pool. The first job is the zero the times
+      // are counted from, not a station: when the peer had the block before
+      // any pool sent a job, the zero falls inside the ping, and splitting the
+      // ping there would only produce two pieces nobody can read. So the zero
+      // keeps its dot and its label below, and the stretch above it stays
+      // whole. Only when the zero comes before the peer is there a stretch
+      // from it to the peer.
+      const at = (st) => xs[stops.indexOf(st)];
+      const seg = (a, z) => {
+        const [label, why] = segLabel(a, z);
+        const e = el("rt-seg", (at(a) + at(z)) / 2, [txt("span", label)]);
+        if (why) e.title = why;
+      };
+      const journey = stops.filter((st) => st.kind !== "win");
+      const win = stops.find((st) => st.kind === "win");
+      if (win && journey.length && win.t <= journey[0].t) seg(win, journey[0]);
+      for (let i = 1; i < journey.length; i++) seg(journey[i - 1], journey[i]);
     }
     const note = document.createElement("p");
     note.className = "note";
