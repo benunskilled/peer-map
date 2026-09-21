@@ -64,6 +64,21 @@ type stratumRace struct {
 	CoreMs *int64 `json:"core_ms,omitempty"`
 }
 
+// One stop of the typical route: its median and over how many blocks.
+type medianStop struct {
+	Ms float64 `json:"ms"`
+	N  int     `json:"n"`
+}
+
+type routeMedian struct {
+	Blocks   int         `json:"blocks"`
+	Core     *medianStop `json:"core,omitempty"`
+	Peer     *medianStop `json:"peer,omitempty"`
+	Template *medianStop `json:"template,omitempty"`
+	Own      *medianStop `json:"own,omitempty"`
+	OwnLabel string      `json:"own_label,omitempty"`
+}
+
 type stratumEntry struct {
 	Label     string   `json:"label"`
 	Own       bool     `json:"own,omitempty"` // a pool the owner added, not one of the public ones
@@ -91,6 +106,14 @@ type lastBlock struct {
 	// work first, and how far behind the others were. Absent when Bitcoin Lab
 	// recorded no race for it, which is the normal case with Stratum Race off.
 	Stratum *stratumRace `json:"stratum,omitempty"`
+	// The route's inner stops, measured by Bitcoin Lab at the moment the
+	// block arrived: how long after the announcement Core had a new block
+	// template ready, and the delivering peer's lowest ping from the snapshot
+	// that credited it. Absent on blocks recorded before the Lab measured them.
+	TemplateMs  *float64 `json:"template_ms,omitempty"`
+	FirstPingMs *float64 `json:"first_ping_ms,omitempty"`
+	// The same route for the typical block, the median over the last hundred.
+	RouteMedian *routeMedian `json:"route_median,omitempty"`
 	// Age at the moment this snapshot was built, from the clock both apps
 	// share - the browser adds however long its copy has been sitting there
 	// rather than comparing two clocks that may disagree.
@@ -197,6 +220,16 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 				Miss      bool     `json:"miss"`
 			} `json:"entries"`
 		} `json:"stratum"`
+		TemplateMs  *float64 `json:"templateMs"`
+		FirstPingMs *float64 `json:"firstPingMs"`
+		RouteMedian *struct {
+			Blocks   int         `json:"blocks"`
+			Core     *medianStop `json:"core"`
+			Peer     *medianStop `json:"peer"`
+			Template *medianStop `json:"template"`
+			Own      *medianStop `json:"own"`
+			OwnLabel string      `json:"ownLabel"`
+		} `json:"routeMedian"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&got); err != nil || got.DetectedAt == 0 {
 		s.block = nil
@@ -219,18 +252,25 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 			})
 		}
 	}
+	var med *routeMedian
+	if m := got.RouteMedian; m != nil && m.Blocks > 0 {
+		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel}
+	}
 	s.block = &lastBlock{
-		Hash:       got.Hash,
-		Height:     got.Height,
-		Pool:       got.Pool,
-		PoolName:   got.PoolName,
-		PoolTag:    got.PoolTag,
-		PoolSource: got.PoolSource,
-		FirstPeers: got.FirstPeers,
-		Eligible:   got.Eligible,
-		Stratum:    race,
-		AgeMs:      age,
-		MarkForMs:  blockMarkFor.Milliseconds(),
+		Hash:        got.Hash,
+		Height:      got.Height,
+		Pool:        got.Pool,
+		PoolName:    got.PoolName,
+		PoolTag:     got.PoolTag,
+		PoolSource:  got.PoolSource,
+		FirstPeers:  got.FirstPeers,
+		Eligible:    got.Eligible,
+		Stratum:     race,
+		TemplateMs:  got.TemplateMs,
+		FirstPingMs: got.FirstPingMs,
+		RouteMedian: med,
+		AgeMs:       age,
+		MarkForMs:   blockMarkFor.Milliseconds(),
 	}
 	// Keep the arrival instant rather than the age, so a cached copy handed
 	// out nine seconds later does not claim to be nine seconds younger.
