@@ -322,9 +322,16 @@
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return "~" + d + " · ping";
-    if (a.kind === "win" && z.kind === "peer") return "reaches your peer · " + d;
-    return d;
+    if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · ping"];
+    if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
+    // Not only the template: measured on one node, getblocktemplate itself
+    // took 50 to 92 ms. The rest is the pool noticing the block and turning
+    // the template into a job - which is why the label names both.
+    if (a.kind === "core" && z.kind === "own") {
+      return [d + " · template + job",
+        "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
+    }
+    return [d];
   }
 
   function renderRoute(box, b, stops) {
@@ -385,7 +392,11 @@
         const lab = el("rt-lab " + s.kind + (last ? " last" : ""), xs[i],
           [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
         if (s.title) lab.title = s.title;
-        if (i > 0) el("rt-seg", (xs[i - 1] + xs[i]) / 2, [txt("span", segLabel(stops[i - 1], s))]);
+        if (i > 0) {
+          const [label, why] = segLabel(stops[i - 1], s);
+          const seg = el("rt-seg", (xs[i - 1] + xs[i]) / 2, [txt("span", label)]);
+          if (why) seg.title = why;
+        }
       });
     }
     const note = document.createElement("p");
