@@ -15,10 +15,15 @@ func TestKindOf(t *testing.T) {
 		"/GlobalNodeMap:2.1/":                   "Crawler",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/":       "Research scanner",
 		"/ckp2p:2.0/":                           "Pool node",
-		"/Bitcoin ABC:0.14.5(EB8.0)/":           "Other chain",
-		"/Floresta:0.9.1/":                      "Other",
-		"/btcwire:0.5.0/hemi-soak:1.0/":         "Other",
-		"":                                      "unknown",
+		// The operator's own word, in the comment part - above the software.
+		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
+		"/Satoshi:31.0.0(pool)/":                        "Pool node",
+		// "pool" outside the brackets is not a claim: this is an indexer.
+		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
+		"/Bitcoin ABC:0.14.5(EB8.0)/":    "Other chain",
+		"/Floresta:0.9.1/":               "Other",
+		"/btcwire:0.5.0/hemi-soak:1.0/":  "Other",
+		"":                               "unknown",
 		// The whole reason the observed flags exist. A zero in place of the o,
 		// seen on four connections from rented machines in five regions. It
 		// must not come out as Core, and it must not be quietly swallowed
@@ -34,7 +39,7 @@ func TestKindOf(t *testing.T) {
 // Knots contains "Satoshi" as well, so the order of the rules decides this
 // one. A rule moved above Knots would break it silently.
 func TestKnotsBeatsCore(t *testing.T) {
-	if got := kindOf("/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/"); got != "Node (Knots)" {
+	if got := kindOf("/Satoshi:29.1.0/Knots:20250903/"); got != "Node (Knots)" {
 		t.Errorf("got %q, want Node (Knots)", got)
 	}
 }
