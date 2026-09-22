@@ -40,8 +40,11 @@ var kindRules = []struct {
 	re     *regexp.Regexp
 	relays bool
 }{
-	// Mining pool software speaking the p2p protocol.
-	{"Pool node", regexp.MustCompile(`(?i)ckp2p|ckpool`), true},
+	// Mining pool software speaking the p2p protocol, or a node whose operator
+	// says in the comment part of the agent - the bit in brackets - that it
+	// belongs to a pool, e.g. "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/".
+	// Only the brackets count: outside them "pool" is also in "mempool".
+	{"Pool node", regexp.MustCompile(`(?i)ckp2p|ckpool|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
