@@ -65,7 +65,7 @@ func TestSiblingLatestBlock(t *testing.T) {
 				{"label":"Public A","own":false,"latencyMs":0,"rank":1,"miss":false},
 				{"label":"My pool","own":true,"latencyMs":412.5,"rank":2,"miss":false},
 				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]},
-			"templateMs":84.5,"firstPingMs":98,
+			"templateMs":84.5,"firstPingMs":98,"deliveredEver":["1.2.3.4:8333","5.6.7.8:8333"],
 			"routeMedian":{"blocks":100,"core":{"ms":210,"n":100},"peer":{"ms":120,"n":97},
 				"template":{"ms":295,"n":60},"own":{"ms":420,"n":99},"ownLabel":"My pool"}}`, detected, detected-225)
 	}))
@@ -119,6 +119,9 @@ func TestSiblingLatestBlock(t *testing.T) {
 	// The route's inner stops and the typical route arrive intact.
 	if got.TemplateMs == nil || *got.TemplateMs != 84.5 || got.FirstPingMs == nil || *got.FirstPingMs != 98 {
 		t.Errorf("template %v, ping %v", got.TemplateMs, got.FirstPingMs)
+	}
+	if len(got.DeliveredEver) != 2 || got.DeliveredEver[1] != "5.6.7.8:8333" {
+		t.Errorf("delivered ever: %v", got.DeliveredEver)
 	}
 	m := got.RouteMedian
 	if m == nil || m.Blocks != 100 || m.Template == nil || m.Template.Ms != 295 || m.Template.N != 60 || m.OwnLabel != "My pool" {

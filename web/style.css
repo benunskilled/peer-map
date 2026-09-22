@@ -333,6 +333,11 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
    the same axis is one a colour-blind reader cannot separate - measured, not
    assumed. It is not a fault either; a wallet is doing what a wallet does. */
 .peers td.norelay { color: var(--muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+/* A row that has brought a block, in --good at low strength. A focused row
+   keeps its orange tint and bar, which is what keeps the two apart. */
+.peers tr.delivered-ever td { background: rgba(63,185,80,.13); }
+/* The newest block's deliverer, while its star is up - the same two minutes. */
+.peers tr.delivered-now td { background: rgba(247,147,26,.13); }
 .peers tr.focus td { background: rgba(247,147,26,.10); }
 .peers tr.focus td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .empty { color: var(--muted); margin: 0 20px 8px; }
