@@ -114,6 +114,9 @@ type lastBlock struct {
 	FirstPingMs *float64 `json:"first_ping_ms,omitempty"`
 	// The same route for the typical block, the median over the last hundred.
 	RouteMedian *routeMedian `json:"route_median,omitempty"`
+	// Every address Bitcoin Lab has ever credited with delivering a block
+	// first. The tables tint those rows.
+	DeliveredEver []string `json:"delivered_ever,omitempty"`
 	// Age at the moment this snapshot was built, from the clock both apps
 	// share - the browser adds however long its copy has been sitting there
 	// rather than comparing two clocks that may disagree.
@@ -220,9 +223,10 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 				Miss      bool     `json:"miss"`
 			} `json:"entries"`
 		} `json:"stratum"`
-		TemplateMs  *float64 `json:"templateMs"`
-		FirstPingMs *float64 `json:"firstPingMs"`
-		RouteMedian *struct {
+		TemplateMs    *float64 `json:"templateMs"`
+		FirstPingMs   *float64 `json:"firstPingMs"`
+		DeliveredEver []string `json:"deliveredEver"`
+		RouteMedian   *struct {
 			Blocks   int         `json:"blocks"`
 			Core     *medianStop `json:"core"`
 			Peer     *medianStop `json:"peer"`
@@ -257,20 +261,21 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel}
 	}
 	s.block = &lastBlock{
-		Hash:        got.Hash,
-		Height:      got.Height,
-		Pool:        got.Pool,
-		PoolName:    got.PoolName,
-		PoolTag:     got.PoolTag,
-		PoolSource:  got.PoolSource,
-		FirstPeers:  got.FirstPeers,
-		Eligible:    got.Eligible,
-		Stratum:     race,
-		TemplateMs:  got.TemplateMs,
-		FirstPingMs: got.FirstPingMs,
-		RouteMedian: med,
-		AgeMs:       age,
-		MarkForMs:   blockMarkFor.Milliseconds(),
+		Hash:          got.Hash,
+		Height:        got.Height,
+		Pool:          got.Pool,
+		PoolName:      got.PoolName,
+		PoolTag:       got.PoolTag,
+		PoolSource:    got.PoolSource,
+		FirstPeers:    got.FirstPeers,
+		Eligible:      got.Eligible,
+		Stratum:       race,
+		TemplateMs:    got.TemplateMs,
+		FirstPingMs:   got.FirstPingMs,
+		RouteMedian:   med,
+		DeliveredEver: got.DeliveredEver,
+		AgeMs:         age,
+		MarkForMs:     blockMarkFor.Milliseconds(),
 	}
 	// Keep the arrival instant rather than the age, so a cached copy handed
 	// out nine seconds later does not claim to be nine seconds younger.

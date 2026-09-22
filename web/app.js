@@ -179,6 +179,7 @@
   // Refreshed once per render and read by the table and the map, so both
   // always show the same peers starred.
   let deliveredNow = new Set();
+  let deliveredEver = new Set();
 
   function deliveredSet() {
     const b = liveBlock();
@@ -610,8 +611,10 @@
 
     renderStatus();
     deliveredNow = deliveredSet();
+    deliveredEver = new Set((d.last_block && d.last_block.delivered_ever) || []);
     renderSiblingLink();
     renderBlockMark();
+    if (deliveredNow.size) state.markShown = true;
     renderBlockCard();
     renderMarkers();
     renderUnplaced();
@@ -1250,6 +1253,17 @@
       for (const p of peers) {
         const tr = document.createElement("tr");
         if (state.focus && p.addr === state.focus) tr.className = "focus";
+        // A connection that has brought this node a block, at least once.
+        // The peer that brought the newest block, for as long as the star
+        // is up - one rule for "just delivered", in the row and on the map.
+        else if (deliveredNow.has(p.addr)) {
+          tr.className = "delivered-now";
+          tr.title = "Delivered the newest block first";
+        }
+        else if (deliveredEver.has(p.addr)) {
+          tr.className = "delivered-ever";
+          tr.title = "Has delivered a block first (Bitcoin Lab)";
+        }
         for (const c of cols) {
           const td = document.createElement("td");
           if (c.cls) td.className = c.cls;
