@@ -1,18 +1,50 @@
 name: Tests
 
+# Tags are no longer listed under `push:`. They are covered by `workflow_call:`
+# instead: release.yml calls this workflow as its first job and gates the
+# publish on it, so on a tag these checks run once, as part of the release, and
+# a red one stops the image from being pushed. Previously both workflows started
+# on the same tag push with no edge between them - which is how v0.8.0 published
+# while "The image builds" was red beside it.
+#
+# The integration job below still keys off the ref, which is the caller's tag
+# when this workflow is called that way.
 on:
   push:
     branches: ['**']
-    tags: ['v*.*.*']
   pull_request:
+  workflow_call: {}
   workflow_dispatch: {}
+
+# Least privilege, at the workflow level so no job can inherit anything wider.
+# Nothing here writes to the repository or publishes anything - a checkout needs
+# `contents: read` and that is the whole list. In particular this file must not
+# hold `packages: write`: it builds an image but never pushes one.
+permissions:
+  contents: read
+
+# One run per ref, so two pushes in quick succession to the same branch do not
+# race; the older run is cancelled, which only discards an answer nobody is
+# waiting for any more.
+#
+# A tag is never cancelled. On a tag this workflow is release.yml's gate, and a
+# cancelled gate reads as "cancelled" rather than "failed" - which is exactly
+# how a half-checked release gets published.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+# Every `uses:` below is pinned to a full commit SHA with the released version
+# in the comment beside it. A tag - even `v3` - is a pointer the action's owner
+# can move, so `@v3` means "whatever that account publishes next", resolved on
+# every run. The SHA is the code itself.
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
       - name: gofmt
@@ -33,17 +65,43 @@ jobs:
     runs-on: ubuntu-latest
     name: The image builds
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: false
           build-args: |
             VERSION=ci
+          # This job answers one question - does the Dockerfile still build
+          # this source tree - and the cache is only here to make the answer
+          # cheap. It must not be able to change the answer, and twice it did:
+          #
+          # On the v0.8.0 tag this step ran 182s and failed, while the run for
+          # the same commit on main ran the same step in 55s and passed, at the
+          # same minute. Same source, same Dockerfile, opposite results - so
+          # whatever failed was not the build. What differs between those two
+          # runs is entirely the cache: Actions cache scopes are per ref, so the
+          # tag run imported nothing and then exported a full mode=max cache of
+          # both architectures into a cold scope, concurrently with the main run
+          # exporting the same content, because pushing a branch and its tag
+          # together starts both at once.
+          #
+          # Two changes, either of which alone would have left v0.8.0 green:
+          #
+          # 1. No export on a tag. That run can never reuse what it writes (the
+          #    next release is a different ref), and it is now the run a publish
+          #    waits on. Import stays on everywhere: a miss just costs a minute.
+          # 2. ignore-error=true elsewhere, so a cache service that is throttled,
+          #    full or racing another writer makes this job slower, not red.
+          #
+          # What is still unproven: the run logs need authentication, so the
+          # actual error text was never read. "The cache export failed" is an
+          # inference from the timing and from main passing on the same commit,
+          # not something anyone has seen written down.
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: ${{ github.ref_type == 'tag' && '' || 'type=gha,mode=max,ignore-error=true' }}
 
   # The unit tests prove the code does what it was written to do, against a
   # getpeerinfo reply shaped by hand. This proves Bitcoin Core really reports
@@ -57,14 +115,14 @@ jobs:
     env:
       CORE_VERSION: '31.1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
 
       - name: Cache Bitcoin Core
         id: core-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/bitcoin-core
           key: bitcoin-core-${{ env.CORE_VERSION }}-x86_64-linux-gnu
