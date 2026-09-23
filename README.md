@@ -40,6 +40,8 @@ The map uses approximate IP locations, with country labels generally more reliab
 
 With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it, which of your peers delivered it first, and — if you run Stratum Race — how quickly each pool turned it into fresh work. The peers that delivered it are starred on the map for two minutes, so you can see where your blocks come in from.
 
+In the peer tables, every peer that has ever delivered a block first is tinted green, and the one that delivered the newest block turns orange for two minutes.
+
 With Stratum Race running, the card draws the block's route to scale — from the first job any pool sent, through your peer and Core, to your own pool's job — and next to it the typical route over the last hundred blocks. You see which stretch takes the time. Without Bitcoin Lab the card does not appear.
 
 ## Local data, quiet operation
