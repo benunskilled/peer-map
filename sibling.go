@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -153,19 +154,30 @@ func (s *siblingCheck) installed(ctx context.Context) bool {
 	if !s.checkedAt.IsZero() && time.Since(s.checkedAt) < s.every {
 		return s.present
 	}
-	s.checkedAt = time.Now()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
+	// The probe is this app's, not the browser's: tied to the incoming request
+	// it was cancelled whenever a dashboard went away mid-poll, and that
+	// cancellation was then remembered as "no neighbour" for the next five
+	// minutes - the link vanished for everyone. The lock is held across the
+	// call, so pollers arriving meanwhile still share this one probe.
+	req, err := http.NewRequestWithContext(context.WithoutCancel(ctx), http.MethodGet, s.url, nil)
 	if err != nil {
-		s.present = false
+		s.checkedAt, s.present = time.Now(), false
 		return false
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		s.present = false
+		if errors.Is(err, context.Canceled) {
+			// Nothing was learned about the neighbour, so nothing is
+			// remembered: the next poll probes again.
+			return false
+		}
+		// A neighbour that is not there is the normal case and is an answer:
+		// remembered, or a missing app costs a request per dashboard poll.
+		s.checkedAt, s.present = time.Now(), false
 		return false
 	}
 	defer resp.Body.Close()
-	s.present = resp.StatusCode == http.StatusOK
+	s.checkedAt, s.present = time.Now(), resp.StatusCode == http.StatusOK
 	return s.present
 }
 
@@ -184,22 +196,29 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	if !s.blockAt.IsZero() && now.Sub(s.blockAt) < interval {
 		return s.withAge(s.block, now)
 	}
-	s.blockAt = now
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.blockURL, nil)
-	if err != nil {
-		s.block = nil
+	// A neighbour that answers badly has answered: no block for this window,
+	// so a broken Bitcoin Lab costs one request per interval and no more.
+	miss := func() *lastBlock {
+		s.blockAt, s.block = now, nil
 		return nil
+	}
+	// Detached from the browser request for the same reason as the probe
+	// above: a dashboard that goes away must not blank the block card for
+	// every other dashboard until the window runs out.
+	req, err := http.NewRequestWithContext(context.WithoutCancel(ctx), http.MethodGet, s.blockURL, nil)
+	if err != nil {
+		return miss()
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		s.block = nil
-		return nil
+		if errors.Is(err, context.Canceled) {
+			return nil // nothing learned; the next poll asks again
+		}
+		return miss()
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		s.block = nil
-		return nil
+		return miss()
 	}
 	// Bitcoin Lab's own shape, which is not this app's: decoded here and
 	// handed on in this app's vocabulary.
@@ -236,8 +255,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		} `json:"routeMedian"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&got); err != nil || got.DetectedAt == 0 {
-		s.block = nil
-		return nil
+		return miss()
 	}
 	age := now.UnixMilli() - got.DetectedAt
 	if age < 0 {
@@ -260,6 +278,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	if m := got.RouteMedian; m != nil && m.Blocks > 0 {
 		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel}
 	}
+	s.blockAt = now
 	s.block = &lastBlock{
 		Hash:          got.Hash,
 		Height:        got.Height,

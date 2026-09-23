@@ -83,26 +83,58 @@ func env(k, def string) string {
 
 // ---- Bitcoin Core RPC ------------------------------------------------------
 
+// An error with two faces: the detail for the log, and the one line the
+// dashboard is allowed to see. Go's *url.Error prints the URL it failed on,
+// which is Core's host and port - the node's address on the umbrel network,
+// which no browser has any business learning. The dashboard is told only what
+// is written here, so an error type nobody anticipated cannot leak a new
+// detail by accident.
+type shownError struct {
+	line string // for the browser; nothing about where the node lives
+	err  error  // for the log; nil when the line is the whole story
+}
+
+func (e *shownError) Error() string {
+	if e.err == nil {
+		return e.line
+	}
+	return e.err.Error()
+}
+
+func (e *shownError) Unwrap() error { return e.err }
+
+// shownText is the line the snapshot may carry for err. An error that never
+// passed through the RPC client says as little as possible.
+func shownText(err error) string {
+	var s *shownError
+	if errors.As(err, &s) {
+		return s.line
+	}
+	return "could not be asked for its peers"
+}
+
 type rpcClient struct {
 	url, user, pass string
 	http            *http.Client
 }
 
+// The dashboard prefixes these lines with "Bitcoin Core: ", so they are
+// written to continue that sentence.
 func (c *rpcClient) getPeerInfo(ctx context.Context) ([]rawPeer, error) {
 	body := []byte(`{"jsonrpc":"1.0","id":"peermap","method":"getpeerinfo","params":[]}`)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(body))
 	if err != nil {
-		return nil, err
+		return nil, &shownError{line: "could not be asked for its peers", err: err}
 	}
 	req.SetBasicAuth(c.user, c.pass)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cannot reach Bitcoin Core: %w", err)
+		return nil, &shownError{line: "unreachable from this app", err: fmt.Errorf("cannot reach Bitcoin Core: %w", err)}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, errors.New("Bitcoin Core rejected the RPC credentials (401)")
+		return nil, &shownError{line: "rejected the RPC credentials (401)"}
 	}
 	var out struct {
 		Result []rawPeer `json:"result"`
@@ -113,10 +145,16 @@ func (c *rpcClient) getPeerInfo(ctx context.Context) ([]rawPeer, error) {
 	}
 	// 200 peers are roughly 250 KB of JSON; 32 MB is a guard, not a budget.
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&out); err != nil {
-		return nil, fmt.Errorf("unreadable RPC reply (HTTP %d): %w", resp.StatusCode, err)
+		return nil, &shownError{
+			line: fmt.Sprintf("sent a reply this app could not read (HTTP %d)", resp.StatusCode),
+			err:  fmt.Errorf("unreadable RPC reply (HTTP %d): %w", resp.StatusCode, err),
+		}
 	}
 	if out.Error != nil {
-		return nil, fmt.Errorf("Bitcoin Core RPC error %d: %s", out.Error.Code, out.Error.Message)
+		// Core's own words about the request - "Loading block index...", and
+		// the like. Worth showing: it says what to wait for, and unlike a
+		// transport error it names nothing about where the node lives.
+		return nil, &shownError{line: fmt.Sprintf("RPC error %d: %s", out.Error.Code, out.Error.Message)}
 	}
 	return out.Result, nil
 }
@@ -139,12 +177,13 @@ type snapshot struct {
 }
 
 type source struct {
-	mu    sync.Mutex
-	fetch func(context.Context) ([]rawPeer, error)
-	now   func() time.Time
-	last  time.Time
-	snap  snapshot
-	calls int // RPC calls made, for tests and the log
+	mu      sync.Mutex
+	fetch   func(context.Context) ([]rawPeer, error)
+	now     func() time.Time
+	last    time.Time // when the last answer came in; the window runs from there
+	lastErr string    // the last failure logged, so a node that stays down logs once
+	snap    snapshot
+	calls   int // RPC calls made, for tests and the log
 }
 
 func (s *source) get(ctx context.Context) snapshot {
@@ -152,19 +191,33 @@ func (s *source) get(ctx context.Context) snapshot {
 	defer s.mu.Unlock()
 	now := s.now()
 	if s.last.IsZero() || now.Sub(s.last) >= interval {
-		// The window starts before the call, and failures count too: a node
-		// that is down is not asked again until the interval has passed.
-		s.last = now
 		s.calls++
-		cctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		// The call belongs to this app, not to the browser request that
+		// triggered it: a dashboard that navigates away mid-poll used to
+		// cancel the RPC, and the cancellation was then cached as Core's
+		// answer - every other open dashboard read an error its node never
+		// produced. The lock is still held across the call, so the pollers
+		// waiting behind it get this one answer instead of asking again.
+		cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 		raw, err := s.fetch(cctx)
 		cancel()
-		if err != nil {
-			if s.snap.Error != err.Error() {
+		now = s.now() // the call can take seconds; the window runs from its end
+		switch {
+		case errors.Is(err, context.Canceled):
+			// Nothing was learned about the node, so this does not open a
+			// window: the next poll asks again, and what is on screen stays.
+		case err != nil:
+			// A node that is down has answered all the same. The window holds,
+			// so it is asked once per interval and not once per poll.
+			s.last = now
+			if s.lastErr != err.Error() {
 				log.Printf("getpeerinfo failed: %v", err)
+				s.lastErr = err.Error()
 			}
-			s.snap.Error = err.Error() // keep the last good peer list on screen
-		} else {
+			s.snap.Error = shownText(err) // keep the last good peer list on screen
+		default:
+			s.last = now
+			s.lastErr = ""
 			s.snap.Peers = convert(raw)
 			s.snap.FetchedAt = now.Unix()
 			s.snap.Error = ""
@@ -212,7 +265,11 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'")
+		// base-uri and form-action have no fallback: default-src does not cover
+		// them, so without these two an injected <base> could re-point every
+		// relative URL on the page, and an injected form could post off-site.
+		// The dashboard has neither a <base> nor a form, so both are 'none'.
+		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
 		mux.ServeHTTP(w, r)
 	})
 }
