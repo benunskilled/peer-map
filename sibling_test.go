@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -41,6 +43,99 @@ func TestSiblingMissingIsSilent(t *testing.T) {
 func TestSiblingOff(t *testing.T) {
 	if offSibling().installed(context.Background()) {
 		t.Error(`url "off" must switch the check off entirely`)
+	}
+}
+
+// A neighbour reached through a transport that answers the health probe and
+// cuts off the block request, or refuses both - whatever err says.
+type stubNeighbour struct {
+	healthOK bool
+	err      error
+	calls    map[string]int
+}
+
+func (t *stubNeighbour) RoundTrip(r *http.Request) (*http.Response, error) {
+	t.calls[r.URL.Path]++
+	if t.healthOK && r.URL.Path == "/api/health" {
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: http.Header{}, Request: r}, nil
+	}
+	return nil, &url.Error{Op: r.Method, URL: r.URL.String(), Err: t.err}
+}
+
+func neighbour(tr *stubNeighbour) *siblingCheck {
+	return &siblingCheck{
+		url:      "http://bitcoinlab-node_dashboard_1:8788/api/health",
+		blockURL: "http://bitcoinlab-node_dashboard_1:8788/api/blocks/latest",
+		client:   &http.Client{Transport: tr},
+		every:    5 * time.Minute,
+		now:      time.Now,
+	}
+}
+
+// The probe belongs to this app, not to the browser request that triggered it:
+// a dashboard that goes away mid-poll must not be able to hide the link from
+// everyone else.
+func TestSiblingProbeOutlivesTheBrowserRequest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	s := &siblingCheck{url: srv.URL, client: srv.Client(), every: time.Minute}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if !s.installed(ctx) {
+		t.Error("a cancelled browser request cancelled the probe with it")
+	}
+}
+
+// Two failures that must not be treated alike. A neighbour that refuses the
+// connection has answered - that is the normal case, remembered for five
+// minutes so a missing app costs no request per poll - while a probe cut off
+// mid-request learned nothing and has to be repeated.
+func TestSiblingRemembersARefusalButNotACancellation(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"a refused connection is an answer", errors.New("connect: connection refused"), 1},
+		{"a cancelled probe is not", context.Canceled, 2},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := &stubNeighbour{err: c.err, calls: map[string]int{}}
+			s := neighbour(tr)
+			if s.installed(context.Background()) || s.installed(context.Background()) {
+				t.Fatal("a neighbour that never answered must not produce a link")
+			}
+			if got := tr.calls["/api/health"]; got != c.want {
+				t.Errorf("probed %d times, want %d", got, c.want)
+			}
+		})
+	}
+}
+
+// The same rule one level down, where the cost of getting it wrong is an
+// empty block card for the rest of the poll interval.
+func TestSiblingBlockRemembersARefusalButNotACancellation(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{"a refused connection is an answer", errors.New("connect: connection refused"), 1},
+		{"a cut-off request is not", context.Canceled, 2},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			tr := &stubNeighbour{healthOK: true, err: c.err, calls: map[string]int{}}
+			s := neighbour(tr)
+			if s.latest(context.Background()) != nil || s.latest(context.Background()) != nil {
+				t.Fatal("a neighbour that sent no block must not produce one")
+			}
+			if got := tr.calls["/api/blocks/latest"]; got != c.want {
+				t.Errorf("asked %d times, want %d", got, c.want)
+			}
+		})
 	}
 }
 

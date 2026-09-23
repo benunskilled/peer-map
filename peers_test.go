@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -194,12 +198,147 @@ func TestAtMostOneCallPerInterval(t *testing.T) {
 	now = now.Add(time.Second)
 	fail = true
 	snap := s.get(ctx)
-	if calls != 2 || snap.Error != "node down" || len(snap.Peers) != 1 {
+	// What the failure says is TestRPCFailureStaysOutOfTheSnapshot's business;
+	// here it only has to say something and leave the peers alone.
+	if calls != 2 || snap.Error == "" || len(snap.Peers) != 1 {
 		t.Fatalf("after failure: calls=%d err=%q peers=%d (last good list must stay)", calls, snap.Error, len(snap.Peers))
 	}
 	s.get(ctx) // failure does not shorten the window
 	if calls != 2 {
 		t.Fatalf("retried inside window after failure: calls=%d", calls)
+	}
+}
+
+// A browser that goes away mid-poll must not take the RPC with it: the call
+// belongs to the app, and its answer is what every other open dashboard reads
+// for the rest of the window.
+func TestTheRPCOutlivesTheBrowserRequest(t *testing.T) {
+	var gotErr error
+	var hadDeadline bool
+	s := &source{
+		now: time.Now,
+		fetch: func(ctx context.Context) ([]rawPeer, error) {
+			gotErr = ctx.Err()
+			_, hadDeadline = ctx.Deadline()
+			return []rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "manual"}}, nil
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // the dashboard is gone before Core is even asked
+
+	snap := s.get(ctx)
+	if gotErr != nil {
+		t.Fatalf("the RPC was handed the dead browser context: %v", gotErr)
+	}
+	if !hadDeadline {
+		t.Error("detaching the request must not lose the 20s timeout")
+	}
+	if snap.Error != "" || len(snap.Peers) != 1 {
+		t.Fatalf("err=%q peers=%d - the answer must still reach the snapshot", snap.Error, len(snap.Peers))
+	}
+}
+
+// An RPC that was cut off learned nothing about the node, so it must not hold
+// the window: the next poll asks again instead of serving ten seconds of an
+// error nobody's node produced.
+func TestAnAbortedRPCDoesNotOpenAWindow(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	calls, cut := 0, true
+	s := &source{
+		now: func() time.Time { return now },
+		fetch: func(context.Context) ([]rawPeer, error) {
+			calls++
+			if cut {
+				return nil, context.Canceled
+			}
+			return []rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "manual"}}, nil
+		},
+	}
+	if snap := s.get(context.Background()); snap.Error != "" {
+		t.Errorf("a cancelled call was served as Core's answer: %q", snap.Error)
+	}
+	cut = false
+	snap := s.get(context.Background()) // same instant: no waiting for the window
+	if calls != 2 {
+		t.Fatalf("made %d calls, want 2 - the window stayed open", calls)
+	}
+	if len(snap.Peers) != 1 {
+		t.Errorf("peers=%d, want the list from the call that did go through", len(snap.Peers))
+	}
+}
+
+// Go's *url.Error prints the address it failed to reach, which here is the
+// node's host and port. The browser gets a line it can act on; the address
+// stays in the log.
+func TestRPCFailureStaysOutOfTheSnapshot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := srv.URL + "/"
+	srv.Close() // nothing listens there any more
+	addr := strings.TrimPrefix(srv.URL, "http://")
+
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	defer log.SetOutput(os.Stderr)
+
+	c := &rpcClient{url: url, http: &http.Client{}}
+	s := &source{now: time.Now, fetch: c.getPeerInfo}
+	snap := s.get(context.Background())
+
+	if snap.Error == "" {
+		t.Fatal("a node that is not there must still say so on the dashboard")
+	}
+	if strings.Contains(snap.Error, addr) || strings.Contains(snap.Error, "http") {
+		t.Errorf("the snapshot names the node: %q", snap.Error)
+	}
+	if !strings.Contains(logged.String(), addr) {
+		t.Errorf("the detail never reached the log: %q", logged.String())
+	}
+}
+
+// Only lines this app wrote reach the browser; anything else is answered
+// vaguely rather than passed through.
+func TestShownText(t *testing.T) {
+	refused := errors.New("dial tcp 10.21.0.1:8332: connect: connection refused")
+	for _, c := range []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"a line with nothing behind it", &shownError{line: "rejected the RPC credentials (401)"}, "rejected the RPC credentials (401)"},
+		{"a line in front of a detail", &shownError{line: "unreachable from this app", err: refused}, "unreachable from this app"},
+		{"wrapped further up", fmt.Errorf("getpeerinfo: %w", &shownError{line: "unreachable from this app", err: refused}), "unreachable from this app"},
+		{"an error that never passed through here", refused, "could not be asked for its peers"},
+	} {
+		if got := shownText(c.err); got != c.want {
+			t.Errorf("%s: got %q want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// default-src is not a fallback for base-uri or form-action: without them an
+// injected <base> could re-point every relative URL on the page, and an
+// injected form could post off-site. The page has neither, so both are 'none'.
+func TestCSPClosesBaseAndForm(t *testing.T) {
+	h := newHandler(&source{now: time.Now, fetch: mockPeers}, offSibling())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 200 {
+		t.Fatalf("the page no longer loads: HTTP %d", rec.Code)
+	}
+	csp := rec.Header().Get("Content-Security-Policy")
+	for _, want := range []string{"default-src 'self'", "script-src 'self'", "base-uri 'none'", "form-action 'none'"} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("CSP %q is missing %q", csp, want)
+		}
+	}
+	page, err := webFS.ReadFile("web/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tag := range []string{"<base", "<form"} {
+		if strings.Contains(string(page), tag) {
+			t.Errorf("the page now has a %s, which 'none' forbids", tag)
+		}
 	}
 }
 
