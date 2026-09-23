@@ -9,32 +9,63 @@ on:
       - 'v*.*.*'
   workflow_dispatch: {}
 
+# Least privilege, and `packages: write` is deliberately NOT here. At the
+# workflow level it hands a GHCR-write token to every job in the file. It is
+# granted below, on the single job that pushes.
 permissions:
   contents: read
-  packages: write
+
+# A release never runs twice at once, and is never cancelled. cancel-in-progress
+# is false on purpose: the dangerous moment is between "the multi-arch image is
+# pushed" and "the smoke test says both architectures run", and a run cancelled
+# there leaves a published image that nothing has checked. Re-pushing a tag
+# queues behind the run in flight instead of racing it to the registry.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Every `uses:` below is pinned to a full commit SHA with the released version
+# in the comment beside it. This is the file where it matters most: this job
+# holds `packages: write` and the GHCR token, and `@v3` is a promise by somebody
+# else's account that the code behind that tag will not change.
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - run: go vet ./...
-      - run: go test ./...
+  # The whole of Tests, run here as this release's gate rather than as a second
+  # workflow racing it.
+  #
+  # v0.8.0 is why this exists. Its Tests run went red - "The image builds"
+  # failed - and the image was published anyway, in the same minute, because
+  # both workflows triggered on the same tag push and neither knew the other
+  # existed. `needs: ci` below is the edge that was missing: gofmt, go vet,
+  # go test, the both-architecture image build and the regtest integration test
+  # all have to pass before anything reaches GHCR. That integration job is gated
+  # on a tag ref inside ci.yml, and a called workflow sees the caller's ref, so
+  # on a release it runs.
+  #
+  # The old `test` job here duplicated a subset of ci.yml's test job and was
+  # missing its gofmt check, so "the release gate" and "the tests" were not the
+  # same set of checks. Now there is one definition of both.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
 
   build-and-push:
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
+    # The only job in either workflow that may write a package - and the only
+    # one that needs to.
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Only for the smoke test below: the build itself cross-compiles.
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -46,7 +77,7 @@ jobs:
 
       - name: Build and push
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
