@@ -50,7 +50,7 @@ Peer Map reads your current connections. The map, geolocation and ASN data are b
 
 The dashboard requests updates only while it is visible. Background tabs stop polling, and a dashboard with no mouse or keyboard activity for 30 minutes pauses until you resume it.
 
-There is no background collection job or stored peer history. The app is a single static Go binary using only the standard library.
+There is no background collection job or stored peer history. The app is a single static Go binary using only the standard library, and on the author's node it uses about 19 MB of RAM.
 
 ## Install on Umbrel
 
@@ -60,8 +60,8 @@ Want to know which of your peers delivers new blocks first? [Bitcoin Lab](https:
 
 ## Data and attribution
 
-- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0.
-- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0.
+- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0 — data from August 2026 (IPv4) and September 2026 (IPv6).
+- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0 — data from September 2026.
 - World map: Natural Earth, public domain.
 
 See [geo/SOURCE.md](geo/SOURCE.md) and [asn/SOURCE.md](asn/SOURCE.md) for data versions and update instructions.
