@@ -332,7 +332,7 @@
       sub: [!(lead && ping != null) && credited.length ? "via " + hostOf(credited[0].addr) : "your node"],
     });
     if (b.template_ms != null) {
-      stops.push({ kind: "tpl", t: s.core_ms + b.template_ms, name: "Template", sub: ["ready in Core"] });
+      stops.push({ kind: "tpl", t: s.core_ms + b.template_ms, name: "Template", sub: ["ready in Core"], tx: b.template_tx });
     }
     if (own) stops.push({ kind: "own", t: own.latency_ms, name: own.label, sub: ["your job"] });
     for (const st of stops) if (typeof st.sub === "string") st.sub = [st.sub];
@@ -350,7 +350,7 @@
     const stops = [{ kind: "win", t: 0, name: "First pool", sub: ["first job"] }];
     if (m.peer) stops.push({ kind: "peer", t: m.peer.ms, name: "Your peer", sub: ["has the block"], title: n(m.peer), plain: true });
     stops.push({ kind: "core", t: m.core.ms, name: "Core", sub: ["your node"], title: n(m.core) });
-    if (m.template) stops.push({ kind: "tpl", t: m.template.ms, name: "Template", sub: ["ready in Core"], title: n(m.template) });
+    if (m.template) stops.push({ kind: "tpl", t: m.template.ms, name: "Template", sub: ["ready in Core"], title: n(m.template), tx: m.tx && m.tx.ms });
     if (m.own) stops.push({ kind: "own", t: m.own.ms, name: m.own_label || "Your pool", sub: ["your job"], title: n(m.own) });
     return stops.sort((x, y) => x.t - y.t);
   }
@@ -376,7 +376,12 @@
       return [d + " · template", "Core builds a new block template (getblocktemplate)"];
     }
     if (a.kind === "tpl" && z.kind === "own") {
-      return [d + " · job", "Your pool notices the block and turns the template into a job"];
+      // The template's size is most of the reason this stretch varies: the
+      // pool handles every transaction in it before it can send the job.
+      const tx = a.tx != null ? " · " + Math.round(a.tx).toLocaleString("en-US") + " tx" : "";
+      return [d + " · job" + tx,
+        "Your pool notices the block and turns the template into a job" +
+        (tx ? " - the more transactions the template carries, the longer that takes" : "")];
     }
     // No template timing for this block: the two are one stretch.
     if (a.kind === "core" && z.kind === "own") {

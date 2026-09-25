@@ -78,6 +78,8 @@ type routeMedian struct {
 	Template *medianStop `json:"template,omitempty"`
 	Own      *medianStop `json:"own,omitempty"`
 	OwnLabel string      `json:"own_label,omitempty"`
+	// Transactions per template, the median over the same blocks.
+	Tx *medianStop `json:"tx,omitempty"`
 }
 
 type stratumEntry struct {
@@ -113,6 +115,9 @@ type lastBlock struct {
 	// that credited it. Absent on blocks recorded before the Lab measured them.
 	TemplateMs  *float64 `json:"template_ms,omitempty"`
 	FirstPingMs *float64 `json:"first_ping_ms,omitempty"`
+	// How many transactions that template carried: a pool spends time on
+	// every one, so this is why one block's job is slower than the next.
+	TemplateTx *int `json:"template_tx,omitempty"`
 	// The same route for the typical block, the median over the last hundred.
 	RouteMedian *routeMedian `json:"route_median,omitempty"`
 	// Every address Bitcoin Lab has ever credited with delivering a block
@@ -243,6 +248,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 			} `json:"entries"`
 		} `json:"stratum"`
 		TemplateMs    *float64 `json:"templateMs"`
+		TemplateTx    *int     `json:"templateTx"`
 		FirstPingMs   *float64 `json:"firstPingMs"`
 		DeliveredEver []string `json:"deliveredEver"`
 		RouteMedian   *struct {
@@ -252,6 +258,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 			Template *medianStop `json:"template"`
 			Own      *medianStop `json:"own"`
 			OwnLabel string      `json:"ownLabel"`
+			Tx       *medianStop `json:"tx"`
 		} `json:"routeMedian"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&got); err != nil || got.DetectedAt == 0 {
@@ -276,7 +283,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	}
 	var med *routeMedian
 	if m := got.RouteMedian; m != nil && m.Blocks > 0 {
-		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel}
+		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel, Tx: m.Tx}
 	}
 	s.blockAt = now
 	s.block = &lastBlock{
@@ -290,6 +297,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		Eligible:      got.Eligible,
 		Stratum:       race,
 		TemplateMs:    got.TemplateMs,
+		TemplateTx:    got.TemplateTx,
 		FirstPingMs:   got.FirstPingMs,
 		RouteMedian:   med,
 		DeliveredEver: got.DeliveredEver,
