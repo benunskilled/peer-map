@@ -1,7 +1,5 @@
 
 
-https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c
-
 # Peer Map
 
 **Get to know the connections behind your Bitcoin node.**
@@ -44,9 +42,9 @@ The map uses approximate IP locations, with country labels generally more reliab
 
 With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it, which of your peers delivered it first, and — if you run Stratum Race — how quickly each pool turned it into fresh work. The peers that delivered it are starred on the map for two minutes, so you can see where your blocks come in from.
 
-[![Block 968,560 from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)](https://github.com/user-attachments/assets/0944244e-3537-41ef-90be-ebb6b2aa97b3)
+[![Block 968,560 from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c)
 
-*Block 968,560 on the author's node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/0944244e-3537-41ef-90be-ebb6b2aa97b3).*
+*Block 968,560 on the author's node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c).*
 
 In the peer tables, every peer that has ever delivered a block first is tinted green, and the one that delivered the newest block turns orange for two minutes.
 
