@@ -55,12 +55,68 @@ var kindRules = []struct {
 	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|mempool`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
 	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|bither|multibit|wasabi|Bitcoin Wallet`), false},
-	// BIP157 light clients. btcwire alone is only the Go p2p library, which
-	// says nothing about the program using it, so it stays out here and is
-	// caught by "Other" below.
-	{"Light client", regexp.MustCompile(`(?i)neutrino`), false},
+	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
+	// Kyoto, which announces itself as "Rust BIP-157". btcwire alone is only
+	// the Go p2p library, which says nothing about the program using it, so it
+	// stays out here and is caught by "Other" below.
+	{"Light client", regexp.MustCompile(`(?i)neutrino|BIP-157|kyoto`), false},
+	// A small Utreexo node. Named so it is not lost in "Other", and counted as
+	// relaying like any node - Bitcoin Lab has no rule for it either.
+	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
+}
+
+// fakeWalletKind is for a peer whose user agent names a wallet while it
+// offers what no wallet can: blocks (NODE_NETWORK) or the encrypted v2
+// transport, which no wallet had when these names were current. On the node
+// this was written for, some 33,000 inbound sessions in a fortnight came as
+// Bitcoin Wallet 4.x/5.x from 2016 (BlackBerry builds among them), MultiBit
+// and breadwallet 0.6 - each version about as often as the next, gone after
+// some 20 seconds, from over 800 addresses, and nearly all offering
+// NETWORK and P2P_V2. The real Bitcoin Wallet 9 to 11 offered nothing. So
+// this is a claim contradicted by an observation, and the kind says so
+// rather than counting them as wallets. They still pass no blocks on to
+// this node, so they keep the wallet's no-relay mark.
+const fakeWalletKind = "Fake wallet"
+
+func offersWhatNoWalletCan(services []string) bool {
+	for _, s := range services {
+		if s == "NETWORK" || s == "P2P_V2" {
+			return true
+		}
+	}
+	return false
+}
+
+// What a piece of software is, in a sentence, for the peers somebody is
+// likely to ask about. Only software that says who it is: the kind already
+// covers the rest.
+var aboutRules = []struct {
+	re   *regexp.Regexp
+	text string
+}{
+	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
+	{regexp.MustCompile(`(?i)breadwallet|/bread:`), "BRD (breadwallet), a phone wallet shut down in 2022"},
+	{regexp.MustCompile(`(?i)multibit`), "MultiBit, a desktop wallet discontinued in 2017"},
+	{regexp.MustCompile(`(?i)bither`), "Bither, a wallet for phone and desktop"},
+	{regexp.MustCompile(`(?i)wasabi`), "Wasabi Wallet, a desktop wallet"},
+	{regexp.MustCompile(`(?i)neutrino`), "Neutrino: Lightning wallets on lnd, such as Blixt or Zeus"},
+	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
+	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
+	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckpool's p2p relay, run next to solo mining pools"},
+	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
+	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
+}
+
+func aboutOf(subver string) string {
+	for _, r := range aboutRules {
+		if r.re.MatchString(subver) {
+			return r.text
+		}
+	}
+	return ""
 }
 
 // kindOf returns the family name, "unknown" for a peer that sent no user
