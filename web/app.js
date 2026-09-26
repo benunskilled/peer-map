@@ -336,6 +336,18 @@
     }
     if (own) stops.push({ kind: "own", t: own.latency_ms, name: own.label, sub: ["your job"] });
     for (const st of stops) if (typeof st.sub === "string") st.sub = [st.sub];
+    return byTime(stops);
+  }
+
+  // Core's template time is kept in whole milliseconds, the pool's job to the
+  // fraction, and with small templates the job is ready the same moment:
+  // rounding alone can put the job before the template it was built from.
+  // It cannot be, so the template waits for it, and the job stretch - the
+  // one that says how many transactions the template carried - stays.
+  function byTime(stops) {
+    const tpl = stops.find((s) => s.kind === "tpl");
+    const own = stops.find((s) => s.kind === "own");
+    if (tpl && own && own.t < tpl.t) tpl.t = own.t;
     return stops.sort((x, y) => x.t - y.t);
   }
 
@@ -352,7 +364,7 @@
     stops.push({ kind: "core", t: m.core.ms, name: "Core", sub: ["your node"], title: n(m.core) });
     if (m.template) stops.push({ kind: "tpl", t: m.template.ms, name: "Template", sub: ["ready in Core"], title: n(m.template), tx: m.tx && m.tx.ms });
     if (m.own) stops.push({ kind: "own", t: m.own.ms, name: m.own_label || "Your pool", sub: ["your job"], title: n(m.own) });
-    return stops.sort((x, y) => x.t - y.t);
+    return byTime(stops);
   }
 
   // To scale, but never so close that two labels touch: a stop that would
