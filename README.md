@@ -1,5 +1,3 @@
-
-
 # Peer Map
 
 **Get to know the connections behind your Bitcoin node.**
