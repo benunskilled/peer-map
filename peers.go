@@ -54,6 +54,7 @@ type Peer struct {
 	Operator string `json:"operator,omitempty"`
 	Subver   string `json:"subver"`
 	Kind     string `json:"kind"`               // what the user agent claims; see kinds.go
+	About    string `json:"about,omitempty"`    // what that software is, when known
 	NoRelay  bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
@@ -163,7 +164,7 @@ func convert(raw []rawPeer) []Peer {
 		}
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
-			Subver: r.Subver, Kind: kindOf(r.Subver), NoRelay: !relaysBlocks(r.Subver),
+			Subver: r.Subver, Kind: kindOf(r.Subver), About: aboutOf(r.Subver), NoRelay: !relaysBlocks(r.Subver),
 			ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 		}
@@ -172,6 +173,10 @@ func convert(raw []rawPeer) []Peer {
 		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
+		if p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames) {
+			// Not the wallet it names, so no sentence about that wallet either.
+			p.Kind, p.About = fakeWalletKind, ""
+		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
 		}

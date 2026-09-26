@@ -83,6 +83,8 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		}
 		nets = append(nets, pl.net)
 	}
+	// A 2016 wallet name that offers blocks and v2 - see fakeWalletKind.
+	const fakeWallet = "/bitcoinj:0.14.5/Bitcoin Wallet:5.42/"
 	// A real node hears from more than Bitcoin Core. The spread here is taken
 	// from one evening on an actual node, so the demo shows the Kind column
 	// doing its job instead of a wall of "Core".
@@ -92,6 +94,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", "/breadwallet:1.3.5/",
 		"/btcwire:0.5.0/neutrino:0.17.1/", "/electrs:0.11.1/", "/Metrika-Bitnodes:0.1/",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
+		fakeWallet,
 	}
 
 	nodeClients := []string{}
@@ -133,10 +136,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		// something calling itself Core that behaves like neither.
 		services, relay, headers := []string{"NETWORK", "WITNESS"}, true, int64(967000+r.Intn(400))
 		switch kindOf(subver) {
-		case "Wallet", "Light client", "Crawler", "Research", "Indexer":
+		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
 			relay = r.Intn(3) > 0
-		case "Core":
+			if subver == fakeWallet {
+				services = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+			}
+		case "Node (Core)":
 			if r.Intn(20) == 0 {
 				services, relay, headers = []string{}, false, -1
 			}

@@ -855,7 +855,9 @@
     "Crawler": "its user agent says bitnodes, crawler, scanner or similar",
     "Indexer": "its user agent says electrs, electrum, esplora or mempool",
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
-    "Light client": "its user agent says neutrino",
+    "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
+    "Node (Floresta)": "its user agent says Floresta",
+    "Fake wallet": "its user agent names a wallet, but it offers blocks or encrypted v2 connections - no wallet does",
     "Node (Knots)": "its user agent says Knots",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
     "Other": "its user agent matches none of the known kinds",
@@ -1195,7 +1197,13 @@
       // worth having, not worth the width, and it was the widest column in the
       // table by a distance.
       cell: (td, p) => {
-        td.textContent = kindLabel(p);
+        // The label in its own element, so the strike-through for software
+        // that passes no blocks on stays on the label and leaves the agent
+        // and its description below readable.
+        const label = document.createElement("span");
+        label.className = "klabel";
+        label.textContent = kindLabel(p);
+        td.appendChild(label);
         // With a kind filter on, the question is why these peers are in it,
         // and the answer is the agent: shown under the kind, only then.
         if (state.kind && p.subver) {
@@ -1203,11 +1211,17 @@
           ua.className = "ua";
           ua.textContent = p.subver;
           td.appendChild(ua);
+          if (p.about) {
+            const about = document.createElement("div");
+            about.className = "about";
+            about.textContent = p.about;
+            td.appendChild(about);
+          }
         }
         const note = p.no_relay
           ? "Software that does not pass blocks on - this peer can never deliver one first."
           : "";
-        td.title = [p.subver, note].filter(Boolean).join("\n");
+        td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
         if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
       },
     },

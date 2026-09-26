@@ -8,17 +8,19 @@ import (
 
 func TestKindOf(t *testing.T) {
 	for subver, want := range map[string]string{
-		"/Satoshi:31.1.0/":                      "Node (Core)",
-		"/Satoshi:29.3.0/Knots:20260507/":       "Node (Knots)",
-		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/": "Wallet",
-		"/breadwallet:1.3.5/":                   "Wallet",
-		"/btcwire:0.5.0/neutrino:0.17.1/":       "Light client",
-		"/electrs:0.11.1/":                      "Indexer",
-		"/Metrika-Bitnodes:0.1/":                "Crawler",
-		"/bitnodes.io:0.3/":                     "Crawler",
-		"/GlobalNodeMap:2.1/":                   "Crawler",
-		"/dsn.tm.kit.edu/bitcoin:0.9.99/":       "Research scanner",
-		"/ckp2p:2.0/":                           "Pool node",
+		"/Satoshi:31.1.0/":                         "Node (Core)",
+		"/Satoshi:29.3.0/Knots:20260507/":          "Node (Knots)",
+		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/":    "Wallet",
+		"/breadwallet:1.3.5/":                      "Wallet",
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "Light client",
+		"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Light client",
+		"/Floresta:0.9.1/mandacaru:0.15.2/":        "Node (Floresta)",
+		"/electrs:0.11.1/":                         "Indexer",
+		"/Metrika-Bitnodes:0.1/":                   "Crawler",
+		"/bitnodes.io:0.3/":                        "Crawler",
+		"/GlobalNodeMap:2.1/":                      "Crawler",
+		"/dsn.tm.kit.edu/bitcoin:0.9.99/":          "Research scanner",
+		"/ckp2p:2.0/":                              "Pool node",
 		// The operator's own word, in the comment part - above the software.
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
 		"/Satoshi:31.0.0(pool)/":                        "Pool node",
@@ -29,7 +31,7 @@ func TestKindOf(t *testing.T) {
 		// "pool" outside the brackets is not a claim: this is an indexer.
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
 		"/Bitcoin ABC:0.14.5(EB8.0)/":    "Other chain",
-		"/Floresta:0.9.1/":               "Other",
+		"/Floresta:0.9.1/":               "Node (Floresta)",
 		"/btcwire:0.5.0/hemi-soak:1.0/":  "Other",
 		"":                               "unknown",
 		// The whole reason the observed flags exist. A zero in place of the o,
@@ -116,13 +118,41 @@ func TestEveryKindIsExplainedOnThePage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"Other", "unknown"}
+	names := []string{"Other", "unknown", fakeWalletKind}
 	for _, r := range kindRules {
 		names = append(names, r.name)
 	}
 	for _, n := range names {
 		if !strings.Contains(string(js), `"`+n+`": `) {
 			t.Errorf("KIND_WHY in web/app.js has no line for %q", n)
+		}
+	}
+}
+
+// A 2016 wallet name on something offering blocks and v2 is not that wallet.
+// The real Bitcoin Wallet, offering nothing, stays a wallet and says what it is.
+func TestFakeWallet(t *testing.T) {
+	cases := []struct {
+		subver    string
+		services  []string
+		kind      string
+		aboutSays string
+	}{
+		{"/bitcoinj:0.14.5/Bitcoin Wallet:5.42/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, fakeWalletKind, ""},
+		{"/breadwallet:0.6.5/", []string{"NETWORK"}, fakeWalletKind, ""},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", []string{}, "Wallet", "Schildbach"},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", nil, "Wallet", "Schildbach"},
+		// Only a wallet name can be fake: a node offering blocks is a node.
+		{"/Satoshi:31.1.0/", []string{"NETWORK", "P2P_V2"}, "Node (Core)", ""},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, ServicesNames: c.services}})[0]
+		if got.Kind != c.kind {
+			t.Errorf("%s %v: kind %q, want %q", c.subver, c.services, got.Kind, c.kind)
+		}
+		if c.aboutSays == "" && got.About != "" || !strings.Contains(got.About, c.aboutSays) {
+			t.Errorf("%s %v: about %q, want it to say %q", c.subver, c.services, got.About, c.aboutSays)
 		}
 	}
 }
