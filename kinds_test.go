@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+)
 
 func TestKindOf(t *testing.T) {
 	for subver, want := range map[string]string{
@@ -18,6 +22,10 @@ func TestKindOf(t *testing.T) {
 		// The operator's own word, in the comment part - above the software.
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
 		"/Satoshi:31.0.0(pool)/":                        "Pool node",
+		// As it arrives on a real node, with a URL after the Knots part.
+		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/https://pyblock.xyz:8443/": "Pool node",
+		// PyBLOCK's node without the pool: a Knots node, not a pool.
+		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
 		// "pool" outside the brackets is not a claim: this is an indexer.
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
 		"/Bitcoin ABC:0.14.5(EB8.0)/":    "Other chain",
@@ -97,6 +105,24 @@ func TestRelaysBlocks(t *testing.T) {
 	} {
 		if got := relaysBlocks(subver); got != want {
 			t.Errorf("%q: relaysBlocks = %v, want %v", subver, got, want)
+		}
+	}
+}
+
+// The page explains each kind in a sentence (KIND_WHY in web/app.js). A kind
+// added here without a line there would show its filter with no reason given.
+func TestEveryKindIsExplainedOnThePage(t *testing.T) {
+	js, err := os.ReadFile("web/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"Other", "unknown"}
+	for _, r := range kindRules {
+		names = append(names, r.name)
+	}
+	for _, n := range names {
+		if !strings.Contains(string(js), `"`+n+`": `) {
+			t.Errorf("KIND_WHY in web/app.js has no line for %q", n)
 		}
 	}
 }

@@ -841,7 +841,26 @@
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
     $("kindFilterName").textContent = state.kind || "";
+    $("kindFilterWhy").textContent = state.kind && KIND_WHY[state.kind] ? "- " + KIND_WHY[state.kind] : "";
   }
+
+  // Why a peer lands in a kind, in words - the rule from kindRules in
+  // kinds.go. Shown beside the kind filter, because "Only Pool node" says
+  // what is left but not what put it there. kinds_test.go checks that every
+  // kind there has a line here.
+  const KIND_WHY = {
+    "Pool node": 'its user agent says ckpool or ckp2p, or has "pool" in brackets',
+    "Other chain": "its user agent names another chain (Bitcoin ABC, Bitcoin SV, Bitcoin XT, BCH)",
+    "Research scanner": "its user agent names a university or research network",
+    "Crawler": "its user agent says bitnodes, crawler, scanner or similar",
+    "Indexer": "its user agent says electrs, electrum, esplora or mempool",
+    "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
+    "Light client": "its user agent says neutrino",
+    "Node (Knots)": "its user agent says Knots",
+    "Node (Core)": 'its user agent starts with "/Satoshi:"',
+    "Other": "its user agent matches none of the known kinds",
+    "unknown": "it sent no user agent",
+  };
 
   // Both filters redraw the same three things, and the map is in that list on
   // purpose: after clicking "5 Pool node" the next question is where those
@@ -1177,6 +1196,14 @@
       // table by a distance.
       cell: (td, p) => {
         td.textContent = kindLabel(p);
+        // With a kind filter on, the question is why these peers are in it,
+        // and the answer is the agent: shown under the kind, only then.
+        if (state.kind && p.subver) {
+          const ua = document.createElement("div");
+          ua.className = "ua";
+          ua.textContent = p.subver;
+          td.appendChild(ua);
+        }
         const note = p.no_relay
           ? "Software that does not pass blocks on - this peer can never deliver one first."
           : "";
