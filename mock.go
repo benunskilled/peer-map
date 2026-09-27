@@ -94,12 +94,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", "/breadwallet:1.3.5/",
 		"/btcwire:0.5.0/neutrino:0.17.1/", "/electrs:0.11.1/", "/Metrika-Bitnodes:0.1/",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
-		fakeWallet,
+		fakeWallet, "/Sat0shi:31.0.0/", "/bitcoin-seeder:0.01/",
 	}
 
 	nodeClients := []string{}
 	for _, c := range clients {
-		if relaysBlocks(c) {
+		// Fakes arrive; on the node this was written for, none was ever dialled.
+		if relaysBlocks(c) && kindOf(c) != fakeWalletKind {
 			nodeClients = append(nodeClients, c)
 		}
 	}
