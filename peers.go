@@ -155,6 +155,13 @@ func operator(p rawPeer) (asn.Info, bool) {
 	return asn.Lookup(a)
 }
 
+// isPrivate: an address inside a private network, such as the one umbrelOS
+// runs its apps in.
+func isPrivate(addr string) bool {
+	a, err := netip.ParseAddr(hostOf(addr))
+	return err == nil && a.Unmap().IsPrivate()
+}
+
 func convert(raw []rawPeer) []Peer {
 	out := make([]Peer, 0, len(raw))
 	for _, r := range raw {
@@ -173,10 +180,22 @@ func convert(raw []rawPeer) []Peer {
 		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
-		if p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames) {
+		switch {
+		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
-		} else if p.Kind == fakeWalletKind {
+		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
+		default:
+			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+			}
+		}
+		if p.Kind == noAgentKind {
+			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
+		}
+		// Umbrel's own apps reach Core from inside its network.
+		if p.Kind == "Indexer" && isPrivate(r.Addr) {
+			p.About = "Probably your own " + claimOf(r.Subver) + " on this Umbrel"
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name

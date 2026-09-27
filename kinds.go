@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -56,7 +58,9 @@ var kindRules = []struct {
 	// Only the brackets count: outside them "pool" is also in "mempool".
 	{"Pool node", regexp.MustCompile(`(?i)ckp2p|ckpool|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT`), false},
+	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
+	// Irium and VDS are forks and altcoins of their own.
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds_`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-`), false},
@@ -64,7 +68,7 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|mempool`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
@@ -77,6 +81,11 @@ var kindRules = []struct {
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
+	// Other full-node software, named rather than left in "Other".
+	{"Node (btcd)", regexp.MustCompile(`(?i)btcd:`), true},
+	{"Node (libbitcoin)", regexp.MustCompile(`(?i)libbitcoin`), true},
+	{"Node (bcoin)", regexp.MustCompile(`(?i)/bcoin:`), true},
+	{"Node (Gocoin)", regexp.MustCompile(`(?i)gocoin`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -124,6 +133,11 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)ckp2p`), "ckpool's p2p relay, run next to solo mining pools"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
+	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},
+	{regexp.MustCompile(`(?i)libbitcoin`), "libbitcoin, a full node written in C++, independent of Core"},
+	{regexp.MustCompile(`(?i)/bcoin:`), "bcoin, a full node written in JavaScript"},
+	{regexp.MustCompile(`(?i)gocoin`), "Gocoin, a full node and wallet written in Go"},
+	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 
 // fakeAbout says, for a Fake, what it claims and what it probably is. The
@@ -161,6 +175,65 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
+// What Bitcoin Core started to offer, and in which version. A peer calling
+// itself an older Core (or a Knots built on it) that offers one of these
+// is not that version. On one node 23,567 sessions came as Core 0.7 to 0.18
+// offering P2P_V2 - from Core 26, 2023 - each gone after about 25 seconds.
+var serviceSince = []struct {
+	name, what string
+	major      int
+	minor      int
+}{
+	{"P2P_V2", "encrypted v2 connections", 26, 0},
+	{"COMPACT_FILTERS", "compact block filters", 0, 21},
+	{"NETWORK_LIMITED", "the pruned-node service", 0, 16},
+	{"WITNESS", "SegWit", 0, 13},
+}
+
+var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
+
+// Software with no version that ever spoke the v2 transport.
+var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin)`)
+
+// anachronism returns what a peer offers that the software it names never
+// had, as a sentence for "Probably:", or "".
+func anachronism(subver string, services []string) string {
+	has := map[string]bool{}
+	for _, s := range services {
+		has[s] = true
+	}
+	if m := claimedCore.FindStringSubmatch(subver); m != nil {
+		maj, _ := strconv.Atoi(m[1])
+		mnr, _ := strconv.Atoi(m[2])
+		for _, s := range serviceSince {
+			if has[s.name] && (maj < s.major || maj == s.major && mnr < s.minor) {
+				since := fmt.Sprintf("%d.%d", s.major, s.minor)
+				if s.major > 0 {
+					since = fmt.Sprint(s.major)
+				}
+				return fmt.Sprintf("a scanner - it offers %s, which Core %s.%s did not have (from Core %s)", s.what, m[1], m[2], since)
+			}
+		}
+	}
+	if has["P2P_V2"] && neverV2.MatchString(subver) {
+		return "a scanner - it offers encrypted v2 connections, which that software never had"
+	}
+	return ""
+}
+
+// claimOf is the software a user agent names, readably: "/bcoin:v1.0.0/" is
+// "bcoin v1.0.0", Core and Knots are spelled out.
+func claimOf(subver string) string {
+	if v := coreVersion.FindStringSubmatch(subver); v != nil {
+		if strings.Contains(subver, "Knots:") {
+			return "Bitcoin Knots (Core " + v[1] + ")"
+		}
+		return "Bitcoin Core " + v[1]
+	}
+	first, _, _ := strings.Cut(strings.Trim(subver, "/"), "/")
+	return strings.Replace(first, ":", " ", 1)
+}
+
 func aboutOf(subver string) string {
 	for _, r := range aboutRules {
 		if r.re.MatchString(subver) {
@@ -170,7 +243,13 @@ func aboutOf(subver string) string {
 	return ""
 }
 
-// kindOf returns the family name, "unknown" for a peer that sent no user
+// noAgentKind is a peer that has not told its name. On one node that was
+// 21,830 sessions in a fortnight, from 2,516 addresses, typically gone after
+// 16 seconds: connections that only checked the port, or that are still
+// being set up when the page asks.
+const noAgentKind = "No user agent"
+
+// kindOf returns the family name, noAgentKind for a peer that sent no user
 // agent at all, and "Other" for one whose agent matches nothing here - which
 // is a normal answer, not a failure: the network runs plenty of software this
 // list has never heard of.
@@ -188,7 +267,7 @@ func relaysBlocks(subver string) bool {
 
 func classify(subver string) (string, bool) {
 	if subver == "" {
-		return "unknown", true
+		return noAgentKind, true
 	}
 	for _, r := range kindRules {
 		if r.re.MatchString(subver) {

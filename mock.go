@@ -83,6 +83,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		}
 		nets = append(nets, pl.net)
 	}
+	nodeServices := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
 	// A 2016 wallet name that offers blocks and v2 - see fakeWalletKind.
 	const fakeWallet = "/bitcoinj:0.14.5/Bitcoin Wallet:5.42/"
 	// A real node hears from more than Bitcoin Core. The spread here is taken
@@ -94,13 +95,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", "/breadwallet:1.3.5/",
 		"/btcwire:0.5.0/neutrino:0.17.1/", "/electrs:0.11.1/", "/Metrika-Bitnodes:0.1/",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
-		fakeWallet, "/Sat0shi:31.0.0/", "/bitcoin-seeder:0.01/",
+		fakeWallet, "/Sat0shi:31.0.0/", "/bitcoin-seeder:0.01/", "/Satoshi:0.14.2/", "",
 	}
 
 	nodeClients := []string{}
 	for _, c := range clients {
 		// Fakes arrive; on the node this was written for, none was ever dialled.
-		if relaysBlocks(c) && kindOf(c) != fakeWalletKind {
+		if relaysBlocks(c) && kindOf(c) != fakeWalletKind && c != "" && anachronism(c, nodeServices) == "" {
 			nodeClients = append(nodeClients, c)
 		}
 	}
@@ -135,7 +136,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		// crawler offers nothing and Core never learns its chain, while a
 		// full node does both. The rare last case is the interesting one -
 		// something calling itself Core that behaves like neither.
-		services, relay, headers := []string{"NETWORK", "WITNESS"}, true, int64(967000+r.Intn(400))
+		services, relay, headers := nodeServices, true, int64(967000+r.Intn(400))
 		switch kindOf(subver) {
 		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
