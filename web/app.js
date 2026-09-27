@@ -666,12 +666,17 @@
     if (state.data.sibling) a.href = siblingURL(null);
   }
 
+  const LOOKERS = new Set(["Fake", "Crawler", "Research scanner"]);
   function renderStatus() {
     const d = state.data;
     if (!d) return;
     const since = d.fetched_at ? ago(Date.now() / 1000 - d.fetched_at) + " ago" : "never";
     const mode = state.paused ? "paused" : `every ${d.interval}s while open`;
-    $("status").textContent = `${d.peers.length} peers · updated ${since} · ${mode}`;
+    // Quietly, in the same line: how many of them are only looking, or
+    // pretending. On the node this was written for, most of them.
+    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind)).length;
+    const of = lookers ? `, ${lookers} fake or crawling` : "";
+    $("status").textContent = `${d.peers.length} peers${of} · updated ${since} · ${mode}`;
   }
 
   // ---------- map ----------
@@ -1228,7 +1233,9 @@
           ? "Software that does not pass blocks on - this peer can never deliver one first."
           : "";
         td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
-        if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
+        // Not for a Fake: some of them name a wallet and some Core, and a
+        // strike-through on half of one kind reads as two kinds.
+        if (p.no_relay && p.kind !== "Fake") td.className = (td.className ? td.className + " " : "") + "norelay";
       },
     },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
