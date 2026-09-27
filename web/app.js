@@ -850,18 +850,22 @@
   // kind there has a line here.
   const KIND_WHY = {
     "Pool node": 'its user agent says ckpool or ckp2p, or has "pool" in brackets',
-    "Other chain": "its user agent names another chain (Bitcoin ABC, Bitcoin SV, Bitcoin XT, BCH)",
+    "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
     "Research scanner": "its user agent names a university or research network",
-    "Crawler": "its user agent says crawl, scan, seeder, census, monitor, bitnodes or similar",
+    "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar",
     "Indexer": "its user agent says electrs, electrum, esplora or mempool",
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
-    "Fake": "its user agent claims software it is not: a wallet that offers blocks, or Bitcoin Core misspelt (Sat0shi, Satoshi2, no slashes)",
+    "Fake": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), or a version offering what that version never had (v2 before Core 26), or a wallet offering blocks",
     "Node (Knots)": "its user agent says Knots",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
     "Other": "its user agent matches none of the known kinds",
-    "unknown": "it sent no user agent",
+    "No user agent": "it has not sent a user agent - usually a port check, or a connection still starting",
+    "Node (btcd)": "its user agent says btcd",
+    "Node (libbitcoin)": "its user agent says libbitcoin",
+    "Node (bcoin)": "its user agent says bcoin",
+    "Node (Gocoin)": "its user agent says Gocoin",
   };
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1211,12 +1215,14 @@
           ua.className = "ua";
           ua.textContent = p.subver;
           td.appendChild(ua);
-          if (p.about) {
-            const about = document.createElement("div");
-            about.className = "about";
-            about.textContent = p.about;
-            td.appendChild(about);
-          }
+        }
+        // Also without an agent: "No user agent" is the kind that most
+        // needs the sentence.
+        if (state.kind && p.about) {
+          const about = document.createElement("div");
+          about.className = "about";
+          about.textContent = p.about;
+          td.appendChild(about);
         }
         const note = p.no_relay
           ? "Software that does not pass blocks on - this peer can never deliver one first."

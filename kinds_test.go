@@ -51,7 +51,7 @@ func TestKindOf(t *testing.T) {
 		"/Bitcoin ABC:0.14.5(EB8.0)/":    "Other chain",
 		"/Floresta:0.9.1/":               "Node (Floresta)",
 		"/btcwire:0.5.0/hemi-soak:1.0/":  "Other",
-		"":                               "unknown",
+		"":                               noAgentKind,
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
@@ -131,7 +131,7 @@ func TestEveryKindIsExplainedOnThePage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	names := []string{"Other", "unknown", fakeWalletKind}
+	names := []string{"Other", noAgentKind, fakeWalletKind}
 	for _, r := range kindRules {
 		names = append(names, r.name)
 	}
@@ -170,5 +170,51 @@ func TestFakeWallet(t *testing.T) {
 		if c.aboutSays == "" && got.About != "" || !strings.Contains(got.About, c.aboutSays) {
 			t.Errorf("%s %v: about %q, want it to say %q", c.subver, c.services, got.About, c.aboutSays)
 		}
+	}
+}
+
+// Core versions offering what they never had: the kind says Fake, and why.
+// Real peers of their own version stay what they are.
+func TestAnachronism(t *testing.T) {
+	v2 := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	cases := []struct {
+		subver   string
+		services []string
+		kind     string
+		says     string
+	}{
+		{"/Satoshi:0.14.2/", v2, "Fake", "Claims: Bitcoin Core 0.14.2\nProbably: a scanner - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
+		{"/Satoshi:25.1.0/", v2, "Fake", "Core 25.1 did not have"},
+		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Fake", "pruned-node service, which Core 0.15"},
+		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Fake", "compact block filters"},
+		{"/Satoshi:25.1.0/Knots:20231115/", v2, "Fake", "Claims: Bitcoin Knots (Core 25.1.0)"},
+		{"/bcoin:v1.0.0-beta.14/", v2, "Fake", "Claims: bcoin v1.0.0-beta.14"},
+		{"/Classic:1.3.4(EB8)/", v2, "Fake", "never had"},
+		{"/Satoshi:31.1.0/", v2, "Node (Core)", ""},
+		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
+		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
+		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
+		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
+		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, ServicesNames: c.services}})[0]
+		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
+			t.Errorf("%s %v: got %q / %q, want %q containing %q", c.subver, c.services, got.Kind, got.About, c.kind, c.says)
+		}
+	}
+}
+
+// Your own electrs reaches Core from inside Umbrel's network, and says so.
+func TestOwnIndexer(t *testing.T) {
+	got := convert([]rawPeer{{Addr: "10.21.21.10:40216", ConnectionType: "inbound", Inbound: true,
+		Network: "not_publicly_routable", Subver: "/electrs:0.11.1/"}})[0]
+	if got.Kind != "Indexer" || got.About != "Probably your own electrs 0.11.1 on this Umbrel" {
+		t.Errorf("got %q / %q", got.Kind, got.About)
+	}
+	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ""}})[0]
+	if got.Kind != noAgentKind || !strings.Contains(got.About, "checks the port") {
+		t.Errorf("no agent: got %q / %q", got.Kind, got.About)
 	}
 }
