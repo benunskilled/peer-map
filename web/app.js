@@ -1229,13 +1229,11 @@
           about.textContent = p.about;
           td.appendChild(about);
         }
-        const note = p.no_relay
-          ? "Software that does not pass blocks on - this peer can never deliver one first."
-          : "";
+        const note = !p.no_relay ? ""
+          : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
+          : "Software that does not pass blocks on - this peer can never deliver one first.";
         td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
-        // Not for a Fake: some of them name a wallet and some Core, and a
-        // strike-through on half of one kind reads as two kinds.
-        if (p.no_relay && p.kind !== "Fake") td.className = (td.className ? td.className + " " : "") + "norelay";
+        if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
       },
     },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },

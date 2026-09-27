@@ -180,6 +180,9 @@ func convert(raw []rawPeer) []Peer {
 		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
+		// Offering nothing means no blocks to pass on, whatever the name says.
+		// Bitcoin Lab strikes the same peers.
+		p.NoRelay = p.NoRelay || p.NoServices
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)

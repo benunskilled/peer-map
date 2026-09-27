@@ -93,6 +93,9 @@ func TestObservedFlags(t *testing.T) {
 			t.Fatalf("%s: got %d peers", c.name, len(got))
 		}
 		p := got[0]
+		if p.NoServices && !p.NoRelay {
+			t.Errorf("%s: offers nothing but is not marked as unable to deliver", c.name)
+		}
 		if p.NoServices != c.noServices || p.NoTxRelay != c.noTxRelay || p.ChainUnknown != c.chainUnknown {
 			t.Errorf("%s: got no_services=%v no_tx=%v chain_unknown=%v, want %v/%v/%v",
 				c.name, p.NoServices, p.NoTxRelay, p.ChainUnknown, c.noServices, c.noTxRelay, c.chainUnknown)
