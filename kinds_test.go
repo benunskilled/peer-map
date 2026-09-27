@@ -14,13 +14,31 @@ func TestKindOf(t *testing.T) {
 		"/breadwallet:1.3.5/":                      "Wallet",
 		"/btcwire:0.5.0/neutrino:0.17.1/":          "Light client",
 		"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Light client",
-		"/Floresta:0.9.1/mandacaru:0.15.2/":        "Node (Floresta)",
-		"/electrs:0.11.1/":                         "Indexer",
-		"/Metrika-Bitnodes:0.1/":                   "Crawler",
-		"/bitnodes.io:0.3/":                        "Crawler",
-		"/GlobalNodeMap:2.1/":                      "Crawler",
-		"/dsn.tm.kit.edu/bitcoin:0.9.99/":          "Research scanner",
-		"/ckp2p:2.0/":                              "Pool node",
+		// Seen on a real node, all of them "Other" before.
+		"/bitcoin-seeder:0.01/":          "Crawler",
+		"/btc-range-scan:0.1.0/":         "Crawler",
+		"/BTC-Nodes:2026-09-24/Sonar/":   "Crawler",
+		"/census:0.1.7/":                 "Crawler",
+		"/btc-node-observatory:0.1.0/":   "Crawler",
+		"/go-bitnode-monitor:firstseen/": "Crawler",
+		"/atlas-scout:0.1/":              "Crawler",
+		"nebula/2.4.1-85b3e43":           "Crawler",
+		"/onlytwentyone-crawler:0.1/":    "Crawler",
+		// The whole reason the observed flags exist: a zero in place of the o,
+		// seen from rented machines in five regions. It must not come out as
+		// Core. It was "Other" until the Fake kind existed to say what it is.
+		"/Sat0shi:31.0.0/":                  "Fake",
+		"/Satoshi2:0.18.3/":                 "Fake",
+		"/SatoshiX:0.18.0/":                 "Fake",
+		"Satoshi:22.0.0":                    "Fake",
+		"/Satoshi:22.0.0/":                  "Node (Core)",
+		"/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
+		"/electrs:0.11.1/":                  "Indexer",
+		"/Metrika-Bitnodes:0.1/":            "Crawler",
+		"/bitnodes.io:0.3/":                 "Crawler",
+		"/GlobalNodeMap:2.1/":               "Crawler",
+		"/dsn.tm.kit.edu/bitcoin:0.9.99/":   "Research scanner",
+		"/ckp2p:2.0/":                       "Pool node",
 		// The operator's own word, in the comment part - above the software.
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
 		"/Satoshi:31.0.0(pool)/":                        "Pool node",
@@ -34,11 +52,6 @@ func TestKindOf(t *testing.T) {
 		"/Floresta:0.9.1/":               "Node (Floresta)",
 		"/btcwire:0.5.0/hemi-soak:1.0/":  "Other",
 		"":                               "unknown",
-		// The whole reason the observed flags exist. A zero in place of the o,
-		// seen on four connections from rented machines in five regions. It
-		// must not come out as Core, and it must not be quietly swallowed
-		// either - "Other" is the honest answer to a name nobody recognises.
-		"/Sat0shi:31.0.0/": "Other",
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
@@ -138,10 +151,13 @@ func TestFakeWallet(t *testing.T) {
 		kind      string
 		aboutSays string
 	}{
-		{"/bitcoinj:0.14.5/Bitcoin Wallet:5.42/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, fakeWalletKind, ""},
-		{"/breadwallet:0.6.5/", []string{"NETWORK"}, fakeWalletKind, ""},
+		{"/bitcoinj:0.14.5/Bitcoin Wallet:5.42/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, fakeWalletKind, "Probably: a node or scanner behind an old wallet name"},
+		{"/breadwallet:0.6.5/", []string{"NETWORK"}, fakeWalletKind, "Probably: a node or scanner behind an old wallet name"},
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", []string{}, "Wallet", "Schildbach"},
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", nil, "Wallet", "Schildbach"},
+		// Core's name misspelt: what it claims, and a guess from what it offers.
+		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: a crawler"},
+		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: a scanner or node that hides"},
 		// Only a wallet name can be fake: a node offering blocks is a node.
 		{"/Satoshi:31.1.0/", []string{"NETWORK", "P2P_V2"}, "Node (Core)", ""},
 	}

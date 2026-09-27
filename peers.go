@@ -174,8 +174,9 @@ func convert(raw []rawPeer) []Peer {
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
 		if p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames) {
-			// Not the wallet it names, so no sentence about that wallet either.
-			p.Kind, p.About = fakeWalletKind, ""
+			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
+		} else if p.Kind == fakeWalletKind {
+			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
