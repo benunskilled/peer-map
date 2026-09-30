@@ -1146,6 +1146,26 @@
     });
   }
 
+  // How spread out a group is: distinct operators and countries. Operators by
+  // the name in the Operator column, not by ASN: a large company runs several
+  // ASNs (Amazon has AS16509 and AS14618) and should still count once. Peers
+  // that cannot be placed - Tor, I2P, private addresses - have neither, and
+  // are named instead of being silently left out.
+  function spreadText(peers) {
+    const ops = new Set(), ccs = new Set();
+    let unplaced = 0;
+    for (const p of peers) {
+      if (p.operator || p.asn) ops.add(p.operator || "AS" + p.asn);
+      if (p.cc) ccs.add(p.cc);
+      else unplaced++;
+    }
+    const parts = [];
+    if (ops.size) parts.push(ops.size + (ops.size === 1 ? " provider" : " providers"));
+    if (ccs.size) parts.push(ccs.size + (ccs.size === 1 ? " country" : " countries"));
+    if (unplaced) parts.push(unplaced + " not placed");
+    return parts.join(" \u00b7 ");
+  }
+
   const COLS = [
     {
       key: "addr", label: "Address", cls: "addr", val: (p) => p.addr,
@@ -1275,6 +1295,13 @@
         // back - and switching from one kind to another is one click.
         renderKindMix(mix, kindPool);
         card.appendChild(mix);
+      }
+
+      if (peers.length) {
+        const spread = document.createElement("p");
+        spread.className = "kinds spread";
+        spread.textContent = spreadText(peers);
+        card.appendChild(spread);
       }
 
       if (!peers.length) {

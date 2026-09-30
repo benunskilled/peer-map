@@ -24,7 +24,7 @@ Each table includes the address, location, hosting provider, software, network, 
 
 ## Look beyond the map
 
-**See which networks your peers use.** Three peers in three countries may still be hosted by the same provider. Sort by provider to bring those connections together and see how widely your peers are distributed across networks.
+**See which networks your peers use.** Three peers in three countries may still be hosted by the same provider. Sort by provider to bring those connections together and see how widely your peers are distributed across networks. Each connection group also counts its providers and countries, so you can see at a glance how widely your manual peers are spread.
 
 **Understand the mix of software.** Peer Map recognises Core, Knots, pools, wallets, light clients, indexers, crawlers and research software. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
 
