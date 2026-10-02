@@ -1,5 +1,7 @@
 # Peer Map
 
+[![Tests](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml/badge.svg)](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/benunskilled/peer-map)](https://github.com/benunskilled/peer-map/releases)
+
 **Ever wondered who all these connections are? Peer Map shows where your node's peers are, who runs them and what they are.**
 
 Your live peers on a world map: their location, the provider that hosts them, and what they run – nodes, pool nodes, wallets, crawlers or scanners. Manual, outbound and inbound connections stay separate.
@@ -54,7 +56,7 @@ There is no background collection job or stored peer history. The app is a singl
 
 ## Install on Umbrel
 
-Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store) and install **Peer Map**. It requires the official **Bitcoin Node** app. Open it from Umbrel or at `<your-umbrel>:8791`.
+Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store) and install **Peer Map**. It requires the official **Bitcoin Node** app. Tested with Bitcoin Core 31.1. Open it from Umbrel or at `<your-umbrel>:8791`.
 
 Curious which of your peers delivers new blocks first? [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab), in the same store, measures it. Both apps work on their own and complement each other.
 
