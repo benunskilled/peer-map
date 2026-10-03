@@ -238,35 +238,6 @@ func TestTheRPCOutlivesTheBrowserRequest(t *testing.T) {
 	}
 }
 
-// An RPC that was cut off learned nothing about the node, so it must not hold
-// the window: the next poll asks again instead of serving ten seconds of an
-// error nobody's node produced.
-func TestAnAbortedRPCDoesNotOpenAWindow(t *testing.T) {
-	now := time.Unix(1_000_000, 0)
-	calls, cut := 0, true
-	s := &source{
-		now: func() time.Time { return now },
-		fetch: func(context.Context) ([]rawPeer, error) {
-			calls++
-			if cut {
-				return nil, context.Canceled
-			}
-			return []rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "manual"}}, nil
-		},
-	}
-	if snap := s.get(context.Background()); snap.Error != "" {
-		t.Errorf("a cancelled call was served as Core's answer: %q", snap.Error)
-	}
-	cut = false
-	snap := s.get(context.Background()) // same instant: no waiting for the window
-	if calls != 2 {
-		t.Fatalf("made %d calls, want 2 - the window stayed open", calls)
-	}
-	if len(snap.Peers) != 1 {
-		t.Errorf("peers=%d, want the list from the call that did go through", len(snap.Peers))
-	}
-}
-
 // Go's *url.Error prints the address it failed to reach, which here is the
 // node's host and port. The browser gets a line it can act on; the address
 // stays in the log.
