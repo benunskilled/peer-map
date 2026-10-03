@@ -2,7 +2,10 @@
 # cross-compiles, so the arm64 image needs no QEMU to build - Go does it
 # natively with CGO off. The result is one static binary with the dashboard,
 # the world map and the region and network tables embedded.
-FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS build
+# The Go release is the one go.mod names, pinned by digest - the multi-arch
+# index, so this stage resolves on any build machine - like the images the
+# store pins. toolchain_test.go keeps the two in step.
+FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine@sha256:8a5910f31396cd4d89662f56c68b3ae31d374308270a1c3bd96672ee5ed43414 AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev

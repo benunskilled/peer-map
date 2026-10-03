@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -294,3 +298,46 @@ func TestSiblingCoreOffset(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// A reply past the 64 KB this reads used to cost the block card without a
+// word anywhere. It still costs the card - a truncated reply is not one to
+// show - but the log now says why, once, instead of nothing every ten seconds.
+func TestSiblingSaysSoWhenTheReplyIsTooLarge(t *testing.T) {
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" {
+			return
+		}
+		many := make([]string, 4000)
+		for i := range many {
+			many[i] = fmt.Sprintf(`"[2001:db8::%x]:51234"`, i)
+		}
+		fmt.Fprintf(w, `{"hash":"00beef","height":1,"detectedAt":%d,"deliveredEver":[%s]}`,
+			now.UnixMilli(), strings.Join(many, ","))
+	}))
+	defer srv.Close()
+
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	defer log.SetOutput(os.Stderr)
+
+	clock := now
+	s := &siblingCheck{
+		url:      srv.URL + "/api/health",
+		blockURL: srv.URL + "/api/blocks/latest",
+		client:   srv.Client(),
+		every:    time.Hour,
+		now:      func() time.Time { return clock },
+	}
+	if got := s.latest(context.Background()); got != nil {
+		t.Fatalf("a truncated reply was shown: %+v", got)
+	}
+	if !strings.Contains(logged.String(), "64 KB") {
+		t.Fatalf("nothing logged about the size; log: %q", logged.String())
+	}
+	clock = clock.Add(interval)
+	s.latest(context.Background())
+	if n := strings.Count(logged.String(), "64 KB"); n != 1 {
+		t.Errorf("logged %d times, want once while it stays too large", n)
+	}
+}
