@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -34,6 +36,10 @@ const siblingDefault = "http://bitcoinlab-node_dashboard_1:8788/api/health"
 // showing connections.
 const blockMarkFor = 2 * time.Minute
 
+// The most of /api/blocks/latest this reads. The reply is a few kilobytes;
+// the limit is a guard against a neighbour gone wrong, not a budget.
+const blockReplyLimit = 64 << 10
+
 type siblingCheck struct {
 	url      string
 	blockURL string
@@ -45,6 +51,7 @@ type siblingCheck struct {
 	checkedAt time.Time
 	present   bool
 
+	lastProblem     string // the last reply problem logged, so it is logged once
 	blockAt         time.Time
 	blockDetectedAt int64
 	block           *lastBlock
@@ -261,9 +268,27 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 			Tx       *medianStop `json:"tx"`
 		} `json:"routeMedian"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&got); err != nil || got.DetectedAt == 0 {
+	// Read one byte past the limit, so a reply that does not fit is told apart
+	// from one that merely ends there. Either way there is no card to show -
+	// a truncated reply is not one to trust - but a reply too large to read
+	// used to cost the card without a word, so the log now says which it was,
+	// once, rather than nothing on every poll.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, blockReplyLimit+1))
+	switch {
+	case err != nil:
+		s.problem(fmt.Sprintf("reading Bitcoin Lab's latest block failed: %v", err))
+		return miss()
+	case len(body) > blockReplyLimit:
+		s.problem("Bitcoin Lab's latest block reply is larger than 64 KB - the block card is left out")
 		return miss()
 	}
+	if err := json.Unmarshal(body, &got); err != nil || got.DetectedAt == 0 {
+		if err != nil {
+			s.problem(fmt.Sprintf("Bitcoin Lab's latest block reply could not be read: %v", err))
+		}
+		return miss()
+	}
+	s.problem("")
 	age := now.UnixMilli() - got.DetectedAt
 	if age < 0 {
 		age = 0
@@ -308,6 +333,15 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	// out nine seconds later does not claim to be nine seconds younger.
 	s.blockDetectedAt = got.DetectedAt
 	return s.block
+}
+
+// problem logs a reply problem once, and forgets it when the reply is fine
+// again. Called with s.mu held.
+func (s *siblingCheck) problem(p string) {
+	if p != "" && p != s.lastProblem {
+		log.Printf("%s", p)
+	}
+	s.lastProblem = p
 }
 
 func (s *siblingCheck) withAge(b *lastBlock, now time.Time) *lastBlock {
