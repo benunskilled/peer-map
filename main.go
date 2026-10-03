@@ -202,10 +202,10 @@ func (s *source) get(ctx context.Context) snapshot {
 		raw, err := s.fetch(cctx)
 		cancel()
 		now = s.now() // the call can take seconds; the window runs from its end
+		// No case for context.Canceled: the call runs on a context detached
+		// from the browser's, so only the 20s deadline can end it early, and
+		// a node that does not answer within that has answered all the same.
 		switch {
-		case errors.Is(err, context.Canceled):
-			// Nothing was learned about the node, so this does not open a
-			// window: the next poll asks again, and what is on screen stays.
 		case err != nil:
 			// A node that is down has answered all the same. The window holds,
 			// so it is asked once per interval and not once per poll.
