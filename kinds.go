@@ -179,9 +179,11 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 // the IP addresses of nodes. Named and tracked by 0xB10C, who runs
 // peer-observer (github.com/peer-observer/peer-observer); the ranges are the
 // ones its shared/src/util.rs checks, announced by AS54098. On the node this
-// was written for, 82,180 of 132,952 addresses Bitcoin Lab ever saw - 62% -
-// came from the newer ranges, all inbound, each gone after 1.6 minutes on
-// average, nearly all as the old wallet names fakeWalletKind already catches.
+// was written for, over 24 days, they held 2.1% of all connection time - about
+// 4 of some 180 peers at any moment - but came back so often, each time from a
+// new address and gone after 1.6 minutes on average, that 62% of all addresses
+// Bitcoin Lab ever saw were theirs. Nearly all used the old wallet names
+// fakeWalletKind already catches.
 // It stays a Fake: the kind says what it does, the about says who.
 var linkingLion = []netip.Prefix{
 	// used from late 2025
