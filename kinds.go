@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -172,6 +173,40 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 	}
 	return "Claims: " + claim + "\nProbably: " + guess
 }
+
+// LinkingLion opens connections to many nodes from a few address ranges and
+// listens to transaction announcements, which may let it link transactions to
+// the IP addresses of nodes. Named and tracked by 0xB10C, who runs
+// peer-observer (github.com/peer-observer/peer-observer); the ranges are the
+// ones its shared/src/util.rs checks, announced by AS54098. On the node this
+// was written for, 82,180 of 132,952 addresses Bitcoin Lab ever saw - 62% -
+// came from the newer ranges, all inbound, each gone after 1.6 minutes on
+// average, nearly all as the old wallet names fakeWalletKind already catches.
+// It stays a Fake: the kind says what it does, the about says who.
+var linkingLion = []netip.Prefix{
+	// used from late 2025
+	netip.MustParsePrefix("143.20.137.0/24"), netip.MustParsePrefix("31.58.215.0/24"),
+	netip.MustParsePrefix("87.229.79.0/24"), netip.MustParsePrefix("2602:f5c0::/32"),
+	// used until the end of 2025
+	netip.MustParsePrefix("162.218.65.0/24"), netip.MustParsePrefix("209.222.252.0/24"),
+	netip.MustParsePrefix("91.198.115.0/24"), netip.MustParsePrefix("2604:d500:4:1::/64"),
+}
+
+func isLinkingLion(addr string) bool {
+	a, err := netip.ParseAddr(hostOf(addr))
+	if err != nil {
+		return false
+	}
+	a = a.Unmap()
+	for _, p := range linkingLion {
+		if p.Contains(a) {
+			return true
+		}
+	}
+	return false
+}
+
+const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses (tracked by 0xB10C, b10c.me)"
 
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 

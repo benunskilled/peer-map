@@ -196,6 +196,13 @@ func convert(raw []rawPeer) []Peer {
 		if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
+		if isLinkingLion(r.Addr) {
+			claim := "nothing"
+			if r.Subver != "" {
+				claim = claimOf(r.Subver)
+			}
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+linkingLionAbout
+		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
 			p.About = "Probably your own " + claimOf(r.Subver) + " on this Umbrel"
