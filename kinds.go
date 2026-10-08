@@ -52,12 +52,17 @@ var kindRules = []struct {
 	// for, "/Sat0shi:31.0.0/" alone came 475 times in a fortnight. First, so
 	// nothing below reads it as Core. What it does is unknown, so it is not
 	// marked as unable to relay.
-	{"Fake", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:`), true},
+	{"Disguised", regexp.MustCompile(`^/Sat0shi:|^/Satoshi[0-9X]+:|^Satoshi:`), true},
 	// Mining pool software speaking the p2p protocol, or a node whose operator
 	// says in the comment part of the agent - the bit in brackets - that it
 	// belongs to a pool, e.g. "/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/".
 	// Only the brackets count: outside them "pool" is also in "mempool".
-	{"Pool node", regexp.MustCompile(`(?i)ckp2p|ckpool|\([^)]*pool[^)]*\)`), true},
+	// "mempool" inside the brackets does not count: "(mempool.guide)" is a
+	// node's own label, not a pool (seen on the node this was written for).
+	// /ckp2p:/ used to be here as "ckpool's relay", but nothing named ckp2p
+	// exists in ckpool's source and nothing public explains it, so it is no
+	// longer called a pool; see aboutRules for what was actually observed.
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own.
@@ -71,7 +76,7 @@ var kindRules = []struct {
 	// /btc-range-scan/ used to land in "Other".
 	{"Crawler", regexp.MustCompile(`(?i)bitnodes|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
-	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|mempool`), false},
+	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool:`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
 	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|bither|multibit|wasabi|Bitcoin Wallet`), false},
 	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
@@ -102,7 +107,9 @@ var kindRules = []struct {
 // this is a claim contradicted by an observation, and the kind says so
 // rather than counting them as wallets. They still pass no blocks on to
 // this node, so they keep the wallet's no-relay mark.
-const fakeWalletKind = "Fake"
+// "Disguised" rather than "Fake" (Ben, 08.10.2026): it says what happens - the
+// peer passes itself off as something else - without claiming why.
+const fakeWalletKind = "Disguised"
 
 func offersWhatNoWalletCan(services []string) bool {
 	for _, s := range services {
@@ -131,7 +138,9 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
-	{regexp.MustCompile(`(?i)ckp2p`), "ckpool's p2p relay, run next to solo mining pools"},
+	{regexp.MustCompile(`(?i)ckp2p`), "Fetches blocks only, never transactions, from data centres; the operator is unknown and it is probably not part of ckpool"},
+	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
+	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},
@@ -141,7 +150,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 
-// fakeAbout says, for a Fake, what it claims and what it probably is. The
+// fakeAbout says, for a disguised peer, what it claims and what it probably is. The
 // claim comes from its user agent, the guess from what Core observed of it -
 // the one part nobody can write into a string.
 func fakeAbout(subver, walletAbout string, services []string) string {
@@ -184,7 +193,7 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 // new address and gone after 1.6 minutes on average, that 62% of all addresses
 // Bitcoin Lab ever saw were theirs. Nearly all used the old wallet names
 // fakeWalletKind already catches.
-// It stays a Fake: the kind says what it does, the about says who.
+// It stays Disguised: the kind says what it does, the about says who.
 var linkingLion = []netip.Prefix{
 	// used from late 2025
 	netip.MustParsePrefix("143.20.137.0/24"), netip.MustParsePrefix("31.58.215.0/24"),
@@ -258,6 +267,18 @@ func anachronism(subver string, services []string) string {
 	return ""
 }
 
+// offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no
+// service at all. Core always offers at least WITNESS and NETWORK or
+// NETWORK_LIMITED, so the name is borrowed. On the node this was written for:
+// 6,954 sessions in four weeks, 27% of everything that said "/Satoshi:", from
+// 620 addresses, 73% of them on Amazon's network, and not one ever delivered
+// a block first. A nil list - Core did not say - is not this.
+func offersNothingAsCore(subver string, services []string) bool {
+	return services != nil && len(services) == 0 && claimedCore.MatchString(subver)
+}
+
+const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
+
 // claimOf is the software a user agent names, readably: "/bcoin:v1.0.0/" is
 // "bcoin v1.0.0", Core and Knots are spelled out.
 func claimOf(subver string) string {
@@ -302,12 +323,20 @@ func relaysBlocks(subver string) bool {
 	return relays
 }
 
+// mempoolWord is removed before the kind rules look for "pool", so that a
+// "(mempool.guide)" label does not make a node a pool node.
+var mempoolWord = regexp.MustCompile(`(?i)mempool`)
+
 func classify(subver string) (string, bool) {
 	if subver == "" {
 		return noAgentKind, true
 	}
 	for _, r := range kindRules {
-		if r.re.MatchString(subver) {
+		s := subver
+		if r.name == "Pool node" {
+			s = mempoolWord.ReplaceAllString(subver, "")
+		}
+		if r.re.MatchString(s) {
 			return r.name, r.relays
 		}
 	}
