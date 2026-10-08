@@ -27,10 +27,10 @@ func TestKindOf(t *testing.T) {
 		// The whole reason the observed flags exist: a zero in place of the o,
 		// seen from rented machines in five regions. It must not come out as
 		// Core. It was "Other" until the Fake kind existed to say what it is.
-		"/Sat0shi:31.0.0/":                  "Fake",
-		"/Satoshi2:0.18.3/":                 "Fake",
-		"/SatoshiX:0.18.0/":                 "Fake",
-		"Satoshi:22.0.0":                    "Fake",
+		"/Sat0shi:31.0.0/":                  "Disguised",
+		"/Satoshi2:0.18.3/":                 "Disguised",
+		"/SatoshiX:0.18.0/":                 "Disguised",
+		"Satoshi:22.0.0":                    "Disguised",
 		"/Satoshi:22.0.0/":                  "Node (Core)",
 		"/Floresta:0.9.1/mandacaru:0.15.2/": "Node (Floresta)",
 		"/electrs:0.11.1/":                  "Indexer",
@@ -38,7 +38,7 @@ func TestKindOf(t *testing.T) {
 		"/bitnodes.io:0.3/":                 "Crawler",
 		"/GlobalNodeMap:2.1/":               "Crawler",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/":   "Research scanner",
-		"/ckp2p:2.0/":                       "Pool node",
+		"/ckp2p:2.0/":                       "Other",
 		// The operator's own word, in the comment part - above the software.
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
 		"/Satoshi:31.0.0(pool)/":                        "Pool node",
@@ -48,10 +48,12 @@ func TestKindOf(t *testing.T) {
 		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
 		// "pool" outside the brackets is not a claim: this is an indexer.
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
-		"/Bitcoin ABC:0.14.5(EB8.0)/":    "Other chain",
-		"/Floresta:0.9.1/":               "Node (Floresta)",
-		"/btcwire:0.5.0/hemi-soak:1.0/":  "Other",
-		"":                               noAgentKind,
+		// "mempool" in the brackets is a node's label, not a pool (seen on Ben's node)
+		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
+		"/Bitcoin ABC:0.14.5(EB8.0)/":                       "Other chain",
+		"/Floresta:0.9.1/":                                  "Node (Floresta)",
+		"/btcwire:0.5.0/hemi-soak:1.0/":                     "Other",
+		"":                                                  noAgentKind,
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
@@ -186,13 +188,13 @@ func TestAnachronism(t *testing.T) {
 		kind     string
 		says     string
 	}{
-		{"/Satoshi:0.14.2/", v2, "Fake", "Claims: Bitcoin Core 0.14.2\nProbably: a scanner - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
-		{"/Satoshi:25.1.0/", v2, "Fake", "Core 25.1 did not have"},
-		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Fake", "pruned-node service, which Core 0.15"},
-		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Fake", "compact block filters"},
-		{"/Satoshi:25.1.0/Knots:20231115/", v2, "Fake", "Claims: Bitcoin Knots (Core 25.1.0)"},
-		{"/bcoin:v1.0.0-beta.14/", v2, "Fake", "Claims: bcoin v1.0.0-beta.14"},
-		{"/Classic:1.3.4(EB8)/", v2, "Fake", "never had"},
+		{"/Satoshi:0.14.2/", v2, "Disguised", "Claims: Bitcoin Core 0.14.2\nProbably: a scanner - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
+		{"/Satoshi:25.1.0/", v2, "Disguised", "Core 25.1 did not have"},
+		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "pruned-node service, which Core 0.15"},
+		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Disguised", "compact block filters"},
+		{"/Satoshi:25.1.0/Knots:20231115/", v2, "Disguised", "Claims: Bitcoin Knots (Core 25.1.0)"},
+		{"/bcoin:v1.0.0-beta.14/", v2, "Disguised", "Claims: bcoin v1.0.0-beta.14"},
+		{"/Classic:1.3.4(EB8)/", v2, "Disguised", "never had"},
 		{"/Satoshi:31.1.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
@@ -240,9 +242,33 @@ func TestLinkingLion(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("got %d peers, want 2", len(got))
 	}
-	for _, p := range got {
-		if p.Kind != fakeWalletKind || !strings.Contains(p.About, linkingLionAbout) {
-			t.Errorf("%s: kind %q about %q", p.Addr, p.Kind, p.About)
+	// with a borrowed name: Disguised; without any name: still "No user agent"
+	if got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, linkingLionAbout) {
+		t.Errorf("%s: kind %q about %q", got[0].Addr, got[0].Kind, got[0].About)
+	}
+	if got[1].Kind != noAgentKind || !strings.Contains(got[1].About, linkingLionAbout) {
+		t.Errorf("%s: kind %q about %q", got[1].Addr, got[1].Kind, got[1].About)
+	}
+}
+
+// A peer naming Core that offers no service at all is not Core: Core always
+// offers WITNESS and NETWORK or NETWORK_LIMITED (Ben's node: 6,954 sessions,
+// 73% on Amazon, none ever first). nil = Core did not say, which is not this.
+func TestCoreOfferingNothing(t *testing.T) {
+	no := []string{}
+	got := convert([]rawPeer{{Addr: "198.51.100.7:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: no}})
+	if len(got) != 1 || got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, offersNothingAbout) {
+		t.Fatalf("Core offering nothing: %+v", got)
+	}
+	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS"}, {"NETWORK_LIMITED", "WITNESS"}} {
+		got := convert([]rawPeer{{Addr: "198.51.100.8:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: svc}})
+		if len(got) != 1 || got[0].Kind != "Node (Core)" {
+			t.Errorf("services %v: kind %q, want Node (Core)", svc, got[0].Kind)
 		}
+	}
+	// a wallet offering nothing stays a wallet
+	got = convert([]rawPeer{{Addr: "198.51.100.9:40000", Inbound: true, ConnectionType: "inbound", Subver: "/bitcoinj:0.16.2/Bitcoin Wallet:9.0/", ServicesNames: no}})
+	if got[0].Kind != "Wallet" {
+		t.Errorf("wallet offering nothing: %q", got[0].Kind)
 	}
 }

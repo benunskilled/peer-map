@@ -191,17 +191,22 @@ func convert(raw []rawPeer) []Peer {
 		default:
 			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
 			}
 		}
 		if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
+		// LinkingLion with a borrowed name is Disguised; without any name it
+		// claims nothing, so it stays "No user agent" and only the about says
+		// who it probably is (Ben, 08.10.2026).
 		if isLinkingLion(r.Addr) {
-			claim := "nothing"
-			if r.Subver != "" {
-				claim = claimOf(r.Subver)
+			if r.Subver == "" {
+				p.About = "Probably: " + linkingLionAbout
+			} else {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
 			}
-			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+linkingLionAbout
 		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
