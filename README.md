@@ -26,7 +26,7 @@ Each table includes the address, location, hosting provider, software, network, 
 
 **See which networks your peers use.** Three peers in three different countries may still be hosted by the same provider. Sort by provider to bring those connections together. The count of providers and countries above each table shows how widely your manual peers, for example, are spread.
 
-**Understand the mix of software your peers run.** Peer Map recognises Core, Knots and other node software such as btcd, as well as pools, wallets, light clients, indexers, crawlers, research software and fakes – including LinkingLion, an entity tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/) that connects to many nodes and may link transactions to their IP addresses. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
+**Understand the mix of software your peers run.** Peer Map recognises Core, Knots and other node software such as btcd, as well as pools, wallets, light clients, indexers, crawlers, research software and disguised peers – including LinkingLion, an entity tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/) that connects to many nodes and may link transactions to their IP addresses. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
 
 The labels come from each peer's own user agent, so they are what the peer claims. Next to them, Peer Map shows what Core itself observed: whether the peer offers services, relays transactions and follows a chain Core knows. Together, these details give you a fuller picture of who's connected.
 
