@@ -272,3 +272,31 @@ func TestCoreOfferingNothing(t *testing.T) {
 		t.Errorf("wallet offering nothing: %q", got[0].Kind)
 	}
 }
+
+// Inbound from umbrelOS's Docker gateway is IPv6 with the address hidden;
+// outbound or any other private address is not.
+func TestHiddenIPv6(t *testing.T) {
+	cases := []struct {
+		addr    string
+		inbound bool
+		want    string
+	}{
+		{"10.21.0.1:51234", true, hiddenIPv6},
+		{"10.21.0.1:51234", false, "not_publicly_routable"},
+		{"10.21.22.10:40000", true, "not_publicly_routable"}, // Tor proxy
+		{"10.21.21.10:40216", true, "not_publicly_routable"}, // an app on this Umbrel
+	}
+	for _, c := range cases {
+		typ := "outbound-full-relay"
+		if c.inbound {
+			typ = "inbound"
+		}
+		got := convert([]rawPeer{{Addr: c.addr, Network: "not_publicly_routable", ConnectionType: typ, Inbound: c.inbound, Subver: "/Satoshi:31.0.0/"}})
+		if len(got) != 1 || got[0].Network != c.want {
+			t.Errorf("%s inbound=%v: network %+v, want %s", c.addr, c.inbound, got, c.want)
+		}
+		if got[0].Country != "" || got[0].Operator != "" {
+			t.Errorf("%s: looked up %q %q", c.addr, got[0].Country, got[0].Operator)
+		}
+	}
+}
