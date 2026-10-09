@@ -50,10 +50,12 @@ func TestKindOf(t *testing.T) {
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
 		// "mempool" in the brackets is a node's label, not a pool (seen on Ben's node)
 		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
-		"/Bitcoin ABC:0.14.5(EB8.0)/":                       "Other chain",
-		"/Floresta:0.9.1/":                                  "Node (Floresta)",
-		"/btcwire:0.5.0/hemi-soak:1.0/":                     "Other",
-		"":                                                  noAgentKind,
+		"/mempool/":                     "Indexer",
+		"/mempool.space:1.0/":           "Indexer",
+		"/Bitcoin ABC:0.14.5(EB8.0)/":   "Other chain",
+		"/Floresta:0.9.1/":              "Node (Floresta)",
+		"/btcwire:0.5.0/hemi-soak:1.0/": "Other",
+		"":                              noAgentKind,
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)

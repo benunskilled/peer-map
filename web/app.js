@@ -858,7 +858,7 @@
     "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
     "Research scanner": "its user agent names a university or research network",
     "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar",
-    "Indexer": "its user agent says electrs, electrum, esplora or /mempool:",
+    "Indexer": "its user agent says electrs, electrum or esplora, or begins with /mempool",
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
