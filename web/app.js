@@ -159,7 +159,7 @@
   }[t] || t || "-");
   const netLabel = (n) => ({
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
-    not_publicly_routable: "Private",
+    not_publicly_routable: "Private", ipv6_hidden: "IPv6 (address hidden)",
   }[n] || n || "-");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
@@ -1213,7 +1213,13 @@
         if (p.asn) td.title = "AS" + p.asn;
       },
     },
-    { key: "network", label: "Network", val: (p) => netLabel(p.network) },
+    {
+      key: "network", label: "Network", val: (p) => netLabel(p.network),
+      cell: (td, p) => {
+        td.textContent = netLabel(p.network);
+        if (p.network === "ipv6_hidden") td.title = "Came in over IPv6. umbrelOS passes inbound IPv6 on through Docker, which puts its own address in place of the peer's, so where it is and whose machine it is cannot be known.";
+      },
+    },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
     {
       key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,

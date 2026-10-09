@@ -155,6 +155,17 @@ func operator(p rawPeer) (asn.Info, bool) {
 	return asn.Lookup(a)
 }
 
+// dockerGateway is where inbound IPv6 comes from on umbrelOS: the Bitcoin
+// container has no IPv6, so docker-proxy accepts the connection on the host
+// and passes it on from the gateway of Umbrel's network, port and all. The
+// peer's own address is gone. On the node this was written for: 9,935 inbound
+// sessions in four weeks, against not one outbound IPv6 connection (Core
+// knew 13,357 IPv6 addresses and had tried none successfully).
+const dockerGateway = "10.21.0.1"
+
+// hiddenIPv6 is the network such a peer is shown under instead of "Private".
+const hiddenIPv6 = "ipv6_hidden"
+
 // isPrivate: an address inside a private network, such as the one umbrelOS
 // runs its apps in.
 func isPrivate(addr string) bool {
@@ -207,6 +218,9 @@ func convert(raw []rawPeer) []Peer {
 			} else {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
 			}
+		}
+		if r.Inbound && hostOf(r.Addr) == dockerGateway {
+			p.Network = hiddenIPv6
 		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
