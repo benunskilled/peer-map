@@ -76,7 +76,9 @@ var kindRules = []struct {
 	// /btc-range-scan/ used to land in "Other".
 	{"Crawler", regexp.MustCompile(`(?i)bitnodes|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
-	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool:`), false},
+	// "/mempool" at the start of a part of the agent: "/mempool/" and
+	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
+	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
 	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|bither|multibit|wasabi|Bitcoin Wallet`), false},
 	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
