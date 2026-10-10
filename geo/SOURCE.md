@@ -6,9 +6,8 @@ licence asks for; keep it.
 
 Source: `dbip-city-ipv4.mmdb` and `dbip-city-ipv6.mmdb` from the `latest`
 release of <https://github.com/sapics/ip-location-db>, which republishes that
-data as `.mmdb`. Current table: database build 2026-08-01 (IPv4) and 2026-09-01
-(IPv6), 3,543 regions, 2,076,188 IPv4 and 2,139,636 IPv6 ranges, 33,915,423
-bytes.
+data as `.mmdb`. Current table: database build 2026-10-02 (IPv4 and IPv6), 3,531 regions,
+2,088,036 IPv4 and 2,174,150 IPv6 ranges, 34,331,474 bytes.
 
 **Not from npm.** The same project publishes these databases as npm packages
 too, and warns on them that the data there contains errors and that npm updates
