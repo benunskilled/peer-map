@@ -196,10 +196,16 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 // Bitcoin Lab ever saw were theirs. Nearly all used the old wallet names
 // fakeWalletKind already catches.
 // It stays Disguised: the kind says what it does, the about says who.
+// Current ranges from the bnoc banlist (github.com/bitcoin-noc/banlist,
+// entities.toml, after PR #4 of 16.09.2026): the IPv6 range is one /64, not the
+// provider's whole /32, and two single hosts come on top. One of them,
+// 104.234.118.2, made 5,822 sessions on the node this was written for, with 82
+// different fake user agents from that one address.
 var linkingLion = []netip.Prefix{
-	// used from late 2025
+	// used from 2025-12-05
 	netip.MustParsePrefix("143.20.137.0/24"), netip.MustParsePrefix("31.58.215.0/24"),
-	netip.MustParsePrefix("87.229.79.0/24"), netip.MustParsePrefix("2602:f5c0::/32"),
+	netip.MustParsePrefix("87.229.79.0/24"), netip.MustParsePrefix("2602:f5c0:0:ace::/64"),
+	netip.MustParsePrefix("104.234.118.2/32"), netip.MustParsePrefix("69.17.52.1/32"),
 	// used until the end of 2025
 	netip.MustParsePrefix("162.218.65.0/24"), netip.MustParsePrefix("209.222.252.0/24"),
 	netip.MustParsePrefix("91.198.115.0/24"), netip.MustParsePrefix("2604:d500:4:1::/64"),
