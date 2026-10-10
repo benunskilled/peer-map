@@ -62,8 +62,8 @@ Curious which of your peers delivers new blocks first? [Bitcoin Lab](https://git
 
 ## Data and attribution
 
-- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0 — data from August 2026 (IPv4) and September 2026 (IPv6).
-- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0 — data from September 2026.
+- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0 — data from October 2026.
+- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0 — data from October 2026.
 - World map: Natural Earth, public domain.
 
 See [geo/SOURCE.md](geo/SOURCE.md) and [asn/SOURCE.md](asn/SOURCE.md) for data versions and update instructions.
