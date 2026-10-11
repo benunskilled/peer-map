@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in each Peer Map release. The same notes are on the [releases page](https://github.com/benunskilled/peer-map/releases).
+The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
 ## 0.9.6 – 2026-10-09
 
@@ -29,19 +29,27 @@ The route card keeps the transaction count when your pool's job is ready the sam
 ## 0.9.0 – 2026-09-25
 
 **See why a job took longer.** Next to the time your pool needed to build its job, the route now shows how many transactions the block template carried. The bigger the template, the longer the job takes. This needs Bitcoin Lab 1.24.0. With an older version the route looks as before.
- A node that names a pool in its user agent, such as "(PyBLOCK-POOL)", now shows as a pool node. A lost connection to Core reads as a short sentence instead of a raw error with your node's address, and closing a browser tab no longer leaves the map showing an error for a few seconds.
+
+A node that names a pool in its user agent, such as "(PyBLOCK-POOL)", now shows as a pool node. A lost connection to Core reads as a short sentence instead of a raw error with your node's address, and closing a browser tab no longer leaves the map showing an error for a few seconds.
 
 ## 0.8.0 – 2026-09-22
 
 **Green rows** in the peer tables are the connections Bitcoin Lab has seen
+
 deliver a block first at least once. On one real node that is about one in
+
 twelve connected peers — every manual peer and a handful of inbound ones. The
+
 peer that brought the newest block is **orange** for as long as its star is
+
 up, two minutes, and then turns green.
 
 The route of a block reads better when your peer had the block before any
+
 pool sent a job. The first job is the zero the times are counted from, not a
+
 stop the block passes, so it no longer cuts the ping into two unlabelled
+
 pieces.
 
 Green and orange rows need Bitcoin Lab 1.23.0.
@@ -49,59 +57,89 @@ Green and orange rows need Bitcoin Lab 1.23.0.
 ## 0.7.0 – 2026-09-21
 
 The route of a block now has **four stretches**, each with its own lever: the
+
 block reaching your peer, the hop into your node, Core building the next
+
 template, and your pool turning it into a job. Where the time goes is where
+
 you can make it shorter.
 
 Beside this block's route there is the **typical block**: every stop at its
+
 median over the last hundred blocks. One block scatters; the median shows
+
 whether a change made anything shorter. Switch between the two above the
+
 route — the choice is remembered.
 
 The template stop needs Bitcoin Lab 1.22.0. With an older Bitcoin Lab the card
+
 is as it was.
 
 ## 0.6.0 – 2026-09-21
 
 The block card now draws the **route of the newest block**, to scale. It
+
 starts at the first new job any pool sent here — the zero, because when a
+
 block was found cannot be measured — and runs through the peer that delivered
+
 it, with its location and hosting provider, to your node and on to your own
+
 pool's job. The long stretch is the long stretch: you see at a glance where
+
 the time goes.
 
 Everything on it is measured by one clock on one machine, except the hop from
+
 the peer into your node, which is estimated from that peer's lowest ping. Core
+
 sometimes has a block before any pool has sent a job; the route shows that
+
 too, left of the zero.
 
 With Stratum Race running, the summary and the route stay open and only the
+
 full pool list folds away. On a phone the route becomes a list. Nothing new is
+
 asked of Bitcoin Lab — it already sends the two timestamps this needs.
 
 ## 0.5.0 – 2026-09-20
 
 With **Bitcoin Lab** installed on the same node, a card above the map follows
+
 the newest block: which pool mined it, which of your peers delivered it first,
+
 and — with Stratum Race running — how quickly each pool turned it into fresh
+
 work. Open the card and every delivering peer stands there with its location
+
 and hosting provider, and the race order with your own pool marked.
 
 The peer that brought the block in **is starred on the map** for two minutes,
+
 and in its row in the table, so you can see where your blocks arrive from
+
 before the next one lands. The pool's name sits next to the star in the header.
 
 Missing data stays visible rather than hidden: a miner nobody can name shows
+
 the text out of his own coinbase, a peer that has since disconnected keeps its
+
 row and says so, and a block with no race recorded says why. Several peers
+
 credited for one block are all shown, because the block did not arrive once.
 
 **The counts in each software line are buttons now.** "125 Node (Core) · 14
+
 Other": click one and the tables and the map show only those peers. Finding the
+
 five pool nodes among two hundred connections stopped being a search.
 
 Nothing new is polled for any of this. The block rides along with the peer list
+
 that is fetched every ten seconds anyway, and without Bitcoin Lab the card is
+
 simply not there.
 
 ## 0.4.0 – 2026-09-17
@@ -123,4 +161,5 @@ How much that is worth is a fair question, because the name comes from the peer 
 Nothing is downloaded for this and the app is no larger — the name was already in every row, it just was not read. The demo data now shows the mix of a real node instead of six versions of Core.
 
 **Image:** `ghcr.io/benunskilled/peer-map:0.3.0`
+
 **Digest:** `sha256:18438fb8b155c7251b284231a6814b23db82fcf8978aa30498b3de9ac591b7cb`
