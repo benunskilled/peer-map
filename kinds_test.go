@@ -305,3 +305,16 @@ func TestHiddenIPv6(t *testing.T) {
 		}
 	}
 }
+
+// Every LinkingLion peer is flagged for the header count, whatever kind its
+// user agent made it; nothing else is.
+func TestLinkingLionFlag(t *testing.T) {
+	got := convert([]rawPeer{
+		{Addr: "104.234.118.2:41000", Inbound: true, ConnectionType: "inbound", Subver: "/bitcoinj:0.14.4/Bitcoin Wallet:5.36/"},
+		{Addr: "143.20.137.9:41000", Inbound: true, ConnectionType: "inbound", Subver: ""},
+		{Addr: "198.51.100.7:8333", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: []string{"NETWORK", "WITNESS"}},
+	})
+	if !got[0].LinkingLion || !got[1].LinkingLion || got[2].LinkingLion {
+		t.Fatalf("flags: %v %v %v", got[0].LinkingLion, got[1].LinkingLion, got[2].LinkingLion)
+	}
+}

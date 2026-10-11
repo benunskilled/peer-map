@@ -31,8 +31,9 @@ type rawPeer struct {
 	RelayTxes     *bool    `json:"relaytxes"`
 	SyncedHeaders *int64   `json:"synced_headers"`
 
-	mockLoc *geo.Location // demo data only: documentation addresses have no location
-	mockASN *asn.Info     // demo data only, same reason
+	mockLoc         *geo.Location // demo data only: documentation addresses have no location
+	mockASN         *asn.Info     // demo data only, same reason
+	mockLinkingLion bool          // demo only: a documentation address standing in for LinkingLion
 }
 
 // Peer is what the dashboard receives.
@@ -56,6 +57,9 @@ type Peer struct {
 	Kind     string `json:"kind"`               // what the user agent claims; see kinds.go
 	About    string `json:"about,omitempty"`    // what that software is, when known
 	NoRelay  bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
+	// user agent made it. The header counts these separately.
+	LinkingLion bool `json:"linking_lion,omitempty"`
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
 	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
@@ -212,7 +216,8 @@ func convert(raw []rawPeer) []Peer {
 		// LinkingLion with a borrowed name is Disguised; without any name it
 		// claims nothing, so it stays "No user agent" and only the about says
 		// who it probably is (Ben, 08.10.2026).
-		if isLinkingLion(r.Addr) {
+		if isLinkingLion(r.Addr) || r.mockLinkingLion {
+			p.LinkingLion = true
 			if r.Subver == "" {
 				p.About = "Probably: " + linkingLionAbout
 			} else {

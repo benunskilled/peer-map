@@ -340,11 +340,11 @@ func TestHTTP(t *testing.T) {
 			placed++
 		}
 	}
-	if groups["manual"] != 8 || groups["outbound"] != 12 || groups["inbound"] != 26 {
+	if groups["manual"] != 8 || groups["outbound"] != 12 || groups["inbound"] != 28 { // 22 public + 2 demo LinkingLion + 2 Docker IPv6 + Tor + I2P
 		t.Errorf("groups %v", groups)
 	}
-	if placed != 8+11+22 {
-		t.Errorf("placed %d peers on the map, want 41", placed)
+	if placed != 8+11+22+2 { // + the two demo LinkingLion
+		t.Errorf("placed %d peers on the map, want 43", placed)
 	}
 	for _, p := range snap.Peers {
 		h := hostOf(p.Addr)

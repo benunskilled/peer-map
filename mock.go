@@ -187,6 +187,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 	}
 	add("inbound", true, "not_publicly_routable", "10.21.0.1:51234", nil, nil)
 	add("inbound", true, "not_publicly_routable", "10.21.0.1:51980", nil, nil)
+	// Two LinkingLion connections, so the header's LinkingLion count shows in
+	// the demo too. Documentation addresses like everything here, marked by
+	// hand: the real ranges would put real addresses into screenshots.
+	add("inbound", true, "ipv4", "198.51.100.231:41532", &locs[2], &nets[2])
+	out[len(out)-1].mockLinkingLion = true
+	add("inbound", true, "ipv4", "198.51.100.232:50210", &locs[2], &nets[2])
+	out[len(out)-1].mockLinkingLion = true
 	add("inbound", true, "onion", "127.0.0.1:50122", nil, nil)
 	add("inbound", true, "i2p", "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p:0", nil, nil)
 	add("feeler", false, "ipv4", "192.0.2.250:8333", &locs[0], &nets[0]) // must be hidden
