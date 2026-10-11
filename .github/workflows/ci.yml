@@ -6,9 +6,6 @@ name: Tests
 # a red one stops the image from being pushed. Previously both workflows started
 # on the same tag push with no edge between them - which is how v0.8.0 published
 # while "The image builds" was red beside it.
-#
-# The integration job below still keys off the ref, which is the caller's tag
-# when this workflow is called that way.
 on:
   push:
     branches: ['**']
@@ -107,9 +104,10 @@ jobs:
   # getpeerinfo reply shaped by hand. This proves Bitcoin Core really reports
   # what that reply assumes: four real regtest nodes, one connection of each
   # type the map separates, read back through the same code the app runs.
-  # Only on tags and on demand - it downloads Core.
+  # On every push and pull request (Ben, 11.10.2026): with Core cached it adds
+  # about half a minute, and a change that breaks against real Core shows up
+  # in its PR, not first at the release.
   integration:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     name: Against real Bitcoin Core
     env:
