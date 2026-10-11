@@ -667,6 +667,7 @@
   }
 
   const LOOKERS = new Set(["Disguised", "Crawler", "Research scanner"]);
+  const LION_TITLE = "LinkingLion connects to many nodes and may link transactions to their IP addresses. Tracked by 0xB10C – click for details.";
   function renderStatus() {
     const d = state.data;
     if (!d) return;
@@ -676,7 +677,23 @@
     // pretending. On the node this was written for, most of them.
     const lookers = d.peers.filter((p) => LOOKERS.has(p.kind)).length;
     const of = lookers ? `, ${lookers} disguised or crawling` : "";
-    $("status").textContent = `${d.peers.length} peers${of} · updated ${since} · ${mode}`;
+    // LinkingLion named on its own, with what it is a hover away: most people
+    // have never heard the name, and it is the one entity here with a record.
+    const lions = d.peers.filter((p) => p.linking_lion).length;
+    const el = $("status");
+    el.textContent = `${d.peers.length} peers${of}`;
+    if (lions) {
+      el.append(", ");
+      const a = document.createElement("a");
+      a.href = "https://b10c.me/observations/06-linkinglion/";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.className = "lion";
+      a.textContent = `${lions} LinkingLion`;
+      a.title = LION_TITLE;
+      el.append(a);
+    }
+    el.append(` · updated ${since} · ${mode}`);
   }
 
   // ---------- map ----------
