@@ -10,7 +10,7 @@ body:
     attributes:
       label: Peer Map version
       description: Shown at the bottom of the page.
-      placeholder: v1.0.0
+      placeholder: v0.9.6
     validations: { required: true }
   - type: input
     id: umbrelos
