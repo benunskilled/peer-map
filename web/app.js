@@ -653,10 +653,12 @@
 
   // Bitcoin Lab measures which of these peers actually delivers each block
   // first. The server says whether it is installed; the port is the one its
-  // store manifest publishes, and the host is this one.
+  // store manifest publishes (or PEERMAP_SIBLING_LINK_PORT, passed on as
+  // sibling_port, for a test store), and the host is this one.
   const SIBLING_PORT = 8790;
   function siblingURL(peerAddress) {
-    const base = `${location.protocol}//${location.hostname}:${SIBLING_PORT}/`;
+    const port = (state.data && state.data.sibling_port) || SIBLING_PORT;
+    const base = `${location.protocol}//${location.hostname}:${port}/`;
     return peerAddress ? base + "?peer=" + encodeURIComponent(peerAddress) : base;
   }
   function renderSiblingLink() {
