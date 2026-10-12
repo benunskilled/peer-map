@@ -12,7 +12,7 @@ Security fixes are provided for the latest release. Please update before checkin
 
 ## Access to your node
 
-Peer Map reads Bitcoin Core's peer list over RPC (`getpeerinfo` and `getnetworkinfo`) and changes nothing: it makes no write calls, and its dashboard only shows information. If Bitcoin Lab runs on the same node, Peer Map also reads its block information over the local network.
+Peer Map reads Bitcoin Core's peer list over RPC (`getpeerinfo` only) and changes nothing: it makes no write calls, and its dashboard only shows information. If Bitcoin Lab runs on the same node, Peer Map also reads its block information over the local network.
 
 Locations and network providers are looked up in databases bundled with the app, so no peer address is sent to an outside service.
 
