@@ -675,7 +675,8 @@
     const mode = state.paused ? "paused" : `every ${d.interval}s while open`;
     // Quietly, in the same line: how many of them are only looking, or
     // pretending. On the node this was written for, most of them.
-    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind)).length;
+    // LinkingLion is counted on its own below, not here as well.
+    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind) && !p.linking_lion).length;
     const of = lookers ? `, ${lookers} disguised or crawling` : "";
     // LinkingLion named on its own, with what it is a hover away: most people
     // have never heard the name, and it is the one entity here with a record.
@@ -875,7 +876,7 @@
     "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
     "Research scanner": "its user agent names a university or research network",
     "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar",
-    "Indexer": "its user agent says electrs, electrum or esplora, or begins with /mempool",
+    "Indexer": "its user agent says electrs, electrum or esplora, or contains /mempool",
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
