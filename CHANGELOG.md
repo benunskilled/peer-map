@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 1.0.0 – 2026-10-12
+
+The header now counts LinkingLion connections on their own, with a link explaining who they are. Peer Map now recognises LinkingLion by the ranges in the bnoc banlist, including two single addresses it missed: on my node one of them alone had opened 5,822 connections under 82 fake wallet names. Peers whose user agent contains /mempool count as indexers again. Locations and network names now come from October's DB-IP data.
+
 ## 0.9.6 – 2026-10-09
 
 "Fake" is now called "Disguised", and it now also catches peers that call themselves Bitcoin Core but offer nothing – real Core always offers at least blocks. ckp2p is no longer listed as a pool node, a "(mempool…)" label no longer makes a node a pool or an indexer, and NBitcoin and Bitcore get a short description. On Umbrel, inbound IPv6 peers now show as "IPv6 (address hidden)" instead of "Private": umbrelOS hands them over through Docker, which hides their real address.
