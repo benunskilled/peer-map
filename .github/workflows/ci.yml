@@ -104,7 +104,7 @@ jobs:
   # getpeerinfo reply shaped by hand. This proves Bitcoin Core really reports
   # what that reply assumes: four real regtest nodes, one connection of each
   # type the map separates, read back through the same code the app runs.
-  # On every push and pull request (Ben, 11.10.2026): with Core cached it adds
+  # On every push and pull request: with Core cached it adds
   # about half a minute, and a change that breaks against real Core shows up
   # in its PR, not first at the release.
   integration:

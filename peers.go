@@ -215,7 +215,7 @@ func convert(raw []rawPeer) []Peer {
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
 		// claims nothing, so it stays "No user agent" and only the about says
-		// who it probably is (Ben, 08.10.2026).
+		// who it probably is.
 		if isLinkingLion(r.Addr) || r.mockLinkingLion {
 			p.LinkingLion = true
 			if r.Subver == "" {

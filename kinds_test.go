@@ -48,7 +48,7 @@ func TestKindOf(t *testing.T) {
 		"/Satoshi:29.4.2(PyBLOCK-BIP110)/Knots:20260508/": "Node (Knots)",
 		// "pool" outside the brackets is not a claim: this is an indexer.
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
-		// "mempool" in the brackets is a node's label, not a pool (seen on Ben's node)
+		// "mempool" in the brackets is a node's label, not a pool (seen on a real node)
 		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
 		"/mempool/":                     "Indexer",
 		"/mempool.space:1.0/":           "Indexer",
@@ -228,7 +228,7 @@ func TestOwnIndexer(t *testing.T) {
 
 func TestLinkingLion(t *testing.T) {
 	for _, a := range []string{"143.20.137.5:51234", "[2602:f5c0:0:ace::72:300]:8333", "[2602:f5c0:0:ace::60]:8333",
-		"104.234.118.2:41000", "69.17.52.1:8333", "91.198.115.9:1", "[::ffff:31.58.215.200]:8333"} {
+		"104.234.118.2:41000", "69.17.52.1:8333", "91.198.115.9:1", "[::ffff:31.58.215.200]:8333", "199.116.84.20:8333"} {
 		if !isLinkingLion(a) {
 			t.Errorf("%s not recognised", a)
 		}
@@ -257,7 +257,7 @@ func TestLinkingLion(t *testing.T) {
 }
 
 // A peer naming Core that offers no service at all is not Core: Core always
-// offers WITNESS and NETWORK or NETWORK_LIMITED (Ben's node: 6,954 sessions,
+// offers WITNESS and NETWORK or NETWORK_LIMITED (one node: 6,954 sessions,
 // 73% on Amazon, none ever first). nil = Core did not say, which is not this.
 func TestCoreOfferingNothing(t *testing.T) {
 	no := []string{}
