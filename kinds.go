@@ -109,7 +109,7 @@ var kindRules = []struct {
 // this is a claim contradicted by an observation, and the kind says so
 // rather than counting them as wallets. They still pass no blocks on to
 // this node, so they keep the wallet's no-relay mark.
-// "Disguised" rather than "Fake" (Ben, 08.10.2026): it says what happens - the
+// "Disguised" rather than "Fake": it says what happens - the
 // peer passes itself off as something else - without claiming why.
 const fakeWalletKind = "Disguised"
 
@@ -189,7 +189,7 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 // listens to transaction announcements, which may let it link transactions to
 // the IP addresses of nodes. Named and tracked by 0xB10C, who runs
 // peer-observer (github.com/peer-observer/peer-observer); the ranges are the
-// ones its shared/src/util.rs checks, announced by AS54098. On the node this
+// ones its shared/src/util.rs checked at first, announced by AS54098. On the node this
 // was written for, over 24 days, they held 2.1% of all connection time - about
 // 4 of some 180 peers at any moment - but came back so often, each time from a
 // new address and gone after 1.6 minutes on average, that 62% of all addresses
@@ -209,6 +209,8 @@ var linkingLion = []netip.Prefix{
 	// used until the end of 2025
 	netip.MustParsePrefix("162.218.65.0/24"), netip.MustParsePrefix("209.222.252.0/24"),
 	netip.MustParsePrefix("91.198.115.0/24"), netip.MustParsePrefix("2604:d500:4:1::/64"),
+	// listed by bnoc, no longer announced since 2026-03-30
+	netip.MustParsePrefix("199.116.84.0/24"),
 }
 
 func isLinkingLion(addr string) bool {
