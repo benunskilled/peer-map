@@ -8,9 +8,13 @@ Your live peers on a world map: their location, the provider that hosts them, an
 
 ![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png)
 
+## Not every peer is who it claims to be
+
+Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. On my node, a single LinkingLion address opened 5,822 connections under 82 fake wallet names. Peer Map's header counts them separately.
+
 ## Explore your node's neighbourhood
 
-Start with the world view, then zoom in to split country markers into states, provinces and regions. Click a country or region to filter the peer tables, or toggle connection types to focus on one part of your node's network.
+Zoom from countries down to states and regions, click one to filter the tables, or show only manual, outbound or inbound connections.
 
 The three groups show how each connection got there:
 
@@ -26,7 +30,7 @@ Each table includes the address, location, hosting provider, software, network, 
 
 **See which networks your peers use.** Three peers in three different countries may still be hosted by the same provider. Sort by provider to bring those connections together. The count of providers and countries above each table shows how widely your manual peers, for example, are spread.
 
-**Understand the mix of software your peers run.** Peer Map recognises Core, Knots and other node software such as btcd, as well as pools, wallets, light clients, indexers, crawlers, research software and disguised peers – including LinkingLion, an entity tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/) that connects to many nodes and may link transactions to their IP addresses. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
+**Understand the mix of software your peers run.** Peer Map recognises node software, pool nodes, wallets, light clients, crawlers and more. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
 
 The labels come from each peer's own user agent, so they are what the peer claims. Next to them, Peer Map shows what Core itself observed: whether the peer offers services, relays transactions and follows a chain Core knows. Together, these details give you a fuller picture of who's connected.
 
@@ -52,7 +56,7 @@ Peer Map reads your current connections. The map, geolocation and ASN data are b
 
 The dashboard requests updates only while it is visible. Background tabs stop polling, and a dashboard with no mouse or keyboard activity for 30 minutes pauses until you resume it.
 
-There is no background collection job or stored peer history. The app is a single static Go binary using only the standard library, and on my node, with around 200 peers connected, it uses about 27 MB of RAM.
+There is no background collection job or stored peer history. The app is a single static Go binary using only the standard library, and on my node, with around 200 peers connected, it uses about 20 MB of RAM.
 
 ## Install on Umbrel
 
