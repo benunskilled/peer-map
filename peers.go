@@ -30,10 +30,61 @@ type rawPeer struct {
 	ServicesNames []string `json:"servicesnames"`
 	RelayTxes     *bool    `json:"relaytxes"`
 	SyncedHeaders *int64   `json:"synced_headers"`
+	// The address this peer sees us under. Read only to place this node on
+	// the map (see homeOf); never passed on.
+	AddrLocal string `json:"addrlocal"`
 
 	mockLoc         *geo.Location // demo data only: documentation addresses have no location
 	mockASN         *asn.Info     // demo data only, same reason
 	mockLinkingLion bool          // demo only: a documentation address standing in for LinkingLion
+	mockHome        *geo.Location // demo only: where the demo node itself is
+}
+
+// Home is where this node is, as the map draws it: a region, never an address.
+type Home struct {
+	Country string  `json:"cc"`
+	Region  string  `json:"region,omitempty"`
+	Lat     float64 `json:"lat"`
+	Lon     float64 `json:"lon"`
+}
+
+// homeOf places this node by the address its peers see it under: getpeerinfo's
+// addrlocal, counted across peers, the most common public one wins. No extra
+// RPC and nothing sent anywhere - the lookup is the bundled database, and only
+// the region leaves this function. Nil when no peer reports a public address
+// (a node reachable only over Tor, say).
+func homeOf(raw []rawPeer) *Home {
+	count := map[netip.Addr]int{}
+	var best netip.Addr
+	for _, p := range raw {
+		if p.mockHome != nil {
+			l := *p.mockHome
+			return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
+		}
+		if p.AddrLocal == "" {
+			continue
+		}
+		a, err := netip.ParseAddr(hostOf(p.AddrLocal))
+		if err != nil {
+			continue
+		}
+		a = a.Unmap()
+		if !a.IsGlobalUnicast() || a.IsPrivate() {
+			continue
+		}
+		count[a]++
+		if count[a] > count[best] {
+			best = a
+		}
+	}
+	if !best.IsValid() {
+		return nil
+	}
+	l, ok := geo.Lookup(best)
+	if !ok {
+		return nil
+	}
+	return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
 }
 
 // Peer is what the dashboard receives.

@@ -67,7 +67,7 @@ body {
 .peers td .star { color: var(--accent); margin-right: 4px; }
 /* On the map the same star sits above the marker that holds the peer, and the
    ring underneath it picks the marker out of a crowded cluster. */
-.marker.delivered .ring { stroke: var(--accent); stroke-width: 2; opacity: 1; }
+.marker.delivered .ring { stroke: var(--accent); stroke-width: 2; }
 .marker .delivered-star { fill: var(--accent); font-size: 13px; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
 
 /* ---- one block, all three roles ---- */
@@ -234,13 +234,34 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 #map.dragging { cursor: grabbing; }
 .land { fill: var(--land); stroke: var(--land-edge); stroke-width: 0.6; }
 .land.hot { fill: var(--land-hot); }
+/* World view: a dot grid instead of filled countries (see buildDots). The
+   shapes fade in as the dots fade out on the way to regions (--dots, set in
+   applyView). Without the grid (no canvas) the shapes simply stay. */
+#map.dotted .land { fill-opacity: calc(1 - var(--dots, 1)); stroke-opacity: calc(1 - var(--dots, 1)); }
+.dots { opacity: var(--dots, 1); pointer-events: none; }
+.dots path { fill: none; stroke-linecap: round; stroke-width: 1.15; }
+#dotsAll { stroke: #27333f; }
+#dotsHot { stroke: #46617c; stroke-width: 1.35; }
+/* Arcs from every place to this node; the manual ones a little brighter. */
+.link { fill: none; stroke-width: 0.7; stroke-opacity: 0.16; stroke-linecap: round; pointer-events: none; }
+.l-manual { stroke: var(--manual); stroke-opacity: 0.5; stroke-width: 1; }
+.l-inbound { stroke: var(--inbound); }
+.l-outbound { stroke: var(--outbound); stroke-opacity: 0.3; }
+.home-mark { pointer-events: none; }
+.home-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 1.2; }
+.fx-head { fill: #ffd29a; }
+.fx-trail { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); }
+.fx-ring { fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .marker { cursor: pointer; }
-.marker .ring { fill: var(--panel); }
-.marker .seg { stroke: var(--panel); stroke-width: 1.5; stroke-linejoin: round; }
-.seg-manual { fill: var(--manual); }
-.seg-inbound { fill: var(--inbound); }
-.seg-outbound { fill: var(--outbound); }
-.marker.selected .ring { fill: var(--text); }
+.marker .ring { fill: none; stroke: transparent; }
+.marker .seg { fill: none; stroke-width: 1.6; stroke-linecap: round; }
+.seg-manual { stroke: var(--manual); }
+.seg-inbound { stroke: var(--inbound); }
+.seg-outbound { stroke: var(--outbound); }
+.core.c-manual { fill: var(--manual); }
+.core.c-inbound { fill: var(--inbound); }
+.core.c-outbound { fill: var(--outbound); }
+.marker.selected .ring { stroke: var(--text); stroke-width: 1.5; }
 .marker text { fill: var(--text); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
 
 .map-level {
@@ -313,12 +334,13 @@ details.group-card[open] > .scroll, details.group-card[open] > .empty { margin-t
 
 .scroll { overflow-x: auto; }
 table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-.peers th, .peers td { padding: 8px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.peers tbody tr:hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
 .peers th:last-child, .peers td:last-child { padding-right: 20px; }
 .peers tbody tr:last-child td { border-bottom: 0; }
-.peers tbody tr:nth-child(even) { background: var(--panel-2); }
-.peers th { font-weight: 500; color: var(--muted); font-size: 12px; }
+.peers tbody tr:nth-child(even) { background: transparent; }
+.peers th { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
 .peers th button { all: unset; cursor: pointer; }
 .peers th[aria-sort="ascending"] button::after { content: " ↑"; }
 .peers th[aria-sort="descending"] button::after { content: " ↓"; }
@@ -338,7 +360,14 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
    the same axis is one a colour-blind reader cannot separate - measured, not
    assumed. It is not a fault either; a wallet is doing what a wallet does. */
 .peers td.norelay { color: var(--muted); }
-.peers td.norelay .klabel { text-decoration: line-through; text-decoration-thickness: 1px; }
+.peers td.norelay .never { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
+.peers tr.weak td { color: var(--muted); }
+.peers td .flag { margin-right: 7px; font-size: 15px; vertical-align: -1px; }
+.peers .pbar { display: inline-block; width: 42px; height: 4px; margin-left: 8px; border-radius: 3px; background: var(--border); overflow: hidden; vertical-align: middle; }
+.peers .pbar i { display: block; height: 100%; border-radius: 3px; }
+.peers .pbar .fast { background: var(--good); }
+.peers .pbar .mid { background: var(--inbound); }
+.peers .pbar .slow { background: #f0883e; }
 /* A row that has brought a block, in --good at low strength. A focused row
    keeps its orange tint and bar, which is what keeps the two apart. */
 .peers tr.delivered-ever td { background: rgba(63,185,80,.13); }
@@ -354,3 +383,11 @@ details.group-card:not([open]) > .kinds { display: none; }
 
 .foot { color: var(--muted); font-size: 12px; max-width: 1400px; margin: 0 auto; padding: 0 24px 24px; }
 .foot a { color: var(--muted); }
+
+/* ---- the wave: rolls across the page once when a new block lands ---- */
+.block-wave { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(247,147,26,0) 35%, rgba(247,147,26,.14) 48%, rgba(255,190,110,.28) 50%, rgba(247,147,26,.14) 52%, rgba(247,147,26,0) 65%, transparent 100%);
+  background-size: 300% 100%; }
+.block-wave.run { animation: block-wave-roll 1.4s ease-out; }
+@keyframes block-wave-roll { 0% { opacity: 1; background-position: 100% 0; } 85% { opacity: 1; } 100% { opacity: 0; background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .block-wave.run { animation: none; } }

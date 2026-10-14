@@ -161,6 +161,9 @@
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
     not_publicly_routable: "Private", ipv6_hidden: "IPv6 (address hidden)",
   }[n] || n || "-");
+  // A flag from the two-letter country code: regional-indicator letters, no
+  // image files. Unknown or missing codes get none.
+  const flagOf = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
   // ---------- the block that just landed ----------
@@ -637,6 +640,9 @@
     renderUnplaced();
     renderTables();
     focusOnce();
+    const hash = d.last_block && d.last_block.hash;
+    if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
+    if (hash) state.lastHash = hash;
   }
 
   // Somebody arrived from Bitcoin Lab asking about one peer. Put it in front of
@@ -716,7 +722,55 @@
     for (const [cc, d] of Object.entries(state.world.paths)) addPath(d, cc);
     if (state.world.unnamed) addPath(state.world.unnamed, "");
     $("countries").appendChild(frag);
+    buildDots();
     applyView();
+  }
+
+  // The world view is drawn as a grid of dots rather than filled countries:
+  // calmer, and the markers stand out against it. The grid is worked out once,
+  // in the browser, by painting every country into an offscreen canvas in its
+  // own colour and reading back which country each grid point falls on - so a
+  // country with peers can light up its own dots. Zoomed in, the dots fade out
+  // and the country shapes fade in (see applyView): a dot grid has nothing to
+  // say about regions.
+  const DOT_STEP = 4.4;
+  let dotsByCC = null;
+  function buildDots() {
+    const W = state.world.w, H = state.world.h, S = 2;
+    const off = document.createElement("canvas");
+    off.width = W * S; off.height = H * S;
+    const c = off.getContext("2d", { willReadFrequently: true });
+    if (!c || typeof Path2D !== "function") return;
+    c.scale(S, S);
+    const ccs = Object.keys(state.world.paths);
+    ccs.forEach((cc, i) => {
+      c.fillStyle = `rgb(${(i + 1) & 255},${(i + 1) >> 8},7)`;
+      c.fill(new Path2D(state.world.paths[cc]));
+    });
+    if (state.world.unnamed) { c.fillStyle = "rgb(0,0,9)"; c.fill(new Path2D(state.world.unnamed)); }
+    const img = c.getImageData(0, 0, off.width, off.height).data;
+    dotsByCC = new Map();
+    let all = "";
+    for (let y = DOT_STEP / 2, row = 0; y < H; y += DOT_STEP, row++) {
+      for (let x = (row % 2) * DOT_STEP / 2; x < W; x += DOT_STEP) {
+        const o = (Math.round(y * S) * off.width + Math.round(x * S)) * 4;
+        if (img[o + 3] < 200) continue;
+        const seg = `M${x.toFixed(1)} ${y.toFixed(1)}h0`;
+        all += seg;
+        const i = img[o] + (img[o + 1] << 8) - 1;
+        if (img[o + 2] === 7 && i >= 0 && ccs[i]) dotsByCC.set(ccs[i], (dotsByCC.get(ccs[i]) || "") + seg);
+      }
+    }
+    const grid = document.createElementNS(NS, "g");
+    grid.setAttribute("class", "dots");
+    for (const [id, d] of [["dotsAll", all], ["dotsHot", ""]]) {
+      const p = document.createElementNS(NS, "path");
+      p.id = id;
+      p.setAttribute("d", d);
+      grid.appendChild(p);
+    }
+    $("countries").appendChild(grid);
+    $("map").classList.add("dotted");
   }
 
   // A bucket is one marker: a country (world view) or a region (zoomed in).
@@ -760,14 +814,11 @@
 
   const radius = (n) => Math.min(26, 5 + 3.2 * Math.sqrt(n));
 
-  function wedge(r, a0, a1) {
-    if (a1 - a0 >= Math.PI * 2 - 1e-6) {
-      return `M${-r} 0A${r} ${r} 0 1 1 ${r} 0A${r} ${r} 0 1 1 ${-r} 0Z`;
-    }
+  function arcStroke(r, a0, a1) {
+    if (a1 <= a0) a1 = a0 + 0.01;
     const x0 = r * Math.sin(a0), y0 = -r * Math.cos(a0);
     const x1 = r * Math.sin(a1), y1 = -r * Math.cos(a1);
-    const large = a1 - a0 > Math.PI ? 1 : 0;
-    return `M0 0L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   }
 
   let renderedMode = null;
@@ -792,29 +843,47 @@
       g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : ""));
       g.dataset.x = b.pt[0];
       g.dataset.y = b.pt[1];
+      g.dataset.key = b.key;
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
       g.setAttribute("aria-label", `${b.title}${b.sub ? ", " + b.sub : ""}: ${GROUPS.map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
 
+      // A light, not a pie: the colour is the place's leading group - manual
+      // whenever it holds one of yours - and the split is in the tooltip.
+      const lead = leadGroup(b);
+      const glow = document.createElementNS(NS, "circle");
+      glow.setAttribute("class", "glow");
+      glow.setAttribute("r", r * 1.9);
+      glow.setAttribute("fill", `url(#glow-${lead})`);
+      g.appendChild(glow);
+      const core = r * 0.38 + 1.4;
       const ring = document.createElementNS(NS, "circle");
       ring.setAttribute("class", "ring");
-      ring.setAttribute("r", r + 2);
+      ring.setAttribute("r", core + 4.2);
       g.appendChild(ring);
-
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("class", "core c-" + lead);
+      dot.setAttribute("r", core);
+      g.appendChild(dot);
+      // The split between the three groups, as the pie used to show it: a
+      // thin ring around the light, one arc per group, a small gap between.
+      const rr = core + 1.8, gap = b.total > 1 ? 0.32 : 0;
       let a = 0;
       for (const k of GROUPS) {
         if (!b[k]) continue;
         const span = (b[k] / b.total) * Math.PI * 2;
         const s = document.createElementNS(NS, "path");
         s.setAttribute("class", "seg seg-" + k);
-        s.setAttribute("d", wedge(r, a, a + span));
+        s.setAttribute("d", span >= Math.PI * 2 - 1e-6
+          ? `M${-rr} 0A${rr} ${rr} 0 1 1 ${rr} 0A${rr} ${rr} 0 1 1 ${-rr} 0`
+          : arcStroke(rr, a + gap / 2, a + span - gap / 2));
         g.appendChild(s);
         a += span;
       }
       if (b.total > 1) {
         const t = document.createElementNS(NS, "text");
-        t.setAttribute("x", r + 4);
-        t.setAttribute("y", 4);
+        t.setAttribute("x", core + 5);
+        t.setAttribute("y", -core);
         t.textContent = b.total;
         g.appendChild(t);
       }
@@ -822,7 +891,7 @@
         const star = document.createElementNS(NS, "text");
         star.setAttribute("class", "delivered-star");
         star.setAttribute("x", 0);
-        star.setAttribute("y", -(r + 5));
+        star.setAttribute("y", -(core + 6));
         star.setAttribute("text-anchor", "middle");
         star.textContent = "\u2605";
         g.appendChild(star);
@@ -838,7 +907,121 @@
       });
       layer.appendChild(g);
     }
+    const hotDots = $("dotsHot");
+    if (hotDots && dotsByCC) hotDots.setAttribute("d", [...hot].map((cc) => dotsByCC.get(cc) || "").join(""));
+    renderLinks(bs);
     placeMarkers();
+  }
+
+  const leadGroup = (b) => (b.manual ? "manual" : b.outbound > b.inbound ? "outbound" : "inbound");
+
+  // This node itself, from the region its peers see it in (the server reads
+  // getpeerinfo's addrlocal and sends only the region, never the address).
+  function homePoint() {
+    const h = state.data && state.data.home;
+    return h ? project(h.lon, h.lat) : null;
+  }
+
+  // A thin arc from every place to this node. They make the map read as what
+  // it is - your node's connections - and they are the track a new block
+  // travels along (pulseBlock).
+  let linkByKey = new Map();
+  function arcPath(a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const d = Math.hypot(dx, dy);
+    const lift = Math.min(90, d * 0.28);
+    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2 - lift;
+    return `M${a[0].toFixed(1)} ${a[1].toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`;
+  }
+  function renderLinks(bs) {
+    const layer = $("links");
+    layer.textContent = "";
+    linkByKey = new Map();
+    const home = homePoint();
+    if (!home) return;
+    for (const b of bs) {
+      if (Math.hypot(b.pt[0] - home[0], b.pt[1] - home[1]) < 2) continue;
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("class", "link l-" + leadGroup(b));
+      p.setAttribute("d", arcPath(b.pt, home));
+      p.setAttribute("vector-effect", "non-scaling-stroke");
+      layer.appendChild(p);
+      linkByKey.set(b.key, p);
+    }
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", "home-mark");
+    g.dataset.x = home[0];
+    g.dataset.y = home[1];
+    const halo = document.createElementNS(NS, "circle");
+    halo.setAttribute("r", 11);
+    halo.setAttribute("fill", "url(#glow-home)");
+    const dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("r", 3.2);
+    dot.setAttribute("class", "home-dot");
+    const t = document.createElementNS(NS, "title");
+    t.textContent = "Your node";
+    g.append(halo, dot, t);
+    $("markers").appendChild(g);
+  }
+
+  // A new block: a light runs from the place that delivered it along its arc
+  // to this node, rings spread where it lands, and the wave rolls across the
+  // page. Only for a block that arrives while the page is open - not on the
+  // first load - and not at all for someone who asked for less motion.
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function pulseBlock() {
+    if (reduceMotion || document.hidden) return;
+    const wave = $("blockWave");
+    wave.classList.remove("run"); void wave.offsetWidth; wave.classList.add("run");
+    const home = homePoint();
+    const fx = $("fx");
+    const svg = $("map");
+    // Sizes in screen pixels: the fx layer is scaled with the map.
+    const px = (n) => (n * state.world.w) / (svg.clientWidth || 1000) / state.view.k;
+    const from = [...$("markers").querySelectorAll(".marker.delivered")].map((g) => linkByKey.get(g.dataset.key)).filter(Boolean);
+    const land = () => {
+      if (!home) return;
+      for (let i = 0; i < 3; i++) ring(home, i * 220);
+    };
+    const ring = (pt, delay) => {
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("class", "fx-ring");
+      c.setAttribute("cx", pt[0]);
+      c.setAttribute("cy", pt[1]);
+      c.setAttribute("vector-effect", "non-scaling-stroke");
+      fx.appendChild(c);
+      const t0 = performance.now() + delay;
+      const step = (now) => {
+        const k = Math.max(0, (now - t0) / 1500);
+        c.setAttribute("r", px(3 + 70 * (1 - Math.pow(1 - Math.min(1, k), 3))));
+        c.style.opacity = String(Math.max(0, 1 - k));
+        if (k < 1) requestAnimationFrame(step); else c.remove();
+      };
+      requestAnimationFrame(step);
+    };
+    if (!from.length) { land(); return; }
+    let left = from.length;
+    for (const path of from) {
+      const len = path.getTotalLength();
+      const head = document.createElementNS(NS, "circle");
+      head.setAttribute("class", "fx-head");
+      fx.appendChild(head);
+      const trail = path.cloneNode();
+      trail.setAttribute("class", "fx-trail");
+      fx.appendChild(trail);
+      const t0 = performance.now();
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / 950), e = 1 - Math.pow(1 - k, 2.2), d = e * len;
+        const pt = path.getPointAtLength(d);
+        head.setAttribute("cx", pt.x); head.setAttribute("cy", pt.y); head.setAttribute("r", px(2.6));
+        trail.setAttribute("stroke-dasharray", `${len * 0.22} ${len}`);
+        trail.setAttribute("stroke-dashoffset", String(-(d - len * 0.22)));
+        if (k < 1) { requestAnimationFrame(step); return; }
+        head.remove(); trail.remove();
+        if (--left === 0) land();
+      };
+      requestAnimationFrame(step);
+    }
   }
 
   function placeMarkers() {
@@ -977,7 +1160,9 @@
     if (!state.world) return;
     clampView();
     const { k, x, y } = state.view;
-    $("countries").setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    for (const id of ["countries", "links", "fx"]) $(id).setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    // Dots at the world view, country shapes once zoomed in towards regions.
+    $("map").style.setProperty("--dots", String(Math.max(0, Math.min(1, (REGION_ZOOM + 0.5 - k) / 1.5))));
     if (!state.data) return;
     if (renderedMode !== regionMode()) {
       hideTip();
@@ -1221,6 +1406,14 @@
       // would have put them.
       key: "loc", label: "Location", cls: "loc", show: locLabel,
       val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff"),
+      cell: (td, p) => {
+        const text = locLabel(p);
+        if (!text) { td.textContent = "–"; td.classList.add("dim"); return; }
+        const f = document.createElement("span");
+        f.className = "flag";
+        f.textContent = flagOf(p.cc);
+        td.append(f, text);
+      },
     },
     {
       // Where a peer sits and whose machine it is are two questions, and the
@@ -1279,11 +1472,34 @@
           : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
           : "Software that does not pass blocks on - this peer can never deliver one first.";
         td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
-        if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
+        // Was a strike-through. Now the row is dimmed (see renderTables) and
+        // the cell says it in words, so the fact is still there at a glance.
+        if (p.no_relay) {
+          td.className = (td.className ? td.className + " " : "") + "norelay";
+          const tag = document.createElement("span");
+          tag.className = "never";
+          tag.textContent = "never first";
+          label.after(tag);
+        }
       },
     },
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
-    { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },
+    {
+      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms"),
+      // The number, and a short bar beside it so a slow line stands out down
+      // the column: green under 40 ms, yellow under 120, orange above.
+      cell: (td, p) => {
+        if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
+        const ms = p.ping_ms;
+        const bar = document.createElement("span");
+        bar.className = "pbar";
+        const fill = document.createElement("i");
+        fill.style.width = Math.min(100, (ms / 250) * 100) + "%";
+        fill.className = ms < 40 ? "fast" : ms < 120 ? "mid" : "slow";
+        bar.appendChild(fill);
+        td.append(Math.round(ms) + " ms", bar);
+      },
+    },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
   ];
 
@@ -1386,6 +1602,7 @@
           tr.className = "delivered-ever";
           tr.title = "Has delivered a block first (Bitcoin Lab)";
         }
+        if (p.no_relay) tr.classList.add("weak");
         for (const c of cols) {
           const td = document.createElement("td");
           if (c.cls) td.className = c.cls;
