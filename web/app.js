@@ -1497,18 +1497,9 @@
     { key: "transport", label: "P2P", val: (p) => p.transport || "" },
     {
       key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms"),
-      // The number, and a short bar beside it so a slow line stands out down
-      // the column: green under 40 ms, yellow under 120, orange above.
       cell: (td, p) => {
         if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
-        const ms = p.ping_ms;
-        const bar = document.createElement("span");
-        bar.className = "pbar";
-        const fill = document.createElement("i");
-        fill.style.width = Math.min(100, (ms / 250) * 100) + "%";
-        fill.className = ms < 40 ? "fast" : ms < 120 ? "mid" : "slow";
-        bar.appendChild(fill);
-        td.append(Math.round(ms) + " ms", bar);
+        td.textContent = Math.round(p.ping_ms) + " ms";
       },
     },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
