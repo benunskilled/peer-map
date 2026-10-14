@@ -10,6 +10,8 @@
   <script src="app.js" defer></script>
 </head>
 <body>
+  <!-- Rolls across the page once when a new block lands; see pulseBlock in app.js. -->
+  <div class="block-wave" id="blockWave" aria-hidden="true"></div>
   <header class="topbar">
     <h1>Peer Map</h1>
     <a id="sibling-link" class="sibling-link" hidden target="_blank" rel="noopener">Bitcoin Lab &#8599;</a>
@@ -64,8 +66,17 @@
     <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
         <svg id="map" role="img" aria-label="World map of connected peers">
+          <defs>
+            <!-- One soft glow per group: the markers are a light on the map, not a chart. -->
+            <radialGradient id="glow-manual"><stop offset="0" stop-color="#3987e5" stop-opacity=".9"/><stop offset=".45" stop-color="#3987e5" stop-opacity=".3"/><stop offset="1" stop-color="#3987e5" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-inbound"><stop offset="0" stop-color="#9e9a28" stop-opacity=".9"/><stop offset=".45" stop-color="#9e9a28" stop-opacity=".28"/><stop offset="1" stop-color="#9e9a28" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-outbound"><stop offset="0" stop-color="#1a9e8f" stop-opacity=".9"/><stop offset=".45" stop-color="#1a9e8f" stop-opacity=".3"/><stop offset="1" stop-color="#1a9e8f" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-home"><stop offset="0" stop-color="#f7931a" stop-opacity=".85"/><stop offset="1" stop-color="#f7931a" stop-opacity="0"/></radialGradient>
+          </defs>
           <g id="countries"></g>
+          <g id="links"></g>
           <g id="markers"></g>
+          <g id="fx"></g>
         </svg>
         <span class="map-level"><span id="mapLevel">Countries</span><span class="map-level-hint" id="mapLevelHint"> · zoom in for regions</span></span>
         <div class="zoom" role="group" aria-label="Zoom">

@@ -9,10 +9,13 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/benunskilled/peer-map/geo"
 )
 
 func TestGroup(t *testing.T) {
@@ -355,4 +358,32 @@ func TestHTTP(t *testing.T) {
 			t.Errorf("demo IPv6 %s is not a documentation address", h)
 		}
 	}
+}
+
+func TestHomeOfTakesTheMostCommonPublicAddrLocal(t *testing.T) {
+	raw := []rawPeer{
+		{AddrLocal: "10.21.21.8:8333"},  // private: ignored
+		{AddrLocal: ""},                 // Tor peer: nothing reported
+		{AddrLocal: "203.0.113.9:8333"}, // documentation range: one vote
+		{AddrLocal: "8.8.8.8:8333"},     // public, two votes
+		{AddrLocal: "8.8.8.8:51234"},
+	}
+	h := homeOf(raw)
+	if want, ok := geoLookup("8.8.8.8"); ok {
+		if h == nil || h.Country != want.Country || h.Region != want.Region {
+			t.Fatalf("home = %+v, want the region of the most common public address (%s, %s)", h, want.Country, want.Region)
+		}
+	} else if h != nil {
+		t.Fatalf("home = %+v, want nil when the address cannot be placed", h)
+	}
+}
+
+func TestHomeOfIsNilWithoutAPublicAddress(t *testing.T) {
+	if h := homeOf([]rawPeer{{AddrLocal: "10.21.21.8:8333"}, {AddrLocal: ""}}); h != nil {
+		t.Fatalf("home = %+v, want nil", h)
+	}
+}
+
+func geoLookup(ip string) (geo.Location, bool) {
+	return geo.Lookup(netip.MustParseAddr(ip))
 }

@@ -187,7 +187,9 @@ type snapshot struct {
 	// it, and which peer here delivered it. Absent otherwise, and absent
 	// while it has not seen one.
 	LastBlock *lastBlock `json:"last_block,omitempty"`
-	Version   string     `json:"version"`
+	// Where this node is (a region), so the map can draw the lines to it.
+	Home    *Home  `json:"home,omitempty"`
+	Version string `json:"version"`
 }
 
 type source struct {
@@ -233,6 +235,7 @@ func (s *source) get(ctx context.Context) snapshot {
 			s.last = now
 			s.lastErr = ""
 			s.snap.Peers = convert(raw)
+			s.snap.Home = homeOf(raw)
 			s.snap.FetchedAt = now.Unix()
 			s.snap.Error = ""
 		}
