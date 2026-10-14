@@ -608,9 +608,7 @@
     label.className = "name";
     label.textContent = b.pool ? name : `"${name}"`;
     el.append(star, label);
-    el.title = b.pool
-      ? `Block ${b.height ? b.height.toLocaleString() : ""} was mined by ${b.pool_name || name}. The starred peers delivered it to your node.`
-      : `Block ${b.height ? b.height.toLocaleString() : ""} is from a miner we cannot name; this is the text in its coinbase. The starred peers delivered it to your node.`;
+    el.title = "The starred peers delivered this block to your node.";
   }
 
   // ---------- render ----------
@@ -1397,7 +1395,11 @@
         // A long onion or I2P address is cut off by the column, so the full one
         // lives in the title. A short one is all there already.
         const long = p.addr.length > 30;
-        if (long) td.title = p.addr;
+        // What the row colour means, said where the peer is named rather
+        // than over every cell of the row.
+        const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
+          : deliveredEver.has(p.addr) ? "Has delivered a block first (Bitcoin Lab)" : "";
+        td.title = [long ? p.addr : "", got].filter(Boolean).join("\n");
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
@@ -1412,7 +1414,7 @@
         a.target = "_blank";
         a.rel = "noopener";
         a.textContent = p.addr;
-        a.title = (long ? p.addr + "\n" : "") + "Open this peer in Bitcoin Lab";
+        a.title = [long ? p.addr : "", got, "Open this peer in Bitcoin Lab"].filter(Boolean).join("\n");
         td.appendChild(a);
       },
     },
@@ -1448,7 +1450,7 @@
       key: "network", label: "Network", val: (p) => netLabel(p.network),
       cell: (td, p) => {
         td.textContent = netLabel(p.network);
-        if (p.network === "ipv6_hidden") td.title = "Came in over IPv6. umbrelOS passes inbound IPv6 on through Docker, which puts its own address in place of the peer's, so where it is and whose machine it is cannot be known.";
+        if (p.network === "ipv6_hidden") td.title = "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's.";
       },
     },
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
@@ -1614,11 +1616,9 @@
         // is up - one rule for "just delivered", in the row and on the map.
         else if (deliveredNow.has(p.addr)) {
           tr.className = "delivered-now";
-          tr.title = "Delivered the newest block first";
         }
         else if (deliveredEver.has(p.addr)) {
           tr.className = "delivered-ever";
-          tr.title = "Has delivered a block first (Bitcoin Lab)";
         }
         if (p.no_relay) tr.classList.add("weak");
         for (const c of cols) {
