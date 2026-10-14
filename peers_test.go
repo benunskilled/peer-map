@@ -360,27 +360,38 @@ func TestHTTP(t *testing.T) {
 	}
 }
 
-func TestHomeOfTakesTheMostCommonPublicAddrLocal(t *testing.T) {
+func TestHomeOfVotesByRegionAmongOwnConnections(t *testing.T) {
+	want, ok := geoLookup("8.8.8.8")
+	if !ok {
+		t.Skip("bundled database does not place 8.8.8.8")
+	}
 	raw := []rawPeer{
-		{AddrLocal: "10.21.21.8:8333"},  // private: ignored
-		{AddrLocal: ""},                 // Tor peer: nothing reported
-		{AddrLocal: "203.0.113.9:8333"}, // documentation range: one vote
-		{AddrLocal: "8.8.8.8:8333"},     // public, two votes
-		{AddrLocal: "8.8.8.8:51234"},
+		{AddrLocal: "10.21.21.8:8333"},             // private: ignored
+		{AddrLocal: ""},                            // nothing reported
+		{AddrLocal: "100.64.0.9:8333"},             // CGNAT: cannot be placed, ignored
+		{AddrLocal: "[::ffff:8.8.8.8]:8333"},       // IPv4-mapped counts as 8.8.8.8
+		{AddrLocal: "8.8.4.4:8333"},                // same region, different address
+		{AddrLocal: "1.1.1.1:8333", Inbound: true}, // inbound peers do not vote ...
+		{AddrLocal: "1.1.1.1:8333", Inbound: true}, // ... however many there are
+		{AddrLocal: "1.1.1.1:8333", Inbound: true},
 	}
 	h := homeOf(raw)
-	if want, ok := geoLookup("8.8.8.8"); ok {
-		if h == nil || h.Country != want.Country || h.Region != want.Region {
-			t.Fatalf("home = %+v, want the region of the most common public address (%s, %s)", h, want.Country, want.Region)
-		}
-	} else if h != nil {
-		t.Fatalf("home = %+v, want nil when the address cannot be placed", h)
+	if h == nil || h.Country != want.Country || h.Region != want.Region {
+		t.Fatalf("home = %+v, want %s/%s", h, want.Country, want.Region)
 	}
 }
 
-func TestHomeOfIsNilWithoutAPublicAddress(t *testing.T) {
-	if h := homeOf([]rawPeer{{AddrLocal: "10.21.21.8:8333"}, {AddrLocal: ""}}); h != nil {
-		t.Fatalf("home = %+v, want nil", h)
+func TestHomeOfFallsBackToInboundAndOtherwiseNil(t *testing.T) {
+	if h := homeOf([]rawPeer{{AddrLocal: "10.21.21.8:8333"}, {AddrLocal: "100.64.0.9:8333"}}); h != nil {
+		t.Fatalf("home = %+v, want nil without a placeable address", h)
+	}
+	want, ok := geoLookup("8.8.8.8")
+	if !ok {
+		t.Skip("bundled database does not place 8.8.8.8")
+	}
+	h := homeOf([]rawPeer{{AddrLocal: "8.8.8.8:8333", Inbound: true}})
+	if h == nil || h.Country != want.Country {
+		t.Fatalf("home = %+v, want the inbound peers' answer when no outbound peer reports one", h)
 	}
 }
 

@@ -49,42 +49,61 @@ type Home struct {
 }
 
 // homeOf places this node by the address its peers see it under: getpeerinfo's
-// addrlocal, counted across peers, the most common public one wins. No extra
-// RPC and nothing sent anywhere - the lookup is the bundled database, and only
-// the region leaves this function. Nil when no peer reports a public address
-// (a node reachable only over Tor, say).
+// addrlocal. No extra RPC and nothing sent anywhere - the lookup is the
+// bundled database, and only the region leaves this function. Nil when no
+// peer reports an address that can be placed (a node reachable only over Tor,
+// say).
+//
+// The vote is per region, not per address: IPv6 privacy addresses would
+// otherwise split it, and an address that cannot be placed (CGNAT, a
+// documentation range) simply does not count. Only connections this node
+// opened vote. addrlocal is whatever the peer claims, and inbound peers are
+// anyone - a crowd of them could otherwise move this node across the map.
+// Inbound ones are asked only when there are no others.
 func homeOf(raw []rawPeer) *Home {
-	count := map[netip.Addr]int{}
-	var best netip.Addr
 	for _, p := range raw {
 		if p.mockHome != nil {
 			l := *p.mockHome
 			return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
 		}
-		if p.AddrLocal == "" {
-			continue
-		}
-		a, err := netip.ParseAddr(hostOf(p.AddrLocal))
-		if err != nil {
-			continue
-		}
-		a = a.Unmap()
-		if !a.IsGlobalUnicast() || a.IsPrivate() {
-			continue
-		}
-		count[a]++
-		if count[a] > count[best] {
-			best = a
-		}
 	}
-	if !best.IsValid() {
-		return nil
+	vote := func(inbound bool) *Home {
+		count := map[uint16]int{}
+		where := map[uint16]geo.Location{}
+		var best uint16
+		found := false
+		for _, p := range raw {
+			if p.Inbound != inbound || p.AddrLocal == "" {
+				continue
+			}
+			a, err := netip.ParseAddr(hostOf(p.AddrLocal))
+			if err != nil {
+				continue
+			}
+			a = a.Unmap()
+			if !a.IsGlobalUnicast() || a.IsPrivate() {
+				continue
+			}
+			l, ok := geo.Lookup(a)
+			if !ok {
+				continue
+			}
+			count[l.ID]++
+			where[l.ID] = l
+			if !found || count[l.ID] > count[best] {
+				best, found = l.ID, true
+			}
+		}
+		if !found {
+			return nil
+		}
+		l := where[best]
+		return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
 	}
-	l, ok := geo.Lookup(best)
-	if !ok {
-		return nil
+	if h := vote(false); h != nil {
+		return h
 	}
-	return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
+	return vote(true)
 }
 
 // Peer is what the dashboard receives.
