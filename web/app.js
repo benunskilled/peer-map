@@ -861,13 +861,21 @@
       ring.setAttribute("class", "ring");
       ring.setAttribute("r", core + 4.2);
       g.appendChild(ring);
+      // Selection gets its own outline, so a selected place that also
+      // delivered the block keeps its orange ring.
+      const sel = document.createElementNS(NS, "circle");
+      sel.setAttribute("class", "sel");
+      sel.setAttribute("r", core + 6.6);
+      g.appendChild(sel);
       const dot = document.createElementNS(NS, "circle");
       dot.setAttribute("class", "core c-" + lead);
       dot.setAttribute("r", core);
       g.appendChild(dot);
       // The split between the three groups, as the pie used to show it: a
       // thin ring around the light, one arc per group, a small gap between.
-      const rr = core + 1.8, gap = b.total > 1 ? 0.32 : 0;
+      // The gap never eats a small group: at most half its own arc.
+      const minSpan = Math.min(...GROUPS.filter((k) => b[k]).map((k) => (b[k] / b.total) * Math.PI * 2));
+      const rr = core + 1.8, gap = b.total > 1 ? Math.min(0.32, minSpan / 2) : 0;
       let a = 0;
       for (const k of GROUPS) {
         if (!b[k]) continue;
@@ -968,9 +976,9 @@
   // to this node, rings spread where it lands, and the wave rolls across the
   // page. Only for a block that arrives while the page is open - not on the
   // first load - and not at all for someone who asked for less motion.
-  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const motionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   function pulseBlock() {
-    if (reduceMotion || document.hidden) return;
+    if ((motionQuery && motionQuery.matches) || document.hidden || !state.world) return;
     const wave = $("blockWave");
     wave.classList.remove("run"); void wave.offsetWidth; wave.classList.add("run");
     const home = homePoint();
@@ -1006,8 +1014,12 @@
       const head = document.createElementNS(NS, "circle");
       head.setAttribute("class", "fx-head");
       fx.appendChild(head);
+      // Without non-scaling-stroke: the dash lengths must be in the same units
+      // as getTotalLength(), so the width is scaled by hand instead.
       const trail = path.cloneNode();
+      trail.removeAttribute("vector-effect");
       trail.setAttribute("class", "fx-trail");
+      trail.style.strokeWidth = String(px(2.2));
       fx.appendChild(trail);
       const t0 = performance.now();
       const step = (now) => {
@@ -1436,7 +1448,7 @@
     { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
     {
       key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,
-      // Struck through for software that passes no blocks on. It is not a
+      // Marked "never first" for software that passes no blocks on. It is not a
       // fault: a wallet is doing exactly what a wallet does. It only means this
       // connection was never going to hand your node a block.
       //
@@ -1445,9 +1457,8 @@
       // worth having, not worth the width, and it was the widest column in the
       // table by a distance.
       cell: (td, p) => {
-        // The label in its own element, so the strike-through for software
-        // that passes no blocks on stays on the label and leaves the agent
-        // and its description below readable.
+        // The label in its own element, so the "never first" tag can follow
+        // it and the agent and its description below stay separate.
         const label = document.createElement("span");
         label.className = "klabel";
         label.textContent = kindLabel(p);

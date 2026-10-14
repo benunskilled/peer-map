@@ -250,7 +250,7 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 .home-mark { pointer-events: none; }
 .home-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 1.2; }
 .fx-head { fill: #ffd29a; }
-.fx-trail { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); }
+.fx-trail { fill: none; stroke: var(--accent); stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); }
 .fx-ring { fill: none; stroke: var(--accent); stroke-width: 1.6; }
 .marker { cursor: pointer; }
 .marker .ring { fill: none; stroke: transparent; }
@@ -261,7 +261,8 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 .core.c-manual { fill: var(--manual); }
 .core.c-inbound { fill: var(--inbound); }
 .core.c-outbound { fill: var(--outbound); }
-.marker.selected .ring { stroke: var(--text); stroke-width: 1.5; }
+.marker .sel { fill: none; stroke: transparent; }
+.marker.selected .sel { stroke: var(--text); stroke-width: 1.5; }
 .marker text { fill: var(--text); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; pointer-events: none; }
 
 .map-level {
@@ -335,7 +336,7 @@ details.group-card[open] > .scroll, details.group-card[open] > .empty { margin-t
 .scroll { overflow-x: auto; }
 table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-.peers tbody tr:hover td { background: #17202a; }
+.peers tbody tr:not(.focus):not(.delivered-now):not(.delivered-ever):hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
 .peers th:last-child, .peers td:last-child { padding-right: 20px; }
 .peers tbody tr:last-child td { border-bottom: 0; }
