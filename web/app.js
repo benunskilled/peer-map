@@ -1383,6 +1383,11 @@
     return parts.join(" \u00b7 ");
   }
 
+  const TRANSPORT_TITLE = {
+    v1: "Unencrypted - the original P2P protocol",
+    v2: "Encrypted (BIP324) - an observer on the line cannot read what passes between the nodes",
+  };
+
   const COLS = [
     {
       key: "addr", label: "Address", cls: "addr", val: (p) => p.addr,
@@ -1390,8 +1395,9 @@
       // the other question. Without it, a plain cell - no dead links.
       cell: (td, p) => {
         // A long onion or I2P address is cut off by the column, so the full one
-        // lives in the title either way.
-        td.title = p.addr;
+        // lives in the title. A short one is all there already.
+        const long = p.addr.length > 30;
+        if (long) td.title = p.addr;
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
@@ -1406,7 +1412,7 @@
         a.target = "_blank";
         a.rel = "noopener";
         a.textContent = p.addr;
-        a.title = p.addr + "\nOpen this peer in Bitcoin Lab";
+        a.title = (long ? p.addr + "\n" : "") + "Open this peer in Bitcoin Lab";
         td.appendChild(a);
       },
     },
@@ -1482,7 +1488,9 @@
         const note = !p.no_relay ? ""
           : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
           : "Software that does not pass blocks on - this peer can never deliver one first.";
-        td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
+        // With a kind filter on, the agent and its description are in the
+        // cell already; the title only carries them when they are hidden.
+        if (!state.kind) td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
         // Was a strike-through. Now the row is dimmed (see renderTables) and
         // the cell says it in words, so the fact is still there at a glance.
         if (p.no_relay) {
@@ -1490,11 +1498,19 @@
           const tag = document.createElement("span");
           tag.className = "never";
           tag.textContent = "never first";
+          tag.title = note;
           label.after(tag);
         }
       },
     },
-    { key: "transport", label: "P2P", val: (p) => p.transport || "" },
+    {
+      key: "transport", label: "P2P", val: (p) => p.transport || "",
+      cell: (td, p) => {
+        td.textContent = p.transport || "–";
+        if (!p.transport) td.classList.add("dim");
+        else td.title = TRANSPORT_TITLE[p.transport] || "";
+      },
+    },
     {
       key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms"),
       cell: (td, p) => {
@@ -1615,7 +1631,6 @@
             td.textContent = text === "" ? "–" : text;
             if (text === "") td.classList.add("dim");
           }
-          if (c.key === "addr" || c.key === "loc") td.title = text;
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
