@@ -27,9 +27,9 @@
     </div>
 
     <div class="filters" role="group" aria-label="Show connection types">
-      <button class="chip" data-group="manual" aria-pressed="true"><span class="swatch"></span>Manual <b data-count="manual">0</b></button>
       <button class="chip" data-group="inbound" aria-pressed="true"><span class="swatch"></span>Inbound <b data-count="inbound">0</b></button>
       <button class="chip" data-group="outbound" aria-pressed="true"><span class="swatch"></span>Outbound <b data-count="outbound">0</b></button>
+      <button class="chip" data-group="manual" aria-pressed="true"><span class="swatch"></span>Manual <b data-count="manual">0</b></button>
       <span class="place-filter" id="placeFilter" hidden>
         Showing <b id="placeFilterName"></b>
         <button class="linkish" id="placeFilterClear" aria-label="Clear location filter">×</button>
@@ -91,15 +91,15 @@
         <h2>Not on the map</h2>
         <p class="hint">Tor, I2P and CJDNS peers have no location. Inbound IPv6 on umbrelOS arrives through docker-proxy and shows up as a private address.</p>
         <table class="mini">
-          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-manual"></span>Man.</th><th scope="col"><span class="swatch s-inbound"></span>In</th><th scope="col"><span class="swatch s-outbound"></span>Out</th></tr></thead>
+          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-inbound"></span>In</th><th scope="col"><span class="swatch s-outbound"></span>Out</th><th scope="col"><span class="swatch s-manual"></span>Man.</th></tr></thead>
           <tbody id="unplacedBody"></tbody>
         </table>
       </aside>
       <!-- What the colours on the map mean. -->
       <div class="map-legend">
-        <span><span class="swatch s-manual"></span>Manual</span>
         <span><span class="swatch s-inbound"></span>Inbound</span>
         <span><span class="swatch s-outbound"></span>Outbound</span>
+        <span><span class="swatch s-manual"></span>Manual</span>
         <span><span class="swatch s-home"></span>Your node · block delivery</span>
       </div>
     </section>
