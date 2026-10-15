@@ -34,7 +34,7 @@
     // top, so the two-minute mark never depends on the browser's own clock
     // agreeing with the node's.
     receivedAt: 0,
-    markShown: false,
+    liveShown: false,
     open: { manual: true, inbound: true, outbound: true }, // table sections
   };
 
@@ -132,9 +132,9 @@
       tickTimer = setInterval(() => {
         renderStatus();
         // Two minutes are up between two polls, and a paused dashboard never
-        // polls again at all - so the mark takes itself off rather than
-        // waiting for the next answer.
-        if (state.markShown && !liveBlock()) render();
+        // polls again at all - so the star and the row colour take themselves
+        // off rather than waiting for the next answer.
+        if (state.liveShown && !liveBlock()) render();
       }, 1000);
     }
   }
@@ -154,9 +154,11 @@
     return m + "m";
   }
   const typeLabel = (t) => ({
-    "outbound-full-relay": "full-relay",
-    "block-relay-only": "block-relay",
+    "outbound-full-relay": "Full relay",
+    "block-relay-only": "Block relay",
   }[t] || t || "-");
+  // As Bitcoin Lab writes it: milliseconds below a second, seconds above.
+  const fmtPing = (ms) => (ms < 1000 ? Math.round(ms) + " ms" : (ms / 1000).toFixed(2) + " s");
   const netLabel = (n) => ({
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
     not_publicly_routable: "Private", ipv6_hidden: "IPv6 (address hidden)",
@@ -629,26 +631,6 @@
     body.appendChild(race);
   }
 
-  function renderBlockMark() {
-    const el = $("block-mark");
-    if (!el) return;
-    const b = liveBlock();
-    const name = b ? b.pool || b.pool_tag : null;
-    state.markShown = Boolean(name);
-    el.hidden = !name;
-    el.textContent = "";
-    el.classList.toggle("raw", Boolean(b && !b.pool && b.pool_tag));
-    if (!name) return;
-    const star = document.createElement("span");
-    star.className = "star";
-    star.textContent = "\u2605";
-    const label = document.createElement("span");
-    label.className = "name";
-    label.textContent = b.pool ? name : `"${name}"`;
-    el.append(star, label);
-    el.title = "The starred peers delivered this block to your node.";
-  }
-
   // ---------- render ----------
   const matchesKind = (p) => !state.kind || p.kind === state.kind;
   const visiblePeers = () =>
@@ -669,8 +651,7 @@
     deliveredNow = deliveredSet();
     deliveredEver = new Set((d.last_block && d.last_block.delivered_ever) || []);
     renderSiblingLink();
-    renderBlockMark();
-    if (deliveredNow.size) state.markShown = true;
+    state.liveShown = Boolean(liveBlock()) || deliveredNow.size > 0;
     renderBlockCard();
     renderMarkers();
     renderUnplaced();
@@ -1557,9 +1538,9 @@
       // Network and P2P version as two small tags; outbound also its type.
       key: "net", label: "Net", val: (p) => netLabel(p.network) + (p.transport || ""),
       cell: (td, p) => {
-        const tag = (text, title) => {
+        const tag = (text, title, cls) => {
           const e = document.createElement("span");
-          e.className = "net";
+          e.className = cls ? "net " + cls : "net";
           e.textContent = text;
           if (title) e.title = title;
           td.appendChild(e);
@@ -1567,14 +1548,14 @@
         tag(HIDDEN[p.network] ? HIDDEN[p.network].short : netLabel(p.network) || "–",
           HIDDEN[p.network] ? HIDDEN[p.network].tip : "");
         if (p.transport) tag(p.transport, TRANSPORT_TITLE[p.transport] || "");
-        if (p.group === "outbound" && p.type) tag(typeLabel(p.type));
+        if (p.group === "outbound" && p.type) tag(typeLabel(p.type), "", "type");
       },
     },
     {
-      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms"),
+      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : fmtPing(p.ping_ms)),
       cell: (td, p) => {
         if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
-        td.textContent = Math.round(p.ping_ms) + " ms";
+        td.textContent = fmtPing(p.ping_ms);
       },
     },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
