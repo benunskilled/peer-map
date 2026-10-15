@@ -288,7 +288,8 @@ func TestHiddenIPv6(t *testing.T) {
 	}{
 		{"10.21.0.1:51234", true, hiddenIPv6},
 		{"10.21.0.1:51234", false, "not_publicly_routable"},
-		{"10.21.22.10:40000", true, "not_publicly_routable"}, // Tor proxy
+		{"10.21.22.10:40000", true, torHidden},
+		{"10.21.22.11:40000", true, i2pHidden},
 		{"10.21.21.10:40216", true, "not_publicly_routable"}, // an app on this Umbrel
 	}
 	for _, c := range cases {
@@ -301,7 +302,7 @@ func TestHiddenIPv6(t *testing.T) {
 			t.Errorf("%s inbound=%v: network %+v, want %s", c.addr, c.inbound, got, c.want)
 		}
 		wantOp := "Your Umbrel's own network"
-		if c.want == hiddenIPv6 {
+		if c.want != "not_publicly_routable" {
 			wantOp = ""
 		}
 		if got[0].Country != "" || got[0].Operator != wantOp {

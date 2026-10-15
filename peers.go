@@ -240,6 +240,15 @@ const dockerGateway = "10.21.0.1"
 // hiddenIPv6 is the network such a peer is shown under instead of "Private".
 const hiddenIPv6 = "ipv6_hidden"
 
+// Tor and I2P peers reach Core through the proxy containers in Umbrel's
+// network, which put their own address in place of the peer's.
+const (
+	torProxy  = "10.21.22.10" // bitcoin_tor_1
+	i2pProxy  = "10.21.22.11" // bitcoin_i2pd_daemon_1
+	torHidden = "tor_hidden"
+	i2pHidden = "i2p_hidden"
+)
+
 // isPrivate: an address inside a private network, such as the one umbrelOS
 // runs its apps in.
 func isPrivate(addr string) bool {
@@ -296,6 +305,12 @@ func convert(raw []rawPeer) []Peer {
 		}
 		if r.Inbound && hostOf(r.Addr) == dockerGateway {
 			p.Network = hiddenIPv6
+		}
+		switch hostOf(r.Addr) {
+		case torProxy:
+			p.Network = torHidden
+		case i2pProxy:
+			p.Network = i2pHidden
 		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {

@@ -160,7 +160,13 @@
   const netLabel = (n) => ({
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
     not_publicly_routable: "Private", ipv6_hidden: "IPv6 (address hidden)",
+    tor_hidden: "Tor (address hidden)", i2p_hidden: "I2P (address hidden)",
   }[n] || n || "-");
+  const HIDDEN = {
+    ipv6_hidden: { short: "IPv6", tip: "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." },
+    tor_hidden: { short: "Tor", tip: "Reached through the Tor proxy, which hides the peer's address." },
+    i2p_hidden: { short: "I2P", tip: "Reached through the I2P router, which hides the peer's address." },
+  };
   // A flag from the two-letter country code: regional-indicator letters, no
   // image files. Unknown or missing codes get none.
   const flagOf = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
@@ -1449,7 +1455,7 @@
         const title = placeTitle(p);
         const b = fit(document.createElement("b"), title);
         b.textContent = title;
-        if (p.network === "ipv6_hidden") b.dataset.tip = "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's.";
+        if (HIDDEN[p.network]) b.dataset.tip = HIDDEN[p.network].tip;
         const sub = document.createElement("small");
         sub.className = "fit";
         if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
@@ -1549,8 +1555,8 @@
           if (title) e.title = title;
           td.appendChild(e);
         };
-        tag(p.network === "ipv6_hidden" ? "IPv6" : netLabel(p.network) || "–",
-          p.network === "ipv6_hidden" ? "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." : "");
+        tag(HIDDEN[p.network] ? HIDDEN[p.network].short : netLabel(p.network) || "–",
+          HIDDEN[p.network] ? HIDDEN[p.network].tip : "");
         if (p.transport) tag(p.transport, TRANSPORT_TITLE[p.transport] || "");
         if (p.group === "outbound" && p.type) tag(typeLabel(p.type));
       },
