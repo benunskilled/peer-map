@@ -304,6 +304,9 @@ func convert(raw []rawPeer) []Peer {
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
 		}
+		if p.Network == "not_publicly_routable" {
+			p.Operator = "Your Umbrel's own network"
+		}
 		if loc, ok := locate(r); ok {
 			p.Country = loc.Country
 			if loc.Region != "" {

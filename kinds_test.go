@@ -300,7 +300,11 @@ func TestHiddenIPv6(t *testing.T) {
 		if len(got) != 1 || got[0].Network != c.want {
 			t.Errorf("%s inbound=%v: network %+v, want %s", c.addr, c.inbound, got, c.want)
 		}
-		if got[0].Country != "" || got[0].Operator != "" {
+		wantOp := "Your Umbrel's own network"
+		if c.want == hiddenIPv6 {
+			wantOp = ""
+		}
+		if got[0].Country != "" || got[0].Operator != wantOp {
 			t.Errorf("%s: looked up %q %q", c.addr, got[0].Country, got[0].Operator)
 		}
 	}
