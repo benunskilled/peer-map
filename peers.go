@@ -123,10 +123,12 @@ type Peer struct {
 	// same provider. Empty for an address no network announces.
 	ASN      uint32 `json:"asn,omitempty"`
 	Operator string `json:"operator,omitempty"`
-	Subver   string `json:"subver"`
-	Kind     string `json:"kind"`               // what the user agent claims; see kinds.go
-	About    string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay  bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	// The name of the app when the peer is one of Umbrel's own, such as electrs.
+	App     string `json:"app,omitempty"`
+	Subver  string `json:"subver"`
+	Kind    string `json:"kind"`               // what the user agent claims; see kinds.go
+	About   string `json:"about,omitempty"`    // what that software is, when known
+	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
@@ -315,6 +317,7 @@ func convert(raw []rawPeer) []Peer {
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
 			p.About = "Probably your own " + claimOf(r.Subver) + " on this Umbrel"
+			p.App, _, _ = strings.Cut(strings.Trim(r.Subver, "/"), ":")
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
