@@ -9,6 +9,7 @@
   --border: #1f2a35;
   --text: #e6edf3;
   --muted: #8a99a8;
+  --faint: #5b6876;
   --accent: #f7931a;
   --good: #3fb950;
   --bad: #f85149;
@@ -226,7 +227,7 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 .linkish:hover { color: var(--text); }
 
 /* ---- map card: map | side tab | (optional) panel ---- */
-.map-card { display: flex; overflow: hidden; }
+.map-card { display: flex; flex-wrap: wrap; overflow: hidden; }
 .map-wrap { position: relative; flex: 1 1 auto; min-width: 0; touch-action: none; }
 #map { display: block; width: 100%; height: auto; cursor: grab; user-select: none; }
 #map.dragging { cursor: grabbing; }
@@ -238,8 +239,8 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 #map.dotted .land { fill-opacity: calc(1 - var(--dots, 1)); stroke-opacity: calc(1 - var(--dots, 1)); }
 .dots { opacity: var(--dots, 1); pointer-events: none; }
 .dots path { fill: none; stroke-linecap: round; stroke-width: 1.15; }
-#dotsAll { stroke: #27333f; }
-#dotsHot { stroke: #46617c; stroke-width: 1.35; }
+#dotsAll { stroke: #2b3a49; }
+#dotsHot { stroke: #4f6e8c; stroke-width: 1.35; }
 /* Arcs from every place to this node; the manual ones a little brighter. */
 .link { fill: none; stroke-width: 0.7; stroke-opacity: 0.16; stroke-linecap: round; pointer-events: none; }
 .l-manual { stroke: var(--manual); stroke-opacity: 0.5; stroke-width: 1; }
@@ -359,8 +360,6 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
    the same axis is one a colour-blind reader cannot separate - measured, not
    assumed. It is not a fault either; a wallet is doing what a wallet does. */
 .peers td.norelay { color: var(--muted); }
-/* The kind is cut like the other columns, never wrapped; the never-first tag stays whole beside it. */
-.peers .klabel { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .peers td.norelay .never { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
 .peers tr.weak td { color: var(--muted); }
 .peers td .flag { margin-right: 7px; font-size: 15px; vertical-align: -1px; }
@@ -381,11 +380,7 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .cards.cards table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 14px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
 .cards.cards table tr:last-child { border-bottom: 0; }
 .cards.cards table tr td { display: block; padding: 0; border: 0; max-width: 100%; min-width: 0; background: none; }
-.cards.cards table tr td.k-addr { flex: 1 1 100%; font-size: 13px; }
-.cards.cards table tr td.k-kind { flex: 1 1 100%; }
-.cards.cards table tr td.k-kind .klabel { max-width: calc(100% - 110px); }
 .cards.cards table tr td.k-kind .ua, .cards.cards table tr td.k-kind .about { white-space: normal; }
-.cards.cards table tr td.k-transport::before,
 .cards.cards table tr td.k-ping::before,
 .cards.cards table tr td.k-conntime::before {
   content: attr(data-label); margin-right: 5px;
@@ -411,3 +406,46 @@ details.group-card:not([open]) > .kinds { display: none; }
 .block-wave.run { animation: block-wave-roll 1.4s ease-out; }
 @keyframes block-wave-roll { 0% { opacity: 1; background-position: 100% 0; } 85% { opacity: 1; } 100% { opacity: 0; background-position: 0% 0; } }
 @media (prefers-reduced-motion: reduce) { .block-wave.run { animation: none; } }
+
+/* ---- V2 as in the approved design (Claude outputs/peermap-design) ---- */
+.map-legend { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.map-legend .swatch { width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; }
+.s-home { background: var(--accent); }
+
+/* Group heading: the name, then the count and the kinds as chips. */
+details.group-card summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.kinds.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.chips .chip { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; line-height: 1.5; }
+.chips .chip i { font-style: normal; color: var(--text); font-weight: 600; margin-right: 3px; }
+.kinds.chips .kind-pick { cursor: pointer; font: inherit; font-size: 12px; }
+.kinds.chips .kind-pick:hover { color: var(--text); border-color: #33475b; }
+.kinds.chips .kind-pick.on { color: var(--text); border-color: var(--accent); }
+
+/* Rows: two lines each. */
+.peers td { vertical-align: middle; }
+.peers th { color: var(--faint, #5b6876); }
+.peers td.peer, .peers td.op { max-width: 280px; overflow: visible; }
+.who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.who .flag { font-size: 18px; line-height: 1; margin: 0; }
+.who-text { min-width: 0; }
+.who b, .op-name { display: block; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.op-name { font-weight: 400; max-width: 230px; }
+.peers small { display: block; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.peers small.sub { color: var(--faint, #5b6876); }
+.addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint, #5b6876); }
+a.addr-txt:hover { color: var(--accent); }
+.peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
+.peers .kind.core { background: rgba(31,191,171,.12); color: #7fe3d6; }
+.peers .kind.knots { background: rgba(57,135,229,.14); color: #8fbdf5; }
+.peers .kind.disg { background: rgba(248,81,73,.12); color: #ff9b95; }
+.peers .kind.never { background: #161d26; color: var(--faint, #5b6876); }
+.peers .kind .ico { font-size: 11px; opacity: .85; }
+.peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; }
+.peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
+.peers tr.weak .who b { color: var(--muted); font-weight: 500; }
+
+/* Cards (narrow screens): the peer on top, the rest wrapping below. */
+.cards.cards table tr td.k-peer { flex: 1 1 100%; }
+.cards.cards table tr td.k-kind { flex: 1 1 100%; }
+.cards.cards table tr td.k-operator .sub { display: inline; margin-left: 6px; }
+.cards.cards table tr td.k-operator .op-name { display: inline; }

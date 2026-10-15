@@ -258,7 +258,10 @@
     }
     const n = (b.first_peers || []).length;
     sep();
-    add(null, n === 0 ? "nobody credited" : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
+    // One peer and a known place: say where it came from, with its flag.
+    const one = n === 1 && state.data.peers.find((p) => p.addr === b.first_peers[0]);
+    add(null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
+      : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
       b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
     sep();
     add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
@@ -1371,16 +1374,18 @@
     const n = new Map();
     for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    el.textContent = "";
-    entries.forEach(([kind, count], i) => {
-      if (i) el.appendChild(document.createTextNode(" \u00b7 "));
+    entries.forEach(([kind, count]) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "kind-pick" + (state.kind === kind ? " on" : "");
-      b.textContent = count + " " + kind;
+      b.className = "chip kind-pick" + (state.kind === kind ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + kind);
       b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
       b.setAttribute("aria-pressed", String(state.kind === kind));
-      b.addEventListener("click", () => setKind(kind));
+      // Inside the group's <summary>: the click picks a kind and must not
+      // also fold the group.
+      b.addEventListener("click", (e) => { e.preventDefault(); setKind(kind); });
       el.appendChild(b);
     });
   }
@@ -1410,137 +1415,144 @@
     v2: "Encrypted (BIP324) - an observer on the line cannot read what passes between the nodes",
   };
 
+  // Two lines per peer, as in the approved design: what a row is about on
+  // top, the detail under it - the software, the AS number, the address -
+  // so nothing needs a pointer to be read.
+  const KIND_CLASS = { "Node (Core)": "core", "Node (Knots)": "knots", "Disguised": "disg" };
+  const placeTitle = (p) => p.network === "not_publicly_routable" ? "This Umbrel"
+    : p.region || (p.cc ? regionName(p.cc) : p.network === "ipv6_hidden" ? "IPv6 (address hidden)" : netLabel(p.network) || "Unknown");
+  const neverNote = (p) => !p.no_relay ? ""
+    : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
+    : "Software that does not pass blocks on - this peer can never deliver one first.";
+  const line = (cls, text) => {
+    const e = document.createElement("small");
+    e.className = cls;
+    e.textContent = text;
+    return e;
+  };
+
   const COLS = [
     {
-      key: "addr", label: "Address", cls: "addr", val: (p) => p.addr,
-      // With Bitcoin Lab installed the address becomes the way over: same peer,
-      // the other question. Without it, a plain cell - no dead links.
+      // Where it is on top, the country and the address under it. Sorted by
+      // country first - otherwise Bavaria and Hesse end up on either side of
+      // England. Peers without a place sort last.
+      key: "peer", label: "Peer", cls: "peer",
+      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "￿" + p.addr),
       cell: (td, p) => {
-        // A long onion or I2P address is cut off by the column, so the full one
-        // lives in the title. A short one is all there already.
+        const who = document.createElement("div");
+        who.className = "who";
+        const f = document.createElement("span");
+        f.className = "flag";
+        f.textContent = p.network === "not_publicly_routable" ? "\u{1F3E0}" : flagOf(p.cc);
+        const text = document.createElement("div");
+        text.className = "who-text";
+        const title = placeTitle(p);
+        const b = fit(document.createElement("b"), title);
+        b.textContent = title;
+        if (p.network === "ipv6_hidden") b.dataset.tip = "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's.";
+        const sub = document.createElement("small");
+        sub.className = "fit";
+        if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
           : deliveredEver.has(p.addr) ? "Has delivered a block first (Bitcoin Lab)" : "";
-        fit(td, p.addr, got);
+        sub.dataset.full = p.addr;
+        if (got) sub.dataset.tip = got;
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
-          star.textContent = "\u2605";
+          star.textContent = "★";
           star.title = "Delivered the block that just landed";
-          td.appendChild(star);
+          sub.appendChild(star);
         }
-        if (!state.data || !state.data.sibling) { td.textContent = p.addr; return; }
-        const a = document.createElement("a");
-        a.className = "peer-jump";
-        a.href = siblingURL(p.addr);
-        a.target = "_blank";
-        a.rel = "noopener";
-        a.textContent = p.addr;
-        a.dataset.tip = "Open this peer in Bitcoin Lab";
-        a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
-        td.appendChild(a);
-      },
-    },
-    {
-      // Shown as "Region, Country", sorted by country first - otherwise
-      // Bavaria and Hesse end up on either side of England and the column
-      // looks like it cannot do the one thing it obviously should. Peers
-      // without a place sort last rather than first, where an empty string
-      // would have put them.
-      key: "loc", label: "Location", cls: "loc", show: locLabel,
-      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff"),
-      cell: (td, p) => {
-        const text = locLabel(p);
-        if (!text) { td.textContent = "–"; td.classList.add("dim"); return; }
-        const f = document.createElement("span");
-        f.className = "flag";
-        f.textContent = flagOf(p.cc);
-        td.append(f, text);
-        fit(td, text);
-      },
-    },
-    {
-      // Where a peer sits and whose machine it is are two questions, and the
-      // second is the one that catches three peers in three countries sitting
-      // with the same company. Sorting by this column puts them next to each
-      // other. Empty for Tor, I2P and anything without a public address.
-      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "",
-      cell: (td, p) => {
-        td.textContent = p.operator || "";
-        if (p.asn) td.title = "AS" + p.asn;
-        if (p.operator) fit(td, p.operator, p.asn ? "AS" + p.asn : "");
-      },
-    },
-    {
-      key: "network", label: "Network", val: (p) => netLabel(p.network),
-      cell: (td, p) => {
-        td.textContent = netLabel(p.network);
-        if (p.network === "ipv6_hidden") td.title = "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's.";
-      },
-    },
-    { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
-    {
-      key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,
-      // Marked "never first" for software that passes no blocks on. It is not a
-      // fault: a wallet is doing exactly what a wallet does. It only means this
-      // connection was never going to hand your node a block.
-      //
-      // The user agent itself lives in this cell's title rather than in a
-      // column of its own. It is the raw material this class is derived from -
-      // worth having, not worth the width, and it was the widest column in the
-      // table by a distance.
-      cell: (td, p) => {
-        // The label in its own element, so the "never first" tag can follow
-        // it and the agent and its description below stay separate.
-        const label = document.createElement("span");
-        label.className = "klabel";
-        label.textContent = kindLabel(p);
-        td.appendChild(label);
-        fit(label, kindLabel(p));
-        // With a kind filter on, the question is why these peers are in it,
-        // and the answer is the agent: shown under the kind, only then.
-        if (state.kind && p.subver) {
-          const ua = document.createElement("div");
-          ua.className = "ua";
-          ua.textContent = p.subver;
-          td.appendChild(ua);
+        // With Bitcoin Lab installed the address is the way over: same peer,
+        // the other question. Without it, plain text - no dead links.
+        if (state.data && state.data.sibling) {
+          const a = document.createElement("a");
+          a.className = "peer-jump addr-txt";
+          a.href = siblingURL(p.addr);
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = p.addr;
+          a.dataset.tip = "Open this peer in Bitcoin Lab";
+          a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
+          sub.appendChild(a);
+        } else {
+          const a = document.createElement("span");
+          a.className = "addr-txt";
+          a.textContent = p.addr;
+          sub.appendChild(a);
         }
-        // Also without an agent: "No user agent" is the kind that most
-        // needs the sentence.
+        text.append(b, sub);
+        who.append(f, text);
+        td.appendChild(who);
+      },
+    },
+    {
+      // Whose machine it is, with the AS number under it. Sorting by this
+      // column catches three peers in three countries with the same company.
+      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "￿",
+      cell: (td, p) => {
+        if (!p.operator && !p.asn) { td.textContent = "–"; td.classList.add("dim"); return; }
+        const name = fit(document.createElement("span"), p.operator || "");
+        name.className += " op-name";
+        name.textContent = p.operator || "";
+        td.appendChild(name);
+        if (p.asn) td.appendChild(line("sub", "AS" + p.asn));
+      },
+    },
+    {
+      // What it calls itself and what Core saw, as a pill; the software it
+      // announced under it. A peer that can never deliver a block first is
+      // dimmed and says so in the pill - not a fault, a wallet is doing what
+      // a wallet does.
+      key: "kind", label: "Kind", val: (p) => p.kind || "",
+      cell: (td, p) => {
+        const pill = document.createElement("span");
+        pill.className = "kind " + (p.no_relay ? "never" : KIND_CLASS[p.kind] || "");
+        // Never-first peers: the kind and the fact in the pill; what Core saw
+        // (no services, chain unknown) moves to the line under it, so the
+        // pill is never cut before the words that matter.
+        const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
+        const label = p.no_relay ? p.kind + " \u00b7 never first" : kindLabel(p);
+        if (p.no_relay) {
+          const ico = document.createElement("span");
+          ico.className = "ico";
+          ico.textContent = "⊘";
+          pill.append(ico, " ");
+        }
+        pill.append(label);
+        fit(pill, label, [p.about, neverNote(p)].filter(Boolean).join("\n"));
+        if (p.no_relay) td.classList.add("norelay");
+        td.appendChild(pill);
+        const under = [p.no_relay ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
+        if (under) td.appendChild(fit(line("sub ua", under), under));
+        // With a kind filter on, the question is why these peers are in it:
+        // the description is shown under the kind, only then.
         if (state.kind && p.about) {
           const about = document.createElement("div");
           about.className = "about";
           about.textContent = p.about;
           td.appendChild(about);
         }
-        const note = !p.no_relay ? ""
-          : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
-          : "Software that does not pass blocks on - this peer can never deliver one first.";
-        // With a kind filter on, the agent and its description are in the
-        // cell already; the title only carries them when they are hidden.
-        if (!state.kind) {
-          td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
-          label.dataset.tip = td.title;
-        }
-        // Was a strike-through. Now the row is dimmed (see renderTables) and
-        // the cell says it in words, so the fact is still there at a glance.
-        if (p.no_relay) {
-          td.className = (td.className ? td.className + " " : "") + "norelay";
-          const tag = document.createElement("span");
-          tag.className = "never";
-          tag.textContent = "never first";
-          tag.title = note;
-          label.after(tag);
-        }
       },
     },
     {
-      key: "transport", label: "P2P", val: (p) => p.transport || "",
+      // Network and P2P version as two small tags; outbound also its type.
+      key: "net", label: "Net", val: (p) => netLabel(p.network) + (p.transport || ""),
       cell: (td, p) => {
-        td.textContent = p.transport || "–";
-        if (!p.transport) td.classList.add("dim");
-        else td.title = TRANSPORT_TITLE[p.transport] || "";
+        const tag = (text, title) => {
+          const e = document.createElement("span");
+          e.className = "net";
+          e.textContent = text;
+          if (title) e.title = title;
+          td.appendChild(e);
+        };
+        tag(p.network === "ipv6_hidden" ? "IPv6" : netLabel(p.network) || "–",
+          p.network === "ipv6_hidden" ? "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." : "");
+        if (p.transport) tag(p.transport, TRANSPORT_TITLE[p.transport] || "");
+        if (p.group === "outbound" && p.type) tag(typeLabel(p.type));
       },
     },
     {
@@ -1572,22 +1584,21 @@
       const h = document.createElement("h2");
       const sw = document.createElement("span");
       sw.className = "swatch s-" + g;
+      h.append(sw, LABEL[g]);
+      // The count and the mix of kinds as chips beside the name. Counted
+      // before this group's own kind filter, so a group the filter emptied
+      // still offers the way back - and switching kinds is one click.
+      const mix = document.createElement("span");
+      mix.className = "kinds chips";
       const n = document.createElement("span");
-      n.className = "n";
-      n.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
-      h.append(sw, LABEL[g] + " ", n);
-      summary.appendChild(h);
+      n.className = "chip count";
+      const ni = document.createElement("i");
+      ni.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
+      n.append(ni, " peers");
+      mix.appendChild(n);
+      if (kindPool.length) renderKindMix(mix, kindPool);
+      summary.append(h, mix);
       card.appendChild(summary);
-
-      if (kindPool.length) {
-        const mix = document.createElement("p");
-        mix.className = "kinds";
-        // Counted before this group's own kind filter and drawn before the
-        // empty check, so a group the filter emptied still offers the way
-        // back - and switching from one kind to another is one click.
-        renderKindMix(mix, kindPool);
-        card.appendChild(mix);
-      }
 
       if (peers.length) {
         const spread = document.createElement("p");
