@@ -371,6 +371,30 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers tr.delivered-now td { background: rgba(247,147,26,.13); }
 .peers tr.focus td { background: rgba(247,147,26,.10); }
 .peers tr.focus td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* A table too wide for its card: each row becomes a small card, the address
+   on top, the other values wrapping below it. Nothing scrolls sideways. The
+   labels are only for values that do not explain themselves. */
+.scroll.cards { overflow-x: visible; }
+.scroll.cards table, .scroll.cards tbody { display: block; }
+.scroll.cards thead { display: none; }
+.cards.cards table tr { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 14px; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.cards.cards table tr:last-child { border-bottom: 0; }
+.cards.cards table tr td { display: block; padding: 0; border: 0; max-width: 100%; min-width: 0; background: none; }
+.cards.cards table tr td.k-addr { flex: 1 1 100%; font-size: 13px; }
+.cards.cards table tr td.k-kind { flex: 1 1 100%; }
+.cards.cards table tr td.k-kind .klabel { max-width: calc(100% - 110px); }
+.cards.cards table tr td.k-kind .ua, .cards.cards table tr td.k-kind .about { white-space: normal; }
+.cards.cards table tr td.k-transport::before,
+.cards.cards table tr td.k-ping::before,
+.cards.cards table tr td.k-conntime::before {
+  content: attr(data-label); margin-right: 5px;
+  color: var(--muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
+}
+.cards.cards tr.delivered-ever { background: rgba(63,185,80,.13); }
+.cards.cards tr.delivered-now { background: rgba(247,147,26,.13); }
+.cards.cards tr.focus { background: rgba(247,147,26,.10); box-shadow: inset 3px 0 0 var(--accent); }
+.cards.cards tr.focus td:first-child { box-shadow: none; }
 .empty { color: var(--muted); margin: 0 20px 8px; }
 /* The mix of peer kinds under a group heading: a summary, not a heading of
    its own, so it stays quiet enough to skip over. */
