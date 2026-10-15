@@ -25,8 +25,8 @@
      Inbound used to be an orange-red, which read as a warning - an inbound peer
      is not a problem - and left no room for any other meaning in red. The
      yellow leans green on purpose, to keep its distance from the Bitcoin orange
-     the title and the buttons wear. Nothing here is red: "cannot relay" is
-     carried by a strikethrough, not by a hue. */
+     the title and the buttons wear. Nothing here is red: red is kept for the
+     Kind pill of a disguised or LinkingLion peer. */
   --manual: #3987e5;
   --inbound: #9e9a28;
   --outbound: #1a9e8f;
@@ -435,8 +435,7 @@ details.group-card summary { display: flex; align-items: center; flex-wrap: wrap
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint, #5b6876); }
 a.addr-txt:hover { color: var(--accent); }
 .peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
-.peers .kind.core { background: rgba(31,191,171,.12); color: #7fe3d6; }
-.peers .kind.knots { background: rgba(57,135,229,.14); color: #8fbdf5; }
+.peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
 .peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: #ff9b95; }
 .peers .kind.never { background: #161d26; color: var(--faint, #5b6876); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
