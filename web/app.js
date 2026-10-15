@@ -1284,8 +1284,10 @@
     window.addEventListener("resize", () => { if (state.data) placeMarkers(); });
     // The route is laid out in pixels from the card's width, so a new width
     // needs a new layout - and a narrow one may need the list instead.
-    let routeResize = null;
+    let routeResize = null, routeWidth = window.innerWidth;
     window.addEventListener("resize", () => {
+      if (window.innerWidth === routeWidth) return;
+      routeWidth = window.innerWidth;
       clearTimeout(routeResize);
       routeResize = setTimeout(() => { if (state.data) renderBlockCard(); }, 150);
     });
@@ -1706,7 +1708,14 @@
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
   let fitTimer = null;
-  window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTables, 100); });
+  // Only a change of width can change whether the tables fit; on an iPhone the
+  // height changes all the time while Safari's toolbar shrinks and grows.
+  let fitWidth = window.innerWidth;
+  window.addEventListener("resize", () => {
+    if (window.innerWidth === fitWidth) return;
+    fitWidth = window.innerWidth;
+    clearTimeout(fitTimer); fitTimer = setTimeout(fitTables, 100);
+  });
   document.addEventListener("toggle", fitTables, true);
 
 
