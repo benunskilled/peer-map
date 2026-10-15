@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const GROUPS = ["manual", "inbound", "outbound"];
+  const GROUPS = ["inbound", "outbound", "manual"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
