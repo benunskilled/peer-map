@@ -1517,12 +1517,15 @@
       key: "kind", label: "Kind", val: (p) => p.kind || "",
       cell: (td, p) => {
         const pill = document.createElement("span");
-        pill.className = "kind " + (p.no_relay ? "never" : KIND_CLASS[p.kind] || "");
+        // LinkingLion has its own pill whatever software it claims; the
+        // software stays in the line under it.
+        pill.className = "kind " + (p.linking_lion ? "lion" : p.no_relay ? "never" : KIND_CLASS[p.kind] || "");
         // Never-first peers: the kind and the fact in the pill; what Core saw
         // (no services, chain unknown) moves to the line under it, so the
         // pill is never cut before the words that matter.
         const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
-        const label = p.no_relay ? p.kind + " \u00b7 never first" : kindLabel(p);
+        const never = p.no_relay ? " \u00b7 never first" : "";
+        const label = p.linking_lion ? "LinkingLion" + never : p.no_relay ? p.kind + never : kindLabel(p);
         if (p.no_relay) {
           const ico = document.createElement("span");
           ico.className = "ico";
@@ -1533,7 +1536,7 @@
         fit(pill, label, [p.about, neverNote(p)].filter(Boolean).join("\n"));
         if (p.no_relay) td.classList.add("norelay");
         td.appendChild(pill);
-        const under = [p.no_relay ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
+        const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
         if (under) td.appendChild(fit(line("sub ua", under), under));
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then.
