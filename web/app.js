@@ -1425,7 +1425,7 @@
   // top, the detail under it - the software, the AS number, the address -
   // so nothing needs a pointer to be read.
   const KIND_CLASS = { "Node (Core)": "core", "Node (Knots)": "knots", "Disguised": "disg" };
-  const placeTitle = (p) => p.network === "not_publicly_routable" ? "This Umbrel"
+  const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
     : p.region || (p.cc ? regionName(p.cc) : p.network === "ipv6_hidden" ? "IPv6 (address hidden)" : netLabel(p.network) || "Unknown");
   const neverNote = (p) => !p.no_relay ? ""
     : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
