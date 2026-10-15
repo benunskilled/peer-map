@@ -156,7 +156,7 @@ body {
 .block-body .note { margin: 0; font-size: 13px; color: var(--muted); }
 
 .status-pill { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.status-pill a.lion { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.status-pill a.lion { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
 .status-pill a.lion:hover { color: var(--text, inherit); }
 
 main {
