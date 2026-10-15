@@ -638,6 +638,9 @@
   const regionMode = () => state.view.k >= REGION_ZOOM;
 
   function render() {
+    // Read before anything changes: rebuilding the tables makes the page
+    // shorter for a moment, and Safari clamps the scroll position to it.
+    const y = window.scrollY;
     const d = state.data;
     $("demo").hidden = !d.demo;
     showError(d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "");
@@ -656,6 +659,7 @@
     renderMarkers();
     renderUnplaced();
     renderTables();
+    if (window.scrollY !== y) window.scrollTo(0, y);
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
@@ -1689,11 +1693,17 @@
   // their content, and a closed group has no width to measure until it opens.
   // All groups switch together: one group as cards and the next as a table
   // looked like two different pages.
+  // Measuring takes the cards away for a moment, and on a phone the page is
+  // then far shorter: Safari clamps the scroll position to it and keeps it
+  // there, so a reader far down was thrown up on every refresh. The position
+  // is put back before anything is painted.
   function fitTables() {
+    const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
     for (const w of wraps) w.classList.remove("cards");
     const tight = wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
     for (const w of wraps) w.classList.toggle("cards", tight);
+    if (window.scrollY !== y) window.scrollTo(0, y);
   }
   let fitTimer = null;
   window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTables, 100); });
