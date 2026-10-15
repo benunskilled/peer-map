@@ -1429,7 +1429,6 @@
   // Two lines per peer, as in the approved design: what a row is about on
   // top, the detail under it - the software, the AS number, the address -
   // so nothing needs a pointer to be read.
-  const KIND_CLASS = { "Node (Core)": "core", "Node (Knots)": "knots", "Disguised": "disg" };
   const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
     : p.region || (p.cc ? regionName(p.cc) : p.network === "ipv6_hidden" ? "IPv6 (address hidden)" : netLabel(p.network) || "Unknown");
   const neverNote = (p) => !p.no_relay ? ""
@@ -1521,9 +1520,11 @@
       key: "kind", label: "Kind", val: (p) => p.kind || "",
       cell: (td, p) => {
         const pill = document.createElement("span");
+        // Green for every peer that can deliver a block first, grey for those
+        // that never can, red for a disguise or LinkingLion even when it could.
         // LinkingLion has its own pill whatever software it claims; the
         // software stays in the line under it.
-        pill.className = "kind " + (p.linking_lion ? "lion" : p.no_relay ? "never" : KIND_CLASS[p.kind] || "");
+        pill.className = "kind " + (p.linking_lion ? "lion" : p.no_relay ? "never" : p.kind === "Disguised" ? "disg" : "first");
         // Never-first peers: the kind and the fact in the pill; what Core saw
         // (no services, chain unknown) moves to the line under it, so the
         // pill is never cut before the words that matter.
