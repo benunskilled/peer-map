@@ -282,6 +282,26 @@
   // visible from here, and a whole ping sits in the middle. It only moves the
   // peer's dot - Core and the pools stand where they were measured.
   const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
+  // Text cut off with an ellipsis is readable on hover - and only then, a
+  // tooltip that repeats what is on screen says nothing. Whether it is cut
+  // depends on the screen, so it is decided when the pointer gets there.
+  // `tip` is what the element says on hover anyway, cut or not.
+  function fit(e, full, tip) {
+    e.classList.add("fit");
+    e.dataset.full = full;
+    if (tip) e.dataset.tip = tip;
+    return e;
+  }
+  document.addEventListener("mouseover", (ev) => {
+    const e = ev.target.closest && ev.target.closest(".fit");
+    if (!e) return;
+    const cut = e.scrollWidth > e.clientWidth;
+    const link = e.querySelector("a[data-tip]");
+    const lines = [cut ? e.dataset.full : "", e.dataset.tip || ""];
+    if (link) link.title = [...lines, link.dataset.tip].filter(Boolean).join("\n");
+    else e.title = lines.filter(Boolean).join("\n");
+  });
+
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
 
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
@@ -425,8 +445,9 @@
     }
     const miner = median ? "Miner" : b.pool || (b.pool_tag ? `"${b.pool_tag}"` : "unknown miner");
     const W = box.clientWidth - 12;
-    // The last label is right-aligned on its dot, so the dot keeps a margin.
-    const left = ROUTE_STUB, right = W - 14;
+    // The last label is centred on its dot like the others, so the dot keeps
+    // room for half of it - at the edge it looked squeezed.
+    const left = ROUTE_STUB, right = W - 60;
 
     if ((stops.length - 1) * ROUTE_GAP > right - left) {
       // Narrow: the same stops as rows.
@@ -471,13 +492,16 @@
       const track = el("rt-track", xs[0]);
       track.style.width = (xs[xs.length - 1] - xs[0]) + "px";
       el("rt-dot pool", 6);
-      el("rt-lab pool first", 0, [txt("b", miner), txt("small", "mined it")]);
+      // A raw coinbase text can be long; it stops short of the first stop's
+      // label instead of running underneath it.
+      const minerLab = el("rt-lab pool first", 0, [fit(txt("b", miner), miner), txt("small", "mined it")]);
+      minerLab.style.maxWidth = (xs[0] - 50) + "px";
 
       stops.forEach((s, i) => {
         el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
-        const last = i === stops.length - 1;
-        const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : "") + (last ? " last" : ""), xs[i],
-          [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
+        const name = fit(txt("b", s.name), s.name, s.title);
+        const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : ""), xs[i],
+          [name, txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
         if (s.title) lab.title = s.title;
       });
 
@@ -1394,12 +1418,11 @@
       cell: (td, p) => {
         // A long onion or I2P address is cut off by the column, so the full one
         // lives in the title. A short one is all there already.
-        const long = p.addr.length > 30;
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
           : deliveredEver.has(p.addr) ? "Has delivered a block first (Bitcoin Lab)" : "";
-        td.title = [long ? p.addr : "", got].filter(Boolean).join("\n");
+        fit(td, p.addr, got);
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
@@ -1414,7 +1437,8 @@
         a.target = "_blank";
         a.rel = "noopener";
         a.textContent = p.addr;
-        a.title = [long ? p.addr : "", got, "Open this peer in Bitcoin Lab"].filter(Boolean).join("\n");
+        a.dataset.tip = "Open this peer in Bitcoin Lab";
+        a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
         td.appendChild(a);
       },
     },
@@ -1433,6 +1457,7 @@
         f.className = "flag";
         f.textContent = flagOf(p.cc);
         td.append(f, text);
+        fit(td, text);
       },
     },
     {
@@ -1444,6 +1469,7 @@
       cell: (td, p) => {
         td.textContent = p.operator || "";
         if (p.asn) td.title = "AS" + p.asn;
+        if (p.operator) fit(td, p.operator, p.asn ? "AS" + p.asn : "");
       },
     },
     {
@@ -1471,6 +1497,7 @@
         label.className = "klabel";
         label.textContent = kindLabel(p);
         td.appendChild(label);
+        fit(label, kindLabel(p));
         // With a kind filter on, the question is why these peers are in it,
         // and the answer is the agent: shown under the kind, only then.
         if (state.kind && p.subver) {
@@ -1492,7 +1519,10 @@
           : "Software that does not pass blocks on - this peer can never deliver one first.";
         // With a kind filter on, the agent and its description are in the
         // cell already; the title only carries them when they are hidden.
-        if (!state.kind) td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
+        if (!state.kind) {
+          td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
+          label.dataset.tip = td.title;
+        }
         // Was a strike-through. Now the row is dimmed (see renderTables) and
         // the cell says it in words, so the fact is still there at a glance.
         if (p.no_relay) {

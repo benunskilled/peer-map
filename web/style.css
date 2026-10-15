@@ -116,14 +116,12 @@ body {
   white-space: nowrap; line-height: 1.35;
 }
 .rt-lab.first { transform: none; text-align: left; }
-.rt-lab.last { transform: translateX(-100%); text-align: right; margin-left: 7px; }
-.rt-lab b { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
+.rt-lab b { display: block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: 14px; font-weight: 600; color: var(--text); }
 .rt-lab .t { display: block; font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums; }
 .rt-lab small {
   display: block; font-size: 12px; color: var(--muted);
   max-width: 200px; overflow: hidden; text-overflow: ellipsis;
 }
-.rt-lab.last small { margin-left: auto; }
 .rt-lab.first small { margin-right: auto; }
 .rt-lab.pool b, .rt-lab.own b, .rt-lab.own .t { color: var(--accent); }
 .rt-lab.peer b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
@@ -346,9 +344,9 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers th[aria-sort="ascending"] button::after { content: " ↑"; }
 .peers th[aria-sort="descending"] button::after { content: " ↓"; }
 .peers .num { text-align: right; }
-.peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.loc { max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.op { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.loc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.peers td.op { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
 .peers .dim { color: var(--muted); }
 /* The address doubles as the way over to Bitcoin Lab; it should read as a link
    without turning the table into a wall of blue. */
@@ -361,6 +359,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
    the same axis is one a colour-blind reader cannot separate - measured, not
    assumed. It is not a fault either; a wallet is doing what a wallet does. */
 .peers td.norelay { color: var(--muted); }
+/* The kind is cut like the other columns, never wrapped; the never-first tag stays whole beside it. */
+.peers .klabel { display: inline-block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 .peers td.norelay .never { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
 .peers tr.weak td { color: var(--muted); }
 .peers td .flag { margin-right: 7px; font-size: 15px; vertical-align: -1px; }
