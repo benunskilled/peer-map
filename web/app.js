@@ -1624,7 +1624,7 @@
       for (const c of cols) {
         const th = document.createElement("th");
         th.scope = "col";
-        if (c.cls) th.className = c.cls;
+        th.className = "k-" + c.key + (c.cls ? " " + c.cls : "");
         if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
         const b = document.createElement("button");
         b.textContent = c.label;
@@ -1654,6 +1654,8 @@
         for (const c of cols) {
           const td = document.createElement("td");
           if (c.cls) td.className = c.cls;
+          td.classList.add("k-" + c.key);
+          td.dataset.label = c.label;
           const text = c.show ? c.show(p) : c.val(p);
           if (c.cell) {
             c.cell(td, p);
@@ -1670,7 +1672,25 @@
       card.appendChild(wrap);
       root.appendChild(card);
     }
+    fitTables();
   }
+
+  // A table that does not fit its card turns each row into a small card of
+  // its own (see .scroll.cards in style.css) instead of scrolling sideways:
+  // every value stays, below each other rather than beside. Decided by
+  // measuring, not by a fixed screen width - the columns are as wide as
+  // their content, and a closed group has no width to measure until it opens.
+  // All groups switch together: one group as cards and the next as a table
+  // looked like two different pages.
+  function fitTables() {
+    const wraps = [...document.querySelectorAll("#tables .scroll")];
+    for (const w of wraps) w.classList.remove("cards");
+    const tight = wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
+    for (const w of wraps) w.classList.toggle("cards", tight);
+  }
+  let fitTimer = null;
+  window.addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitTables, 100); });
+  document.addEventListener("toggle", fitTables, true);
 
 
   // ---------- start ----------
