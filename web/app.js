@@ -169,6 +169,7 @@
   };
   // A flag from the two-letter country code: regional-indicator letters, no
   // image files. Unknown or missing codes get none.
+  const HIDDEN_FLAG = { not_publicly_routable: "\u{1F3E0}", tor_hidden: "\u{1F9C5}", i2p_hidden: "\u{1F310}", ipv6_hidden: "\u{1F310}" };
   const flagOf = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
@@ -1449,7 +1450,7 @@
         who.className = "who";
         const f = document.createElement("span");
         f.className = "flag";
-        f.textContent = p.network === "not_publicly_routable" ? "\u{1F3E0}" : flagOf(p.cc);
+        f.textContent = HIDDEN_FLAG[p.network] || flagOf(p.cc);
         const text = document.createElement("div");
         text.className = "who-text";
         const title = placeTitle(p);
