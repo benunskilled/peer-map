@@ -169,7 +169,11 @@
   };
   // A flag from the two-letter country code: regional-indicator letters, no
   // image files. Unknown or missing codes get none.
-  const HIDDEN_FLAG = { not_publicly_routable: "\u{1F3E0}", tor_hidden: "\u{1F9C5}", i2p_hidden: "\u{1F310}", ipv6_hidden: "\u{1F310}" };
+  const HIDDEN_FLAG = {
+    not_publicly_routable: "\u{1F3E0}",
+    onion: "\u{1F9C5}", tor_hidden: "\u{1F9C5}",
+    i2p: "\u{1F310}", i2p_hidden: "\u{1F310}", ipv6_hidden: "\u{1F310}",
+  };
   const flagOf = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
