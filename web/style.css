@@ -330,7 +330,7 @@ details.group-card[open] > .scroll, details.group-card[open] > .empty { margin-t
 .scroll { overflow-x: auto; }
 table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
-.peers tbody tr:not(.focus):not(.delivered-now):not(.delivered-ever):hover td { background: #17202a; }
+.peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
 .peers th:last-child, .peers td:last-child { padding-right: 20px; }
 .peers tbody tr:last-child td { border-bottom: 0; }
@@ -358,9 +358,9 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers td.norelay .never { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
 .peers tr.weak td { color: var(--muted); }
 .peers td .flag { margin-right: 7px; font-size: 15px; vertical-align: -1px; }
-/* A row that has brought a block, in --good at low strength. A focused row
-   keeps its orange tint and bar, which is what keeps the two apart. */
-.peers tr.delivered-ever td { background: rgba(63,185,80,.13); }
+/* A peer that has brought a block: its address in green, the same as in Bitcoin Lab. Only the address - whole green
+   rows were a lot of colour for one bit (Ben, 16.10.2026). The orange of the newest block's deliverer stays a row. */
+.peers tr.delivered-ever .addr-txt { color: #56d364; }
 /* The newest block's deliverer, while its star is up - the same two minutes. */
 .peers tr.delivered-now td { background: rgba(247,147,26,.13); }
 .peers tr.focus td { background: rgba(247,147,26,.10); }
@@ -381,7 +381,6 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
   content: attr(data-label); margin-right: 5px;
   color: var(--muted); font-size: 10px; letter-spacing: .04em; text-transform: uppercase;
 }
-.cards.cards tr.delivered-ever { background: rgba(63,185,80,.13); }
 .cards.cards tr.delivered-now { background: rgba(247,147,26,.13); }
 .cards.cards tr.focus { background: rgba(247,147,26,.10); box-shadow: inset 3px 0 0 var(--accent); }
 .cards.cards tr.focus td:first-child { box-shadow: none; }
