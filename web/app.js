@@ -1,5 +1,9 @@
 "use strict";
 (() => {
+  // This window answers to a name, and links to Bitcoin Lab aim at Bitcoin Lab's name: clicking back and forth between
+  // the two apps then reuses one window each instead of opening a new one per click. That needs the opener kept, so
+  // these links carry no rel="noopener" - both windows are this Umbrel's own apps. Links to other sites keep noopener.
+  window.name = "peer-map";
   const GROUPS = ["inbound", "outbound", "manual"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
@@ -1469,8 +1473,7 @@
           const a = document.createElement("a");
           a.className = "peer-jump addr-txt";
           a.href = siblingURL(p.addr);
-          a.target = "_blank";
-          a.rel = "noopener";
+          a.target = "bitcoin-lab";
           a.textContent = p.addr;
           a.dataset.tip = "Open this peer in Bitcoin Lab";
           a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
