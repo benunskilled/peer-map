@@ -430,7 +430,7 @@ details.group-card summary { display: flex; align-items: center; flex-wrap: wrap
 a.addr-txt:hover { color: var(--accent); }
 .peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
 .peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
-.peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: var(--bad); }
+.peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: #e5534b; }
 /* On a green or orange row the see-through red would mix into pink; laid over
    the panel colour it stays the same red as on a plain row. */
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }

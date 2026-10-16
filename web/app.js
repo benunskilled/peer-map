@@ -1667,9 +1667,8 @@
         else if (deliveredNow.has(p.addr)) {
           tr.className = "delivered-now";
         }
-        else if (deliveredEver.has(p.addr)) {
-          tr.className = "delivered-ever";
-        }
+        // Green address for every peer that has delivered, also on an orange or focused row (as in Bitcoin Lab).
+        if (deliveredEver.has(p.addr) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
         if (p.no_relay) tr.classList.add("weak");
         for (const c of cols) {
           const td = document.createElement("td");
