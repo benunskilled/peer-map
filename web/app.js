@@ -4,6 +4,9 @@
   // the two apps then reuses one window each instead of opening a new one per click. That needs the opener kept, so
   // these links carry no rel="noopener" - both windows are this Umbrel's own apps. Links to other sites keep noopener.
   window.name = "peer-map";
+  // On a phone or tablet Safari loads a named tab in the background and stays where it is, so a tap seemed to do
+  // nothing (Ben, iPhone, 16.10.2026). There the jump stays in the same tab, and Back returns.
+  const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
   const GROUPS = ["inbound", "outbound", "manual"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
@@ -694,6 +697,7 @@
   }
   function renderSiblingLink() {
     const a = $("sibling-link");
+    if (a) a.target = LAB_TARGET;
     if (!a || !state.data) return;
     a.hidden = !state.data.sibling;
     if (state.data.sibling) a.href = siblingURL(null);
@@ -1473,7 +1477,7 @@
           const a = document.createElement("a");
           a.className = "peer-jump addr-txt";
           a.href = siblingURL(p.addr);
-          a.target = "bitcoin-lab";
+          a.target = LAB_TARGET;
           a.textContent = p.addr;
           a.dataset.tip = "Open this peer in Bitcoin Lab";
           a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
