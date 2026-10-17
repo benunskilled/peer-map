@@ -9,10 +9,13 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/benunskilled/peer-map/geo"
 )
 
 func TestGroup(t *testing.T) {
@@ -355,4 +358,43 @@ func TestHTTP(t *testing.T) {
 			t.Errorf("demo IPv6 %s is not a documentation address", h)
 		}
 	}
+}
+
+func TestHomeOfVotesByRegionAmongOwnConnections(t *testing.T) {
+	want, ok := geoLookup("8.8.8.8")
+	if !ok {
+		t.Skip("bundled database does not place 8.8.8.8")
+	}
+	raw := []rawPeer{
+		{AddrLocal: "10.21.21.8:8333"},             // private: ignored
+		{AddrLocal: ""},                            // nothing reported
+		{AddrLocal: "100.64.0.9:8333"},             // CGNAT: cannot be placed, ignored
+		{AddrLocal: "[::ffff:8.8.8.8]:8333"},       // IPv4-mapped counts as 8.8.8.8
+		{AddrLocal: "8.8.4.4:8333"},                // same region, different address
+		{AddrLocal: "1.1.1.1:8333", Inbound: true}, // inbound peers do not vote ...
+		{AddrLocal: "1.1.1.1:8333", Inbound: true}, // ... however many there are
+		{AddrLocal: "1.1.1.1:8333", Inbound: true},
+	}
+	h := homeOf(raw)
+	if h == nil || h.Country != want.Country || h.Region != want.Region {
+		t.Fatalf("home = %+v, want %s/%s", h, want.Country, want.Region)
+	}
+}
+
+func TestHomeOfFallsBackToInboundAndOtherwiseNil(t *testing.T) {
+	if h := homeOf([]rawPeer{{AddrLocal: "10.21.21.8:8333"}, {AddrLocal: "100.64.0.9:8333"}}); h != nil {
+		t.Fatalf("home = %+v, want nil without a placeable address", h)
+	}
+	want, ok := geoLookup("8.8.8.8")
+	if !ok {
+		t.Skip("bundled database does not place 8.8.8.8")
+	}
+	h := homeOf([]rawPeer{{AddrLocal: "8.8.8.8:8333", Inbound: true}})
+	if h == nil || h.Country != want.Country {
+		t.Fatalf("home = %+v, want the inbound peers' answer when no outbound peer reports one", h)
+	}
+}
+
+func geoLookup(ip string) (geo.Location, bool) {
+	return geo.Lookup(netip.MustParseAddr(ip))
 }

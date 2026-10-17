@@ -217,8 +217,13 @@ func TestAnachronism(t *testing.T) {
 func TestOwnIndexer(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "10.21.21.10:40216", ConnectionType: "inbound", Inbound: true,
 		Network: "not_publicly_routable", Subver: "/electrs:0.11.1/"}})[0]
-	if got.Kind != "Indexer" || got.About != "Probably your own electrs 0.11.1 on this Umbrel" {
-		t.Errorf("got %q / %q", got.Kind, got.About)
+	if got.Kind != "Indexer" || got.About != "Probably your own electrs 0.11.1 on this Umbrel" || got.App != "electrs" {
+		t.Errorf("got %q / %q / %q", got.Kind, got.About, got.App)
+	}
+	got = convert([]rawPeer{{Addr: "10.21.22.199:40216", ConnectionType: "inbound", Inbound: true,
+		Network: "not_publicly_routable", Subver: "/ElectrumX:1.16.0/"}})[0]
+	if got.App != "ElectrumX" || got.About != "Probably your own ElectrumX 1.16.0 on this Umbrel" {
+		t.Errorf("electrumx: got %q / %q", got.About, got.App)
 	}
 	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ""}})[0]
 	if got.Kind != noAgentKind || !strings.Contains(got.About, "checks the port") {
@@ -288,7 +293,8 @@ func TestHiddenIPv6(t *testing.T) {
 	}{
 		{"10.21.0.1:51234", true, hiddenIPv6},
 		{"10.21.0.1:51234", false, "not_publicly_routable"},
-		{"10.21.22.10:40000", true, "not_publicly_routable"}, // Tor proxy
+		{"10.21.22.10:40000", true, torHidden},
+		{"10.21.22.11:40000", true, i2pHidden},
 		{"10.21.21.10:40216", true, "not_publicly_routable"}, // an app on this Umbrel
 	}
 	for _, c := range cases {
@@ -300,7 +306,11 @@ func TestHiddenIPv6(t *testing.T) {
 		if len(got) != 1 || got[0].Network != c.want {
 			t.Errorf("%s inbound=%v: network %+v, want %s", c.addr, c.inbound, got, c.want)
 		}
-		if got[0].Country != "" || got[0].Operator != "" {
+		wantOp := "Your Umbrel's own network"
+		if c.want != "not_publicly_routable" {
+			wantOp = ""
+		}
+		if got[0].Country != "" || got[0].Operator != wantOp {
 			t.Errorf("%s: looked up %q %q", c.addr, got[0].Country, got[0].Operator)
 		}
 	}

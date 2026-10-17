@@ -10,11 +10,11 @@ Your live peers on a world map: their location, the provider that hosts them, an
 
 ## Not every peer is who it claims to be
 
-Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. On my node, a single LinkingLion address opened 5,822 connections under 82 fake wallet names. Peer Map's header counts them separately.
+Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims. On my node, a single LinkingLion address opened 5,822 connections under 82 fake wallet names. Peer Map's header counts them separately.
 
 ## Explore your node's neighbourhood
 
-Zoom from countries down to states and regions, click one to filter the tables, or show only manual, outbound or inbound connections.
+Zoom from countries down to states and regions, click one to filter the tables, or show only inbound, outbound or manual connections.
 
 The three groups show how each connection got there:
 
@@ -34,7 +34,7 @@ Each table includes the address, location, hosting provider, software, network, 
 
 The labels come from each peer's own user agent, so they are what the peer claims. Next to them, Peer Map shows what Core itself observed: whether the peer offers services, relays transactions and follows a chain Core knows. Together, these details give you a fuller picture of who's connected.
 
-**Keep unplaced peers in view.** Tor, I2P and CJDNS peers have no public-IP location to plot. On Umbrel, Docker hides the real address of inbound IPv6 peers. These connections are counted in a separate panel beside the map.
+**Keep unplaced peers in view.** Tor, I2P and CJDNS peers have no public-IP location to plot. On Umbrel, Tor and I2P peers are shown as hidden, marked 🧅 and 🌐, and so are inbound IPv6 peers, whose real address Docker hides. Peers that come from your own Umbrel, such as its indexers, are marked 🏠 and named after their app. These connections are counted in a separate panel beside the map.
 
 The map uses approximate IP locations, with country labels generally more reliable than regional positions.
 
