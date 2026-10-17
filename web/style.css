@@ -209,15 +209,6 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 .place-filter b { color: var(--text); font-weight: 600; }
 .place-filter .why { font-size: 13px; }
 td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
-td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
-/* The kind line under each heading is a row of buttons, not a sentence - but
-   it should read as one until somebody points at it. */
-.kinds .kind-pick {
-  border: 0; background: none; padding: 0; font: inherit; color: inherit;
-  cursor: pointer; border-bottom: 1px dotted transparent;
-}
-.kinds .kind-pick:hover { color: var(--text); border-bottom-color: var(--border); }
-.kinds .kind-pick.on { color: var(--text); border-bottom-color: var(--accent); }
 .linkish { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 6px; }
 .linkish:hover { color: var(--text); }
 
@@ -318,13 +309,12 @@ td .ua { font-size: 12px; color: var(--muted); font-family: ui-monospace, SFMono
 .tables { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 details.group-card { padding: 14px 0 6px; }
 details.group-card summary {
-  cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; padding: 0 20px;
+  cursor: pointer; list-style: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 0 20px;
 }
 details.group-card summary::-webkit-details-marker { display: none; }
 details.group-card summary::before { content: "▸"; color: var(--muted); font-size: 11px; transition: transform .15s ease; }
 details.group-card[open] summary::before { transform: rotate(90deg); }
 details.group-card summary h2 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-details.group-card summary .n { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
 details.group-card[open] > .scroll, details.group-card[open] > .empty { margin-top: 12px; }
 
 .scroll { overflow-x: auto; }
@@ -334,32 +324,22 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
 .peers th:last-child, .peers td:last-child { padding-right: 20px; }
 .peers tbody tr:last-child td { border-bottom: 0; }
-.peers tbody tr:nth-child(even) { background: transparent; }
-.peers th { font-weight: 500; color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.peers th { font-weight: 500; color: var(--faint); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
 .peers th button { all: unset; cursor: pointer; }
 .peers th[aria-sort="ascending"] button::after { content: " ↑"; }
 .peers th[aria-sort="descending"] button::after { content: " ↓"; }
 .peers .num { text-align: right; }
-.peers td.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.loc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-.peers td.op { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
 .peers .dim { color: var(--muted); }
 /* The address doubles as the way over to Bitcoin Lab; it should read as a link
    without turning the table into a wall of blue. */
 .peer-jump { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); }
 .peer-jump:hover { color: var(--accent); text-decoration-color: var(--accent); }
-/* The peer another app pointed at. Marked, not filtered - and it stays marked
-   so you can still find it after scrolling away. */
-/* Software that passes no blocks on. Struck through rather than coloured: every
-   hue in this window already means a connection type, and a fourth meaning on
-   the same axis is one a colour-blind reader cannot separate - measured, not
-   assumed. It is not a fault either; a wallet is doing what a wallet does. */
-.peers td.norelay { color: var(--muted); }
-.peers td.norelay .never { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
+/* Software that passes no blocks on: the row in muted text and a quiet "never first" pill rather than a colour -
+   every hue in this window already means a connection type, and a fourth meaning on the same axis is one a
+   colour-blind reader cannot separate. It is not a fault either; a wallet is doing what a wallet does. */
 .peers tr.weak td { color: var(--muted); }
-.peers td .flag { margin-right: 7px; font-size: 15px; vertical-align: -1px; }
 /* A peer that has brought a block: its address in green, the same as in Bitcoin Lab. Only the address - whole green
-   rows were a lot of colour for one bit (Ben, 16.10.2026). The orange of the newest block's deliverer stays a row. */
+   rows were a lot of colour for one bit. The orange of the newest block's deliverer stays a row. */
 .peers tr.delivered-ever .addr-txt { color: #56d364; }
 /* The newest block's deliverer, while its star is up - the same two minutes. */
 .peers tr.delivered-now td { background: rgba(247,147,26,.13); }
@@ -407,7 +387,6 @@ details.group-card:not([open]) > .kinds { display: none; }
 .s-home { background: var(--accent); }
 
 /* Group heading: the name, then the count and the kinds as chips. */
-details.group-card summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
 .kinds.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .chips .chip { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; line-height: 1.5; }
 .chips .chip i { font-style: normal; color: var(--text); font-weight: 600; margin-right: 3px; }
@@ -417,24 +396,23 @@ details.group-card summary { display: flex; align-items: center; flex-wrap: wrap
 
 /* Rows: two lines each. */
 .peers td { vertical-align: middle; }
-.peers th { color: var(--faint, #5b6876); }
 .peers td.peer, .peers td.op { max-width: 280px; overflow: visible; }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.who .flag { font-size: 18px; line-height: 1; margin: 0; }
+.who .flag { font-size: 15px; line-height: 1; margin: 0 7px 0 0; vertical-align: -1px; }
 .who-text { min-width: 0; }
 .who b, .op-name { display: block; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .op-name { font-weight: 400; max-width: 230px; }
 .peers small { display: block; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-.peers small.sub { color: var(--faint, #5b6876); }
-.addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint, #5b6876); }
+.peers small.sub { color: var(--faint); }
+.addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
 .peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
 .peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
 .peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: #e5534b; }
-/* On a green or orange row the see-through red would mix into pink; laid over
-   the panel colour it stays the same red as on a plain row. */
+/* On an orange or focused row, and on hover, the see-through red would mix into another colour; laid over the
+   panel colour it stays the same red as on a plain row. */
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }
-.peers .kind.never { background: #161d26; color: var(--faint, #5b6876); }
+.peers .kind.never { margin-left: 6px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; }
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
