@@ -6,7 +6,7 @@
 
 Your live peers on a world map: their location, the provider that hosts them, and what they run – nodes, pool nodes, wallets, crawlers or scanners. Manual, outbound and inbound connections stay separate.
 
-![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png)
+![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=2)
 
 ## Not every peer is who it claims to be
 
@@ -38,7 +38,7 @@ The labels come from each peer's own user agent, so they are what the peer claim
 
 The map uses approximate IP locations, with country labels generally more reliable than regional positions.
 
-![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png)
+![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png?v=2)
 
 ## Follow a block through your node
 
