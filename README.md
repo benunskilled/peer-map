@@ -10,7 +10,7 @@ Your live peers on a world map: their location, the provider that hosts them, an
 
 ## Not every peer is who it claims to be
 
-Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims. On my node, a single LinkingLion address opened 5,822 connections under 82 fake wallet names. Peer Map's header counts them separately.
+Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims.
 
 ## Explore your node's neighbourhood
 
@@ -42,7 +42,7 @@ The map uses approximate IP locations, with country labels generally more reliab
 
 ## Follow a block through your node
 
-With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it and which of your peers delivered it first. With Stratum Race switched on and your own pool added to it, the card also follows the block all the way to your pool's mining job. The peers that delivered it are starred on the map and turn orange in the peer tables for two minutes; every peer that has ever delivered a block first stays tinted green. Without Bitcoin Lab the card does not appear.
+With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it and which of your peers delivered it first. With Stratum Race switched on and your own pool added to it, the card also follows the block all the way to your pool's mining job. The peers that delivered it are starred on the map and turn orange in the peer tables for two minutes; every peer that has ever delivered a block first keeps its address in green. Without Bitcoin Lab the card does not appear.
 
 ![Block 968,560 from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
