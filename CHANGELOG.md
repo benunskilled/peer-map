@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.0.0 – 2026-10-17
+
+Peer Map 2.0.0 has a new design: a dot map with lit markers, arcs to your node and a pulse when a block arrives, and tables that turn into cards on narrow screens. LinkingLion peers get their own red pill, whatever software they claim. On Umbrel, Tor and I2P peers are shown as hidden with 🧅 and 🌐, and peers from your own Umbrel, such as its indexers, are named after their app with 🏠. Peers that have delivered a block first show their address in green, and the groups are ordered inbound, outbound, manual everywhere. Links between Peer Map and Bitcoin Lab reuse one window per app; on phones they open in the same tab.
+
 ## 1.0.0 – 2026-10-12
 
 The header now counts LinkingLion connections on their own, with a link explaining who they are. Peer Map now recognises LinkingLion by the ranges in the bnoc banlist, including two single addresses it missed: on my node one of them alone had opened 5,822 connections under 82 fake wallet names. Peers whose user agent contains /mempool count as indexers again. Locations and network names now come from October's DB-IP data.
