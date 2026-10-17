@@ -1400,13 +1400,14 @@
   // How spread out a group is: distinct operators and countries. Operators by
   // the name in the Operator column, not by ASN: a large company runs several
   // ASNs (Amazon has AS16509 and AS14618) and should still count once. Peers
-  // that cannot be placed - Tor, I2P, private addresses - have neither, and
-  // are named instead of being silently left out.
+  // that cannot be placed - Tor, I2P, private addresses - have no country, and
+  // are named instead of being silently left out. Your Umbrel's own network
+  // has an operator line but is no provider, so it is not counted as one.
   function spreadText(peers) {
     const ops = new Set(), ccs = new Set();
     let unplaced = 0;
     for (const p of peers) {
-      if (p.operator || p.asn) ops.add(p.operator || "AS" + p.asn);
+      if ((p.operator || p.asn) && p.network !== "not_publicly_routable") ops.add(p.operator || "AS" + p.asn);
       if (p.cc) ccs.add(p.cc);
       else unplaced++;
     }
