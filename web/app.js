@@ -2,10 +2,10 @@
 (() => {
   // This window answers to a name, and links to Bitcoin Lab aim at Bitcoin Lab's name: clicking back and forth between
   // the two apps then reuses one window each instead of opening a new one per click. That needs the opener kept, so
-  // these links carry no rel="noopener" - both windows are this Umbrel's own apps. Links to other sites keep noopener.
+  // these links carry no rel="noopener" - both windows are this Umbrel's own apps.
   window.name = "peer-map";
   // On a phone or tablet Safari loads a named tab in the background and stays where it is, so a tap seemed to do
-  // nothing (Ben, iPhone, 16.10.2026). There the jump stays in the same tab, and Back returns.
+  // nothing. There the jump stays in the same tab, and Back returns.
   const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
   const GROUPS = ["inbound", "outbound", "manual"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
@@ -35,6 +35,7 @@
     // scrolled to, then left alone - it is a starting point, not a filter.
     focus: new URLSearchParams(location.search).get("peer") || null,
     focusDone: false,
+    lastHash: null,       // newest block hash seen, to pulse the map when it changes
     lastInput: Date.now(),
     // When the current snapshot arrived here. The block's age comes from the
     // node's clock; how long it has been sitting in this browser is added on
@@ -1425,7 +1426,7 @@
   // top, the detail under it - the software, the AS number, the address -
   // so nothing needs a pointer to be read.
   const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
-    : p.region || (p.cc ? regionName(p.cc) : p.network === "ipv6_hidden" ? "IPv6 (address hidden)" : netLabel(p.network) || "Unknown");
+    : p.region || (p.cc ? regionName(p.cc) : netLabel(p.network));
   const neverNote = (p) => !p.no_relay ? ""
     : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
     : "Software that does not pass blocks on - this peer can never deliver one first.";
@@ -1442,7 +1443,7 @@
       // country first - otherwise Bavaria and Hesse end up on either side of
       // England. Peers without a place sort last.
       key: "peer", label: "Peer", cls: "peer",
-      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "￿" + p.addr),
+      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff" + p.addr),
       cell: (td, p) => {
         const who = document.createElement("div");
         who.className = "who";
@@ -1456,18 +1457,16 @@
         b.textContent = title;
         if (HIDDEN[p.network]) b.dataset.tip = HIDDEN[p.network].tip;
         const sub = document.createElement("small");
-        sub.className = "fit";
         if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
           : deliveredEver.has(p.addr) ? "Has delivered a block first (Bitcoin Lab)" : "";
-        sub.dataset.full = p.addr;
-        if (got) sub.dataset.tip = got;
+        fit(sub, p.addr, got);
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
-          star.textContent = "★";
+          star.textContent = "\u2605";
           star.title = "Delivered the block that just landed";
           sub.appendChild(star);
         }
@@ -1496,7 +1495,7 @@
     {
       // Whose machine it is, with the AS number under it. Sorting by this
       // column catches three peers in three countries with the same company.
-      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "￿",
+      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "\uffff",
       cell: (td, p) => {
         if (!p.operator && !p.asn) { td.textContent = "–"; td.classList.add("dim"); return; }
         const name = fit(document.createElement("span"), p.operator || "");
@@ -1533,7 +1532,6 @@
         }
         pill.append(label);
         fit(pill, label, [p.about, neverNote(p)].filter(Boolean).join("\n"));
-        if (p.no_relay) td.classList.add("norelay");
         td.appendChild(pill);
         const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
         if (under) td.appendChild(fit(line("sub ua", under), under));
@@ -1565,7 +1563,7 @@
       },
     },
     {
-      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : fmtPing(p.ping_ms)),
+      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms),
       cell: (td, p) => {
         if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
         td.textContent = fmtPing(p.ping_ms);
@@ -1627,7 +1625,7 @@
         continue;
       }
 
-      const cols = COLS.filter((c) => !c.only || c.only === g);
+      const cols = COLS;
       const s = state.sort[g] || { key: "conntime", dir: 1 };
       const col = cols.find((c) => c.key === s.key) || cols[cols.length - 1];
       peers.sort((a, b) => {
@@ -1661,13 +1659,13 @@
       for (const p of peers) {
         const tr = document.createElement("tr");
         if (state.focus && p.addr === state.focus) tr.className = "focus";
-        // A connection that has brought this node a block, at least once.
         // The peer that brought the newest block, for as long as the star
         // is up - one rule for "just delivered", in the row and on the map.
         else if (deliveredNow.has(p.addr)) {
           tr.className = "delivered-now";
         }
-        // Green address for every peer that has delivered, also on an orange or focused row (as in Bitcoin Lab).
+        // A connection that has brought this node a block, at least once: its address in green, also on an orange or
+        // focused row (as in Bitcoin Lab).
         if (deliveredEver.has(p.addr) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
         if (p.no_relay) tr.classList.add("weak");
         for (const c of cols) {
@@ -1675,10 +1673,10 @@
           if (c.cls) td.className = c.cls;
           td.classList.add("k-" + c.key);
           td.dataset.label = c.label;
-          const text = c.show ? c.show(p) : c.val(p);
           if (c.cell) {
             c.cell(td, p);
           } else {
+            const text = c.show ? c.show(p) : c.val(p);
             td.textContent = text === "" ? "–" : text;
             if (text === "") td.classList.add("dim");
           }

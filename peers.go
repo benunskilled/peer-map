@@ -305,14 +305,15 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
 			}
 		}
-		if r.Inbound && hostOf(r.Addr) == dockerGateway {
-			p.Network = hiddenIPv6
-		}
-		switch hostOf(r.Addr) {
-		case torProxy:
-			p.Network = torHidden
-		case i2pProxy:
-			p.Network = i2pHidden
+		if r.Inbound {
+			switch hostOf(r.Addr) {
+			case dockerGateway:
+				p.Network = hiddenIPv6
+			case torProxy:
+				p.Network = torHidden
+			case i2pProxy:
+				p.Network = i2pHidden
+			}
 		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
