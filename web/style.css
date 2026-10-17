@@ -381,7 +381,7 @@ details.group-card:not([open]) > .kinds { display: none; }
 @keyframes block-wave-roll { 0% { opacity: 1; background-position: 100% 0; } 85% { opacity: 1; } 100% { opacity: 0; background-position: 0% 0; } }
 @media (prefers-reduced-motion: reduce) { .block-wave.run { animation: none; } }
 
-/* ---- V2 as in the approved design (Claude outputs/peermap-design) ---- */
+/* ---- V2 design ---- */
 .map-legend { flex: 1 1 100%; display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 .map-legend .swatch { width: 9px; height: 9px; margin-right: 6px; vertical-align: -1px; }
 .s-home { background: var(--accent); }
