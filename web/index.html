@@ -10,12 +10,11 @@
   <script src="app.js" defer></script>
 </head>
 <body>
+  <!-- Rolls across the page once when a new block lands; see pulseBlock in app.js. -->
+  <div class="block-wave" id="blockWave" aria-hidden="true"></div>
   <header class="topbar">
     <h1>Peer Map</h1>
-    <a id="sibling-link" class="sibling-link" hidden target="_blank" rel="noopener">Bitcoin Lab &#8599;</a>
-    <!-- Who mined the block that just landed, for as long as the peer that
-         delivered it wears a star on the map. Both appear and go together. -->
-    <span id="block-mark" class="block-mark" hidden></span>
+    <a id="sibling-link" class="sibling-link" hidden target="bitcoin-lab">Bitcoin Lab &#8599;</a>
     <span class="status-pill" id="status" aria-live="polite">Loading peers…</span>
   </header>
 
@@ -28,9 +27,9 @@
     </div>
 
     <div class="filters" role="group" aria-label="Show connection types">
-      <button class="chip" data-group="manual" aria-pressed="true"><span class="swatch"></span>Manual <b data-count="manual">0</b></button>
       <button class="chip" data-group="inbound" aria-pressed="true"><span class="swatch"></span>Inbound <b data-count="inbound">0</b></button>
       <button class="chip" data-group="outbound" aria-pressed="true"><span class="swatch"></span>Outbound <b data-count="outbound">0</b></button>
+      <button class="chip" data-group="manual" aria-pressed="true"><span class="swatch"></span>Manual <b data-count="manual">0</b></button>
       <span class="place-filter" id="placeFilter" hidden>
         Showing <b id="placeFilterName"></b>
         <button class="linkish" id="placeFilterClear" aria-label="Clear location filter">×</button>
@@ -64,8 +63,17 @@
     <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
         <svg id="map" role="img" aria-label="World map of connected peers">
+          <defs>
+            <!-- One soft glow per group: the markers are a light on the map, not a chart. -->
+            <radialGradient id="glow-manual"><stop offset="0" stop-color="#3987e5" stop-opacity=".9"/><stop offset=".45" stop-color="#3987e5" stop-opacity=".3"/><stop offset="1" stop-color="#3987e5" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-inbound"><stop offset="0" stop-color="#9e9a28" stop-opacity=".9"/><stop offset=".45" stop-color="#9e9a28" stop-opacity=".28"/><stop offset="1" stop-color="#9e9a28" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-outbound"><stop offset="0" stop-color="#1a9e8f" stop-opacity=".9"/><stop offset=".45" stop-color="#1a9e8f" stop-opacity=".3"/><stop offset="1" stop-color="#1a9e8f" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glow-home"><stop offset="0" stop-color="#f7931a" stop-opacity=".85"/><stop offset="1" stop-color="#f7931a" stop-opacity="0"/></radialGradient>
+          </defs>
           <g id="countries"></g>
+          <g id="links"></g>
           <g id="markers"></g>
+          <g id="fx"></g>
         </svg>
         <span class="map-level"><span id="mapLevel">Countries</span><span class="map-level-hint" id="mapLevelHint"> · zoom in for regions</span></span>
         <div class="zoom" role="group" aria-label="Zoom">
@@ -81,12 +89,19 @@
       </button>
       <aside class="unplaced" id="unplaced" hidden>
         <h2>Not on the map</h2>
-        <p class="hint">Tor, I2P and CJDNS peers have no location. Inbound IPv6 on umbrelOS arrives through docker-proxy and shows up as a private address.</p>
+        <p class="hint">Tor, I2P and CJDNS peers have no location. Inbound IPv6 on umbrelOS arrives through docker-proxy, which hides the peer's real address.</p>
         <table class="mini">
-          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-manual"></span>Man.</th><th scope="col"><span class="swatch s-inbound"></span>In</th><th scope="col"><span class="swatch s-outbound"></span>Out</th></tr></thead>
+          <thead><tr><th scope="col">Network</th><th scope="col"><span class="swatch s-inbound"></span>In</th><th scope="col"><span class="swatch s-outbound"></span>Out</th><th scope="col"><span class="swatch s-manual"></span>Man.</th></tr></thead>
           <tbody id="unplacedBody"></tbody>
         </table>
       </aside>
+      <!-- What the colours on the map mean. -->
+      <div class="map-legend">
+        <span><span class="swatch s-inbound"></span>Inbound</span>
+        <span><span class="swatch s-outbound"></span>Outbound</span>
+        <span><span class="swatch s-manual"></span>Manual</span>
+        <span><span class="swatch s-home"></span>Your node · block delivery</span>
+      </div>
     </section>
 
     <div class="tables" id="tables"></div>

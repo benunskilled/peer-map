@@ -1,6 +1,13 @@
 "use strict";
 (() => {
-  const GROUPS = ["manual", "inbound", "outbound"];
+  // This window answers to a name, and links to Bitcoin Lab aim at Bitcoin Lab's name: clicking back and forth between
+  // the two apps then reuses one window each instead of opening a new one per click. That needs the opener kept, so
+  // these links carry no rel="noopener" - both windows are this Umbrel's own apps.
+  window.name = "peer-map";
+  // On a phone or tablet Safari loads a named tab in the background and stays where it is, so a tap seemed to do
+  // nothing. There the jump stays in the same tab, and Back returns.
+  const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
+  const GROUPS = ["inbound", "outbound", "manual"];
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
@@ -28,13 +35,14 @@
     // scrolled to, then left alone - it is a starting point, not a filter.
     focus: new URLSearchParams(location.search).get("peer") || null,
     focusDone: false,
+    lastHash: null,       // newest block hash seen, to pulse the map when it changes
     lastInput: Date.now(),
     // When the current snapshot arrived here. The block's age comes from the
     // node's clock; how long it has been sitting in this browser is added on
     // top, so the two-minute mark never depends on the browser's own clock
     // agreeing with the node's.
     receivedAt: 0,
-    markShown: false,
+    liveShown: false,
     open: { manual: true, inbound: true, outbound: true }, // table sections
   };
 
@@ -132,9 +140,9 @@
       tickTimer = setInterval(() => {
         renderStatus();
         // Two minutes are up between two polls, and a paused dashboard never
-        // polls again at all - so the mark takes itself off rather than
-        // waiting for the next answer.
-        if (state.markShown && !liveBlock()) render();
+        // polls again at all - so the star and the row colour take themselves
+        // off rather than waiting for the next answer.
+        if (state.liveShown && !liveBlock()) render();
       }, 1000);
     }
   }
@@ -154,13 +162,29 @@
     return m + "m";
   }
   const typeLabel = (t) => ({
-    "outbound-full-relay": "full-relay",
-    "block-relay-only": "block-relay",
+    "outbound-full-relay": "Full relay",
+    "block-relay-only": "Block relay",
   }[t] || t || "-");
+  // As Bitcoin Lab writes it: milliseconds below a second, seconds above.
+  const fmtPing = (ms) => (ms < 1000 ? Math.round(ms) + " ms" : (ms / 1000).toFixed(2) + " s");
   const netLabel = (n) => ({
     ipv4: "IPv4", ipv6: "IPv6", onion: "Tor", i2p: "I2P", cjdns: "CJDNS",
     not_publicly_routable: "Private", ipv6_hidden: "IPv6 (address hidden)",
+    tor_hidden: "Tor (address hidden)", i2p_hidden: "I2P (address hidden)",
   }[n] || n || "-");
+  const HIDDEN = {
+    ipv6_hidden: { short: "IPv6", tip: "Inbound IPv6 passes through Docker, which puts its own address in place of the peer's." },
+    tor_hidden: { short: "Tor", tip: "Reached through the Tor proxy, which hides the peer's address." },
+    i2p_hidden: { short: "I2P", tip: "Reached through the I2P router, which hides the peer's address." },
+  };
+  // A flag from the two-letter country code: regional-indicator letters, no
+  // image files. Unknown or missing codes get none.
+  const HIDDEN_FLAG = {
+    not_publicly_routable: "\u{1F3E0}",
+    onion: "\u{1F9C5}", tor_hidden: "\u{1F9C5}",
+    i2p: "\u{1F310}", i2p_hidden: "\u{1F310}", ipv6_hidden: "\u{1F310}",
+  };
+  const flagOf = (cc) => (/^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "");
   const locLabel = (p) => (p.cc ? (p.region ? `${p.region}, ${regionName(p.cc)}` : regionName(p.cc)) : "");
 
   // ---------- the block that just landed ----------
@@ -255,7 +279,10 @@
     }
     const n = (b.first_peers || []).length;
     sep();
-    add(null, n === 0 ? "nobody credited" : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
+    // One peer and a known place: say where it came from, with its flag.
+    const one = n === 1 && state.data.peers.find((p) => p.addr === b.first_peers[0]);
+    add(null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
+      : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
       b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
     sep();
     add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
@@ -279,6 +306,26 @@
   // visible from here, and a whole ping sits in the middle. It only moves the
   // peer's dot - Core and the pools stand where they were measured.
   const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
+  // Text cut off with an ellipsis is readable on hover - and only then, a
+  // tooltip that repeats what is on screen says nothing. Whether it is cut
+  // depends on the screen, so it is decided when the pointer gets there.
+  // `tip` is what the element says on hover anyway, cut or not.
+  function fit(e, full, tip) {
+    e.classList.add("fit");
+    e.dataset.full = full;
+    if (tip) e.dataset.tip = tip;
+    return e;
+  }
+  document.addEventListener("mouseover", (ev) => {
+    const e = ev.target.closest && ev.target.closest(".fit");
+    if (!e) return;
+    const cut = e.scrollWidth > e.clientWidth;
+    const link = e.querySelector("a[data-tip]");
+    const lines = [cut ? e.dataset.full : "", e.dataset.tip || ""];
+    if (link) link.title = [...lines, link.dataset.tip].filter(Boolean).join("\n");
+    else e.title = lines.filter(Boolean).join("\n");
+  });
+
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
 
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
@@ -422,8 +469,9 @@
     }
     const miner = median ? "Miner" : b.pool || (b.pool_tag ? `"${b.pool_tag}"` : "unknown miner");
     const W = box.clientWidth - 12;
-    // The last label is right-aligned on its dot, so the dot keeps a margin.
-    const left = ROUTE_STUB, right = W - 14;
+    // The last label is centred on its dot like the others, so the dot keeps
+    // room for half of it - at the edge it looked squeezed.
+    const left = ROUTE_STUB, right = W - 60;
 
     if ((stops.length - 1) * ROUTE_GAP > right - left) {
       // Narrow: the same stops as rows.
@@ -468,13 +516,16 @@
       const track = el("rt-track", xs[0]);
       track.style.width = (xs[xs.length - 1] - xs[0]) + "px";
       el("rt-dot pool", 6);
-      el("rt-lab pool first", 0, [txt("b", miner), txt("small", "mined it")]);
+      // A raw coinbase text can be long; it stops short of the first stop's
+      // label instead of running underneath it.
+      const minerLab = el("rt-lab pool first", 0, [fit(txt("b", miner), miner), txt("small", "mined it")]);
+      minerLab.style.maxWidth = (xs[0] - 50) + "px";
 
       stops.forEach((s, i) => {
         el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
-        const last = i === stops.length - 1;
-        const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : "") + (last ? " last" : ""), xs[i],
-          [txt("b", s.name), txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
+        const name = fit(txt("b", s.name), s.name, s.title);
+        const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : ""), xs[i],
+          [name, txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
         if (s.title) lab.title = s.title;
       });
 
@@ -588,28 +639,6 @@
     body.appendChild(race);
   }
 
-  function renderBlockMark() {
-    const el = $("block-mark");
-    if (!el) return;
-    const b = liveBlock();
-    const name = b ? b.pool || b.pool_tag : null;
-    state.markShown = Boolean(name);
-    el.hidden = !name;
-    el.textContent = "";
-    el.classList.toggle("raw", Boolean(b && !b.pool && b.pool_tag));
-    if (!name) return;
-    const star = document.createElement("span");
-    star.className = "star";
-    star.textContent = "\u2605";
-    const label = document.createElement("span");
-    label.className = "name";
-    label.textContent = b.pool ? name : `"${name}"`;
-    el.append(star, label);
-    el.title = b.pool
-      ? `Block ${b.height ? b.height.toLocaleString() : ""} was mined by ${b.pool_name || name}. The starred peers delivered it to your node.`
-      : `Block ${b.height ? b.height.toLocaleString() : ""} is from a miner we cannot name; this is the text in its coinbase. The starred peers delivered it to your node.`;
-  }
-
   // ---------- render ----------
   const matchesKind = (p) => !state.kind || p.kind === state.kind;
   const visiblePeers = () =>
@@ -617,6 +646,9 @@
   const regionMode = () => state.view.k >= REGION_ZOOM;
 
   function render() {
+    // Read before anything changes: rebuilding the tables makes the page
+    // shorter for a moment, and Safari clamps the scroll position to it.
+    const y = window.scrollY;
     const d = state.data;
     $("demo").hidden = !d.demo;
     showError(d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "");
@@ -630,13 +662,16 @@
     deliveredNow = deliveredSet();
     deliveredEver = new Set((d.last_block && d.last_block.delivered_ever) || []);
     renderSiblingLink();
-    renderBlockMark();
-    if (deliveredNow.size) state.markShown = true;
+    state.liveShown = Boolean(liveBlock()) || deliveredNow.size > 0;
     renderBlockCard();
     renderMarkers();
     renderUnplaced();
     renderTables();
+    if (window.scrollY !== y) window.scrollTo(0, y);
     focusOnce();
+    const hash = d.last_block && d.last_block.hash;
+    if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
+    if (hash) state.lastHash = hash;
   }
 
   // Somebody arrived from Bitcoin Lab asking about one peer. Put it in front of
@@ -663,6 +698,7 @@
   }
   function renderSiblingLink() {
     const a = $("sibling-link");
+    if (a) a.target = LAB_TARGET;
     if (!a || !state.data) return;
     a.hidden = !state.data.sibling;
     if (state.data.sibling) a.href = siblingURL(null);
@@ -716,7 +752,55 @@
     for (const [cc, d] of Object.entries(state.world.paths)) addPath(d, cc);
     if (state.world.unnamed) addPath(state.world.unnamed, "");
     $("countries").appendChild(frag);
+    buildDots();
     applyView();
+  }
+
+  // The world view is drawn as a grid of dots rather than filled countries:
+  // calmer, and the markers stand out against it. The grid is worked out once,
+  // in the browser, by painting every country into an offscreen canvas in its
+  // own colour and reading back which country each grid point falls on - so a
+  // country with peers can light up its own dots. Zoomed in, the dots fade out
+  // and the country shapes fade in (see applyView): a dot grid has nothing to
+  // say about regions.
+  const DOT_STEP = 4.4;
+  let dotsByCC = null;
+  function buildDots() {
+    const W = state.world.w, H = state.world.h, S = 2;
+    const off = document.createElement("canvas");
+    off.width = W * S; off.height = H * S;
+    const c = off.getContext("2d", { willReadFrequently: true });
+    if (!c || typeof Path2D !== "function") return;
+    c.scale(S, S);
+    const ccs = Object.keys(state.world.paths);
+    ccs.forEach((cc, i) => {
+      c.fillStyle = `rgb(${(i + 1) & 255},${(i + 1) >> 8},7)`;
+      c.fill(new Path2D(state.world.paths[cc]));
+    });
+    if (state.world.unnamed) { c.fillStyle = "rgb(0,0,9)"; c.fill(new Path2D(state.world.unnamed)); }
+    const img = c.getImageData(0, 0, off.width, off.height).data;
+    dotsByCC = new Map();
+    let all = "";
+    for (let y = DOT_STEP / 2, row = 0; y < H; y += DOT_STEP, row++) {
+      for (let x = (row % 2) * DOT_STEP / 2; x < W; x += DOT_STEP) {
+        const o = (Math.round(y * S) * off.width + Math.round(x * S)) * 4;
+        if (img[o + 3] < 200) continue;
+        const seg = `M${x.toFixed(1)} ${y.toFixed(1)}h0`;
+        all += seg;
+        const i = img[o] + (img[o + 1] << 8) - 1;
+        if (img[o + 2] === 7 && i >= 0 && ccs[i]) dotsByCC.set(ccs[i], (dotsByCC.get(ccs[i]) || "") + seg);
+      }
+    }
+    const grid = document.createElementNS(NS, "g");
+    grid.setAttribute("class", "dots");
+    for (const [id, d] of [["dotsAll", all], ["dotsHot", ""]]) {
+      const p = document.createElementNS(NS, "path");
+      p.id = id;
+      p.setAttribute("d", d);
+      grid.appendChild(p);
+    }
+    $("countries").appendChild(grid);
+    $("map").classList.add("dotted");
   }
 
   // A bucket is one marker: a country (world view) or a region (zoomed in).
@@ -760,14 +844,11 @@
 
   const radius = (n) => Math.min(26, 5 + 3.2 * Math.sqrt(n));
 
-  function wedge(r, a0, a1) {
-    if (a1 - a0 >= Math.PI * 2 - 1e-6) {
-      return `M${-r} 0A${r} ${r} 0 1 1 ${r} 0A${r} ${r} 0 1 1 ${-r} 0Z`;
-    }
+  function arcStroke(r, a0, a1) {
+    if (a1 <= a0) a1 = a0 + 0.01;
     const x0 = r * Math.sin(a0), y0 = -r * Math.cos(a0);
     const x1 = r * Math.sin(a1), y1 = -r * Math.cos(a1);
-    const large = a1 - a0 > Math.PI ? 1 : 0;
-    return `M0 0L${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}Z`;
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
   }
 
   let renderedMode = null;
@@ -792,29 +873,55 @@
       g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : ""));
       g.dataset.x = b.pt[0];
       g.dataset.y = b.pt[1];
+      g.dataset.key = b.key;
       g.setAttribute("tabindex", "0");
       g.setAttribute("role", "button");
       g.setAttribute("aria-label", `${b.title}${b.sub ? ", " + b.sub : ""}: ${GROUPS.map((k) => b[k] + " " + LABEL[k].toLowerCase()).join(", ")}`);
 
+      // A light, not a pie: the colour is the place's leading group - manual
+      // whenever it holds one of yours - and the split is in the tooltip.
+      const lead = leadGroup(b);
+      const glow = document.createElementNS(NS, "circle");
+      glow.setAttribute("class", "glow");
+      glow.setAttribute("r", r * 1.9);
+      glow.setAttribute("fill", `url(#glow-${lead})`);
+      g.appendChild(glow);
+      const core = r * 0.38 + 1.4;
       const ring = document.createElementNS(NS, "circle");
       ring.setAttribute("class", "ring");
-      ring.setAttribute("r", r + 2);
+      ring.setAttribute("r", core + 4.2);
       g.appendChild(ring);
-
+      // Selection gets its own outline, so a selected place that also
+      // delivered the block keeps its orange ring.
+      const sel = document.createElementNS(NS, "circle");
+      sel.setAttribute("class", "sel");
+      sel.setAttribute("r", core + 6.6);
+      g.appendChild(sel);
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("class", "core c-" + lead);
+      dot.setAttribute("r", core);
+      g.appendChild(dot);
+      // The split between the three groups, as the pie used to show it: a
+      // thin ring around the light, one arc per group, a small gap between.
+      // The gap never eats a small group: at most half its own arc.
+      const minSpan = Math.min(...GROUPS.filter((k) => b[k]).map((k) => (b[k] / b.total) * Math.PI * 2));
+      const rr = core + 1.8, gap = b.total > 1 ? Math.min(0.32, minSpan / 2) : 0;
       let a = 0;
       for (const k of GROUPS) {
         if (!b[k]) continue;
         const span = (b[k] / b.total) * Math.PI * 2;
         const s = document.createElementNS(NS, "path");
         s.setAttribute("class", "seg seg-" + k);
-        s.setAttribute("d", wedge(r, a, a + span));
+        s.setAttribute("d", span >= Math.PI * 2 - 1e-6
+          ? `M${-rr} 0A${rr} ${rr} 0 1 1 ${rr} 0A${rr} ${rr} 0 1 1 ${-rr} 0`
+          : arcStroke(rr, a + gap / 2, a + span - gap / 2));
         g.appendChild(s);
         a += span;
       }
       if (b.total > 1) {
         const t = document.createElementNS(NS, "text");
-        t.setAttribute("x", r + 4);
-        t.setAttribute("y", 4);
+        t.setAttribute("x", core + 5);
+        t.setAttribute("y", -core);
         t.textContent = b.total;
         g.appendChild(t);
       }
@@ -822,7 +929,7 @@
         const star = document.createElementNS(NS, "text");
         star.setAttribute("class", "delivered-star");
         star.setAttribute("x", 0);
-        star.setAttribute("y", -(r + 5));
+        star.setAttribute("y", -(core + 6));
         star.setAttribute("text-anchor", "middle");
         star.textContent = "\u2605";
         g.appendChild(star);
@@ -838,7 +945,125 @@
       });
       layer.appendChild(g);
     }
+    const hotDots = $("dotsHot");
+    if (hotDots && dotsByCC) hotDots.setAttribute("d", [...hot].map((cc) => dotsByCC.get(cc) || "").join(""));
+    renderLinks(bs);
     placeMarkers();
+  }
+
+  const leadGroup = (b) => (b.manual ? "manual" : b.outbound > b.inbound ? "outbound" : "inbound");
+
+  // This node itself, from the region its peers see it in (the server reads
+  // getpeerinfo's addrlocal and sends only the region, never the address).
+  function homePoint() {
+    const h = state.data && state.data.home;
+    return h ? project(h.lon, h.lat) : null;
+  }
+
+  // A thin arc from every place to this node. They make the map read as what
+  // it is - your node's connections - and they are the track a new block
+  // travels along (pulseBlock).
+  let linkByKey = new Map();
+  function arcPath(a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const d = Math.hypot(dx, dy);
+    const lift = Math.min(90, d * 0.28);
+    const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2 - lift;
+    return `M${a[0].toFixed(1)} ${a[1].toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`;
+  }
+  function renderLinks(bs) {
+    const layer = $("links");
+    layer.textContent = "";
+    linkByKey = new Map();
+    const home = homePoint();
+    if (!home) return;
+    for (const b of bs) {
+      if (Math.hypot(b.pt[0] - home[0], b.pt[1] - home[1]) < 2) continue;
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("class", "link l-" + leadGroup(b));
+      p.setAttribute("d", arcPath(b.pt, home));
+      p.setAttribute("vector-effect", "non-scaling-stroke");
+      layer.appendChild(p);
+      linkByKey.set(b.key, p);
+    }
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", "home-mark");
+    g.dataset.x = home[0];
+    g.dataset.y = home[1];
+    const halo = document.createElementNS(NS, "circle");
+    halo.setAttribute("r", 11);
+    halo.setAttribute("fill", "url(#glow-home)");
+    const dot = document.createElementNS(NS, "circle");
+    dot.setAttribute("r", 3.2);
+    dot.setAttribute("class", "home-dot");
+    const t = document.createElementNS(NS, "title");
+    t.textContent = "Your node";
+    g.append(halo, dot, t);
+    $("markers").appendChild(g);
+  }
+
+  // A new block: a light runs from the place that delivered it along its arc
+  // to this node, rings spread where it lands, and the wave rolls across the
+  // page. Only for a block that arrives while the page is open - not on the
+  // first load - and not at all for someone who asked for less motion.
+  const motionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  function pulseBlock() {
+    if ((motionQuery && motionQuery.matches) || document.hidden || !state.world) return;
+    const wave = $("blockWave");
+    wave.classList.remove("run"); void wave.offsetWidth; wave.classList.add("run");
+    const home = homePoint();
+    const fx = $("fx");
+    const svg = $("map");
+    // Sizes in screen pixels: the fx layer is scaled with the map.
+    const px = (n) => (n * state.world.w) / (svg.clientWidth || 1000) / state.view.k;
+    const from = [...$("markers").querySelectorAll(".marker.delivered")].map((g) => linkByKey.get(g.dataset.key)).filter(Boolean);
+    const land = () => {
+      if (!home) return;
+      for (let i = 0; i < 3; i++) ring(home, i * 220);
+    };
+    const ring = (pt, delay) => {
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("class", "fx-ring");
+      c.setAttribute("cx", pt[0]);
+      c.setAttribute("cy", pt[1]);
+      c.setAttribute("vector-effect", "non-scaling-stroke");
+      fx.appendChild(c);
+      const t0 = performance.now() + delay;
+      const step = (now) => {
+        const k = Math.max(0, (now - t0) / 1500);
+        c.setAttribute("r", px(3 + 70 * (1 - Math.pow(1 - Math.min(1, k), 3))));
+        c.style.opacity = String(Math.max(0, 1 - k));
+        if (k < 1) requestAnimationFrame(step); else c.remove();
+      };
+      requestAnimationFrame(step);
+    };
+    if (!from.length) { land(); return; }
+    let left = from.length;
+    for (const path of from) {
+      const len = path.getTotalLength();
+      const head = document.createElementNS(NS, "circle");
+      head.setAttribute("class", "fx-head");
+      fx.appendChild(head);
+      // Without non-scaling-stroke: the dash lengths must be in the same units
+      // as getTotalLength(), so the width is scaled by hand instead.
+      const trail = path.cloneNode();
+      trail.removeAttribute("vector-effect");
+      trail.setAttribute("class", "fx-trail");
+      trail.style.strokeWidth = String(px(2.2));
+      fx.appendChild(trail);
+      const t0 = performance.now();
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / 950), e = 1 - Math.pow(1 - k, 2.2), d = e * len;
+        const pt = path.getPointAtLength(d);
+        head.setAttribute("cx", pt.x); head.setAttribute("cy", pt.y); head.setAttribute("r", px(2.6));
+        trail.setAttribute("stroke-dasharray", `${len * 0.22} ${len}`);
+        trail.setAttribute("stroke-dashoffset", String(-(d - len * 0.22)));
+        if (k < 1) { requestAnimationFrame(step); return; }
+        head.remove(); trail.remove();
+        if (--left === 0) land();
+      };
+      requestAnimationFrame(step);
+    }
   }
 
   function placeMarkers() {
@@ -977,7 +1202,9 @@
     if (!state.world) return;
     clampView();
     const { k, x, y } = state.view;
-    $("countries").setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    for (const id of ["countries", "links", "fx"]) $(id).setAttribute("transform", `translate(${x} ${y}) scale(${k})`);
+    // Dots at the world view, country shapes once zoomed in towards regions.
+    $("map").style.setProperty("--dots", String(Math.max(0, Math.min(1, (REGION_ZOOM + 0.5 - k) / 1.5))));
     if (!state.data) return;
     if (renderedMode !== regionMode()) {
       hideTip();
@@ -1066,8 +1293,10 @@
     window.addEventListener("resize", () => { if (state.data) placeMarkers(); });
     // The route is laid out in pixels from the card's width, so a new width
     // needs a new layout - and a narrow one may need the list instead.
-    let routeResize = null;
+    let routeResize = null, routeWidth = window.innerWidth;
     window.addEventListener("resize", () => {
+      if (window.innerWidth === routeWidth) return;
+      routeWidth = window.innerWidth;
       clearTimeout(routeResize);
       routeResize = setTimeout(() => { if (state.data) renderBlockCard(); }, 150);
     });
@@ -1152,16 +1381,18 @@
     const n = new Map();
     for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    el.textContent = "";
-    entries.forEach(([kind, count], i) => {
-      if (i) el.appendChild(document.createTextNode(" \u00b7 "));
+    entries.forEach(([kind, count]) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "kind-pick" + (state.kind === kind ? " on" : "");
-      b.textContent = count + " " + kind;
+      b.className = "chip kind-pick" + (state.kind === kind ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + kind);
       b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
       b.setAttribute("aria-pressed", String(state.kind === kind));
-      b.addEventListener("click", () => setKind(kind));
+      // Inside the group's <summary>: the click picks a kind and must not
+      // also fold the group.
+      b.addEventListener("click", (e) => { e.preventDefault(); setKind(kind); });
       el.appendChild(b);
     });
   }
@@ -1169,13 +1400,14 @@
   // How spread out a group is: distinct operators and countries. Operators by
   // the name in the Operator column, not by ASN: a large company runs several
   // ASNs (Amazon has AS16509 and AS14618) and should still count once. Peers
-  // that cannot be placed - Tor, I2P, private addresses - have neither, and
-  // are named instead of being silently left out.
+  // that cannot be placed - Tor, I2P, private addresses - have no country, and
+  // are named instead of being silently left out. Your Umbrel's own network
+  // has an operator line but is no provider, so it is not counted as one.
   function spreadText(peers) {
     const ops = new Set(), ccs = new Set();
     let unplaced = 0;
     for (const p of peers) {
-      if (p.operator || p.asn) ops.add(p.operator || "AS" + p.asn);
+      if ((p.operator || p.asn) && p.network !== "not_publicly_routable") ops.add(p.operator || "AS" + p.asn);
       if (p.cc) ccs.add(p.cc);
       else unplaced++;
     }
@@ -1186,104 +1418,158 @@
     return parts.join(" \u00b7 ");
   }
 
+  const TRANSPORT_TITLE = {
+    v1: "Unencrypted - the original P2P protocol",
+    v2: "Encrypted (BIP324) - an observer on the line cannot read what passes between the nodes",
+  };
+
+  // Two lines per peer, as in the approved design: what a row is about on
+  // top, the detail under it - the software, the AS number, the address -
+  // so nothing needs a pointer to be read.
+  const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
+    : p.region || (p.cc ? regionName(p.cc) : netLabel(p.network));
+  const neverNote = (p) => !p.no_relay ? ""
+    : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
+    : "Software that does not pass blocks on - this peer can never deliver one first.";
+  const line = (cls, text) => {
+    const e = document.createElement("small");
+    e.className = cls;
+    e.textContent = text;
+    return e;
+  };
+
   const COLS = [
     {
-      key: "addr", label: "Address", cls: "addr", val: (p) => p.addr,
-      // With Bitcoin Lab installed the address becomes the way over: same peer,
-      // the other question. Without it, a plain cell - no dead links.
+      // Where it is on top, the country and the address under it. Sorted by
+      // country first - otherwise Bavaria and Hesse end up on either side of
+      // England. Peers without a place sort last.
+      key: "peer", label: "Peer", cls: "peer",
+      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff" + p.addr),
       cell: (td, p) => {
-        // A long onion or I2P address is cut off by the column, so the full one
-        // lives in the title either way.
-        td.title = p.addr;
+        const who = document.createElement("div");
+        who.className = "who";
+        const f = document.createElement("span");
+        f.className = "flag";
+        f.textContent = HIDDEN_FLAG[p.network] || flagOf(p.cc);
+        const text = document.createElement("div");
+        text.className = "who-text";
+        const title = placeTitle(p);
+        const b = fit(document.createElement("b"), title);
+        b.textContent = title;
+        if (HIDDEN[p.network]) b.dataset.tip = HIDDEN[p.network].tip;
+        const sub = document.createElement("small");
+        if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
+        // What the row colour means, said where the peer is named rather
+        // than over every cell of the row.
+        const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
+          : deliveredEver.has(p.addr) ? "Has delivered a block first (Bitcoin Lab)" : "";
+        fit(sub, p.addr, got);
         if (deliveredNow.has(p.addr)) {
           const star = document.createElement("span");
           star.className = "star";
           star.textContent = "\u2605";
           star.title = "Delivered the block that just landed";
-          td.appendChild(star);
+          sub.appendChild(star);
         }
-        if (!state.data || !state.data.sibling) { td.textContent = p.addr; return; }
-        const a = document.createElement("a");
-        a.className = "peer-jump";
-        a.href = siblingURL(p.addr);
-        a.target = "_blank";
-        a.rel = "noopener";
-        a.textContent = p.addr;
-        a.title = p.addr + "\nOpen this peer in Bitcoin Lab";
-        td.appendChild(a);
-      },
-    },
-    {
-      // Shown as "Region, Country", sorted by country first - otherwise
-      // Bavaria and Hesse end up on either side of England and the column
-      // looks like it cannot do the one thing it obviously should. Peers
-      // without a place sort last rather than first, where an empty string
-      // would have put them.
-      key: "loc", label: "Location", cls: "loc", show: locLabel,
-      val: (p) => (p.cc ? regionName(p.cc) + "\u0000" + (p.region || "") : "\uffff"),
-    },
-    {
-      // Where a peer sits and whose machine it is are two questions, and the
-      // second is the one that catches three peers in three countries sitting
-      // with the same company. Sorting by this column puts them next to each
-      // other. Empty for Tor, I2P and anything without a public address.
-      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "",
-      cell: (td, p) => {
-        td.textContent = p.operator || "";
-        if (p.asn) td.title = "AS" + p.asn;
-      },
-    },
-    {
-      key: "network", label: "Network", val: (p) => netLabel(p.network),
-      cell: (td, p) => {
-        td.textContent = netLabel(p.network);
-        if (p.network === "ipv6_hidden") td.title = "Came in over IPv6. umbrelOS passes inbound IPv6 on through Docker, which puts its own address in place of the peer's, so where it is and whose machine it is cannot be known.";
-      },
-    },
-    { key: "type", label: "Type", val: (p) => typeLabel(p.type), only: "outbound" },
-    {
-      key: "kind", label: "Kind", val: (p) => p.kind || "", show: kindLabel,
-      // Struck through for software that passes no blocks on. It is not a
-      // fault: a wallet is doing exactly what a wallet does. It only means this
-      // connection was never going to hand your node a block.
-      //
-      // The user agent itself lives in this cell's title rather than in a
-      // column of its own. It is the raw material this class is derived from -
-      // worth having, not worth the width, and it was the widest column in the
-      // table by a distance.
-      cell: (td, p) => {
-        // The label in its own element, so the strike-through for software
-        // that passes no blocks on stays on the label and leaves the agent
-        // and its description below readable.
-        const label = document.createElement("span");
-        label.className = "klabel";
-        label.textContent = kindLabel(p);
-        td.appendChild(label);
-        // With a kind filter on, the question is why these peers are in it,
-        // and the answer is the agent: shown under the kind, only then.
-        if (state.kind && p.subver) {
-          const ua = document.createElement("div");
-          ua.className = "ua";
-          ua.textContent = p.subver;
-          td.appendChild(ua);
+        // With Bitcoin Lab installed the address is the way over: same peer,
+        // the other question. Without it, plain text - no dead links.
+        if (state.data && state.data.sibling) {
+          const a = document.createElement("a");
+          a.className = "peer-jump addr-txt";
+          a.href = siblingURL(p.addr);
+          a.target = LAB_TARGET;
+          a.textContent = p.addr;
+          a.dataset.tip = "Open this peer in Bitcoin Lab";
+          a.title = [got, a.dataset.tip].filter(Boolean).join("\n");
+          sub.appendChild(a);
+        } else {
+          const a = document.createElement("span");
+          a.className = "addr-txt";
+          a.textContent = p.addr;
+          sub.appendChild(a);
         }
-        // Also without an agent: "No user agent" is the kind that most
-        // needs the sentence.
+        text.append(b, sub);
+        who.append(f, text);
+        td.appendChild(who);
+      },
+    },
+    {
+      // Whose machine it is, with the AS number under it. Sorting by this
+      // column catches three peers in three countries with the same company.
+      key: "operator", label: "Operator", cls: "op", val: (p) => p.operator || "\uffff",
+      cell: (td, p) => {
+        if (!p.operator && !p.asn) { td.textContent = "–"; td.classList.add("dim"); return; }
+        const name = fit(document.createElement("span"), p.operator || "");
+        name.className += " op-name";
+        name.textContent = p.operator || "";
+        td.appendChild(name);
+        if (p.asn) td.appendChild(line("sub", "AS" + p.asn));
+      },
+    },
+    {
+      // What it calls itself and what Core saw, as a pill; the software it
+      // announced under it. A peer that can never deliver a block first is
+      // dimmed and says so in the pill - not a fault, a wallet is doing what
+      // a wallet does.
+      key: "kind", label: "Kind", val: (p) => p.kind || "",
+      cell: (td, p) => {
+        const pill = document.createElement("span");
+        // Green for every peer that can deliver a block first, grey for those
+        // that never can, red for a disguise or LinkingLion even when it could.
+        // LinkingLion has its own pill whatever software it claims; the
+        // software stays in the line under it.
+        pill.className = "kind " + (p.linking_lion ? "lion" : p.no_relay ? "never" : p.kind === "Disguised" ? "disg" : "first");
+        // Never-first peers: the kind and the fact in the pill; what Core saw
+        // (no services, chain unknown) moves to the line under it, so the
+        // pill is never cut before the words that matter.
+        const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
+        const never = p.no_relay ? " \u00b7 never first" : "";
+        const label = p.linking_lion ? "LinkingLion" + never : p.no_relay ? p.kind + never : kindLabel(p);
+        if (p.no_relay) {
+          const ico = document.createElement("span");
+          ico.className = "ico";
+          ico.textContent = "⊘";
+          pill.append(ico, " ");
+        }
+        pill.append(label);
+        fit(pill, label, [p.about, neverNote(p)].filter(Boolean).join("\n"));
+        td.appendChild(pill);
+        const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
+        if (under) td.appendChild(fit(line("sub ua", under), under));
+        // With a kind filter on, the question is why these peers are in it:
+        // the description is shown under the kind, only then.
         if (state.kind && p.about) {
           const about = document.createElement("div");
           about.className = "about";
           about.textContent = p.about;
           td.appendChild(about);
         }
-        const note = !p.no_relay ? ""
-          : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
-          : "Software that does not pass blocks on - this peer can never deliver one first.";
-        td.title = [p.subver, p.about, note].filter(Boolean).join("\n");
-        if (p.no_relay) td.className = (td.className ? td.className + " " : "") + "norelay";
       },
     },
-    { key: "transport", label: "P2P", val: (p) => p.transport || "" },
-    { key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms), show: (p) => (p.ping_ms == null ? "" : Math.round(p.ping_ms) + " ms") },
+    {
+      // Network and P2P version as two small tags; outbound also its type.
+      key: "net", label: "Net", val: (p) => netLabel(p.network) + (p.transport || ""),
+      cell: (td, p) => {
+        const tag = (text, title, cls) => {
+          const e = document.createElement("span");
+          e.className = cls ? "net " + cls : "net";
+          e.textContent = text;
+          if (title) e.title = title;
+          td.appendChild(e);
+        };
+        tag(HIDDEN[p.network] ? HIDDEN[p.network].short : netLabel(p.network) || "–",
+          HIDDEN[p.network] ? HIDDEN[p.network].tip : "");
+        if (p.transport) tag(p.transport, TRANSPORT_TITLE[p.transport] || "");
+        if (p.group === "outbound" && p.type) tag(typeLabel(p.type), "", "type");
+      },
+    },
+    {
+      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms),
+      cell: (td, p) => {
+        if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
+        td.textContent = fmtPing(p.ping_ms);
+      },
+    },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
   ];
 
@@ -1306,22 +1592,21 @@
       const h = document.createElement("h2");
       const sw = document.createElement("span");
       sw.className = "swatch s-" + g;
+      h.append(sw, LABEL[g]);
+      // The count and the mix of kinds as chips beside the name. Counted
+      // before this group's own kind filter, so a group the filter emptied
+      // still offers the way back - and switching kinds is one click.
+      const mix = document.createElement("span");
+      mix.className = "kinds chips";
       const n = document.createElement("span");
-      n.className = "n";
-      n.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
-      h.append(sw, LABEL[g] + " ", n);
-      summary.appendChild(h);
+      n.className = "chip count";
+      const ni = document.createElement("i");
+      ni.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
+      n.append(ni, " peers");
+      mix.appendChild(n);
+      if (kindPool.length) renderKindMix(mix, kindPool);
+      summary.append(h, mix);
       card.appendChild(summary);
-
-      if (kindPool.length) {
-        const mix = document.createElement("p");
-        mix.className = "kinds";
-        // Counted before this group's own kind filter and drawn before the
-        // empty check, so a group the filter emptied still offers the way
-        // back - and switching from one kind to another is one click.
-        renderKindMix(mix, kindPool);
-        card.appendChild(mix);
-      }
 
       if (peers.length) {
         const spread = document.createElement("p");
@@ -1341,7 +1626,7 @@
         continue;
       }
 
-      const cols = COLS.filter((c) => !c.only || c.only === g);
+      const cols = COLS;
       const s = state.sort[g] || { key: "conntime", dir: 1 };
       const col = cols.find((c) => c.key === s.key) || cols[cols.length - 1];
       peers.sort((a, b) => {
@@ -1358,7 +1643,7 @@
       for (const c of cols) {
         const th = document.createElement("th");
         th.scope = "col";
-        if (c.cls) th.className = c.cls;
+        th.className = "k-" + c.key + (c.cls ? " " + c.cls : "");
         if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
         const b = document.createElement("button");
         b.textContent = c.label;
@@ -1375,28 +1660,27 @@
       for (const p of peers) {
         const tr = document.createElement("tr");
         if (state.focus && p.addr === state.focus) tr.className = "focus";
-        // A connection that has brought this node a block, at least once.
         // The peer that brought the newest block, for as long as the star
         // is up - one rule for "just delivered", in the row and on the map.
         else if (deliveredNow.has(p.addr)) {
           tr.className = "delivered-now";
-          tr.title = "Delivered the newest block first";
         }
-        else if (deliveredEver.has(p.addr)) {
-          tr.className = "delivered-ever";
-          tr.title = "Has delivered a block first (Bitcoin Lab)";
-        }
+        // A connection that has brought this node a block, at least once: its address in green, also on an orange or
+        // focused row (as in Bitcoin Lab).
+        if (deliveredEver.has(p.addr) || deliveredNow.has(p.addr)) tr.classList.add("delivered-ever");
+        if (p.no_relay) tr.classList.add("weak");
         for (const c of cols) {
           const td = document.createElement("td");
           if (c.cls) td.className = c.cls;
-          const text = c.show ? c.show(p) : c.val(p);
+          td.classList.add("k-" + c.key);
+          td.dataset.label = c.label;
           if (c.cell) {
             c.cell(td, p);
           } else {
+            const text = c.show ? c.show(p) : c.val(p);
             td.textContent = text === "" ? "–" : text;
             if (text === "") td.classList.add("dim");
           }
-          if (c.key === "addr" || c.key === "loc") td.title = text;
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -1406,7 +1690,38 @@
       card.appendChild(wrap);
       root.appendChild(card);
     }
+    fitTables();
   }
+
+  // A table that does not fit its card turns each row into a small card of
+  // its own (see .scroll.cards in style.css) instead of scrolling sideways:
+  // every value stays, below each other rather than beside. Decided by
+  // measuring, not by a fixed screen width - the columns are as wide as
+  // their content, and a closed group has no width to measure until it opens.
+  // All groups switch together: one group as cards and the next as a table
+  // looked like two different pages.
+  // Measuring takes the cards away for a moment, and on a phone the page is
+  // then far shorter: Safari clamps the scroll position to it and keeps it
+  // there, so a reader far down was thrown up on every refresh. The position
+  // is put back before anything is painted.
+  function fitTables() {
+    const y = window.scrollY;
+    const wraps = [...document.querySelectorAll("#tables .scroll")];
+    for (const w of wraps) w.classList.remove("cards");
+    const tight = wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
+    for (const w of wraps) w.classList.toggle("cards", tight);
+    if (window.scrollY !== y) window.scrollTo(0, y);
+  }
+  let fitTimer = null;
+  // Only a change of width can change whether the tables fit; on an iPhone the
+  // height changes all the time while Safari's toolbar shrinks and grows.
+  let fitWidth = window.innerWidth;
+  window.addEventListener("resize", () => {
+    if (window.innerWidth === fitWidth) return;
+    fitWidth = window.innerWidth;
+    clearTimeout(fitTimer); fitTimer = setTimeout(fitTables, 100);
+  });
+  document.addEventListener("toggle", fitTables, true);
 
 
   // ---------- start ----------

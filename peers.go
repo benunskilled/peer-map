@@ -30,10 +30,80 @@ type rawPeer struct {
 	ServicesNames []string `json:"servicesnames"`
 	RelayTxes     *bool    `json:"relaytxes"`
 	SyncedHeaders *int64   `json:"synced_headers"`
+	// The address this peer sees us under. Read only to place this node on
+	// the map (see homeOf); never passed on.
+	AddrLocal string `json:"addrlocal"`
 
 	mockLoc         *geo.Location // demo data only: documentation addresses have no location
 	mockASN         *asn.Info     // demo data only, same reason
 	mockLinkingLion bool          // demo only: a documentation address standing in for LinkingLion
+	mockHome        *geo.Location // demo only: where the demo node itself is
+}
+
+// Home is where this node is, as the map draws it: a region, never an address.
+type Home struct {
+	Country string  `json:"cc"`
+	Region  string  `json:"region,omitempty"`
+	Lat     float64 `json:"lat"`
+	Lon     float64 `json:"lon"`
+}
+
+// homeOf places this node by the address its peers see it under: getpeerinfo's
+// addrlocal. No extra RPC and nothing sent anywhere - the lookup is the
+// bundled database, and only the region leaves this function. Nil when no
+// peer reports an address that can be placed (a node reachable only over Tor,
+// say).
+//
+// The vote is per region, not per address: IPv6 privacy addresses would
+// otherwise split it, and an address that cannot be placed (CGNAT, a
+// documentation range) simply does not count. Only connections this node
+// opened vote. addrlocal is whatever the peer claims, and inbound peers are
+// anyone - a crowd of them could otherwise move this node across the map.
+// Inbound ones are asked only when there are no others.
+func homeOf(raw []rawPeer) *Home {
+	for _, p := range raw {
+		if p.mockHome != nil {
+			l := *p.mockHome
+			return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
+		}
+	}
+	vote := func(inbound bool) *Home {
+		count := map[uint16]int{}
+		where := map[uint16]geo.Location{}
+		var best uint16
+		found := false
+		for _, p := range raw {
+			if p.Inbound != inbound || p.AddrLocal == "" {
+				continue
+			}
+			a, err := netip.ParseAddr(hostOf(p.AddrLocal))
+			if err != nil {
+				continue
+			}
+			a = a.Unmap()
+			if !a.IsGlobalUnicast() || a.IsPrivate() {
+				continue
+			}
+			l, ok := geo.Lookup(a)
+			if !ok {
+				continue
+			}
+			count[l.ID]++
+			where[l.ID] = l
+			if !found || count[l.ID] > count[best] {
+				best, found = l.ID, true
+			}
+		}
+		if !found {
+			return nil
+		}
+		l := where[best]
+		return &Home{Country: l.Country, Region: l.Region, Lat: l.Lat, Lon: l.Lon}
+	}
+	if h := vote(false); h != nil {
+		return h
+	}
+	return vote(true)
 }
 
 // Peer is what the dashboard receives.
@@ -53,10 +123,12 @@ type Peer struct {
 	// same provider. Empty for an address no network announces.
 	ASN      uint32 `json:"asn,omitempty"`
 	Operator string `json:"operator,omitempty"`
-	Subver   string `json:"subver"`
-	Kind     string `json:"kind"`               // what the user agent claims; see kinds.go
-	About    string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay  bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	// The name of the app when the peer is one of Umbrel's own, such as electrs.
+	App     string `json:"app,omitempty"`
+	Subver  string `json:"subver"`
+	Kind    string `json:"kind"`               // what the user agent claims; see kinds.go
+	About   string `json:"about,omitempty"`    // what that software is, when known
+	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
@@ -170,6 +242,15 @@ const dockerGateway = "10.21.0.1"
 // hiddenIPv6 is the network such a peer is shown under instead of "Private".
 const hiddenIPv6 = "ipv6_hidden"
 
+// Tor and I2P peers reach Core through the proxy containers in Umbrel's
+// network, which put their own address in place of the peer's.
+const (
+	torProxy  = "10.21.22.10" // bitcoin_tor_1
+	i2pProxy  = "10.21.22.11" // bitcoin_i2pd_daemon_1
+	torHidden = "tor_hidden"
+	i2pHidden = "i2p_hidden"
+)
+
 // isPrivate: an address inside a private network, such as the one umbrelOS
 // runs its apps in.
 func isPrivate(addr string) bool {
@@ -224,15 +305,26 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
 			}
 		}
-		if r.Inbound && hostOf(r.Addr) == dockerGateway {
-			p.Network = hiddenIPv6
+		if r.Inbound {
+			switch hostOf(r.Addr) {
+			case dockerGateway:
+				p.Network = hiddenIPv6
+			case torProxy:
+				p.Network = torHidden
+			case i2pProxy:
+				p.Network = i2pHidden
+			}
 		}
 		// Umbrel's own apps reach Core from inside its network.
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
 			p.About = "Probably your own " + claimOf(r.Subver) + " on this Umbrel"
+			p.App, _, _ = strings.Cut(strings.Trim(r.Subver, "/"), ":")
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
+		}
+		if p.Network == "not_publicly_routable" {
+			p.Operator = "Your Umbrel's own network"
 		}
 		if loc, ok := locate(r); ok {
 			p.Country = loc.Country

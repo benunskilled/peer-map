@@ -155,7 +155,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 			ConnTime: now - int64(r.Intn(86400*3)), Transport: []string{"v1", "v2"}[r.Intn(2)],
 			BytesSent: int64(r.Intn(50 << 20)), BytesRecv: int64(r.Intn(200 << 20)),
 			ServicesNames: services, RelayTxes: &relay, SyncedHeaders: &headers,
-			mockLoc: loc, mockASN: net,
+			mockLoc: loc, mockASN: net, mockHome: demoHome(id),
 		})
 		id++
 	}
@@ -198,4 +198,13 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 	add("inbound", true, "i2p", "ukeu3k5oycgaauneqgtnvselmt4yemvoilkln7jpvamvfx7dnkdq.b32.i2p:0", nil, nil)
 	add("feeler", false, "ipv4", "192.0.2.250:8333", &locs[0], &nets[0]) // must be hidden
 	return out, nil
+}
+
+// demoHome places the demo node itself in Hesse, Germany, on the first demo
+// peer only - homeOf takes the first one it finds.
+func demoHome(id int64) *geo.Location {
+	if id != 1 {
+		return nil
+	}
+	return &geo.Location{Country: "DE", Region: "Hesse", Lat: 50.11, Lon: 8.68}
 }
