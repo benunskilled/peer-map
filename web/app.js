@@ -551,14 +551,12 @@
     }
     const note = document.createElement("p");
     note.className = "note";
-    note.textContent = (noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
+    note.textContent = ((noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
       + (median
       ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
       : "0 is the first new job any pool sent here. When the block was found cannot be measured; "
-        + "the hop into your node is estimated from the peer's ping. ")
-      + (stops.some((st) => st.kind === "tpl")
-        ? "The template is requested by Bitcoin Lab itself as the block arrives, which can only make your pool faster, never slower."
-        : "");
+        + "the hop into your node is estimated from the peer's ping.")
+      ).trim();
     box.appendChild(note);
   }
 
