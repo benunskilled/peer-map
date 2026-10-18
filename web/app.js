@@ -8,6 +8,7 @@
   // nothing. There the jump stays in the same tab, and Back returns.
   const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
   const GROUPS = ["inbound", "outbound", "manual"];
+  const INBOUND_LIMIT = 10;
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
@@ -43,7 +44,7 @@
     // agreeing with the node's.
     receivedAt: 0,
     liveShown: false,
-    open: { manual: true, inbound: true, outbound: true }, // table sections
+    showAllInbound: false, // the inbound table shows its top INBOUND_LIMIT until asked for all
   };
 
   const store = {
@@ -550,14 +551,12 @@
     }
     const note = document.createElement("p");
     note.className = "note";
-    note.textContent = (noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
+    note.textContent = ((noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
       + (median
       ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
       : "0 is the first new job any pool sent here. When the block was found cannot be measured; "
-        + "the hop into your node is estimated from the peer's ping. ")
-      + (stops.some((st) => st.kind === "tpl")
-        ? "The template is requested by Bitcoin Lab itself as the block arrives, which can only make your pool faster, never slower."
-        : "");
+        + "the hop into your node is estimated from the peer's ping.")
+      ).trim();
     box.appendChild(note);
   }
 
@@ -1390,9 +1389,7 @@
       b.append(i, " " + kind);
       b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
       b.setAttribute("aria-pressed", String(state.kind === kind));
-      // Inside the group's <summary>: the click picks a kind and must not
-      // also fold the group.
-      b.addEventListener("click", (e) => { e.preventDefault(); setKind(kind); });
+      b.addEventListener("click", () => setKind(kind));
       el.appendChild(b);
     });
   }
@@ -1584,11 +1581,11 @@
       const kindPool = peers;
       if (state.kind) peers = peers.filter(matchesKind);
 
-      const card = document.createElement("details");
+      const card = document.createElement("section");
       card.className = "card group-card";
-      card.open = state.open[g];
-      card.addEventListener("toggle", () => { state.open[g] = card.open; });
-      const summary = document.createElement("summary");
+      card.id = "group-" + g;
+      const summary = document.createElement("div");
+      summary.className = "group-head";
       const h = document.createElement("h2");
       const sw = document.createElement("span");
       sw.className = "swatch s-" + g;
@@ -1656,8 +1653,20 @@
       }
       thead.appendChild(hr);
       table.appendChild(thead);
+      // Inbound runs to a couple of hundred rows and pushed Outbound and Manual
+      // far down the page, so it shows its top ten - in the order of the
+      // current sort - with a toggle for the rest, as Bitcoin Lab's ranking
+      // does. The others never get long. A peer Bitcoin Lab pointed at opens
+      // the full list once, or its row would not exist to land on.
+      let shown = peers;
+      const limited = g === "inbound" && peers.length > INBOUND_LIMIT;
+      if (limited) {
+        if (state.focus && !state.focusDone && !state.showAllInbound
+            && peers.slice(INBOUND_LIMIT).some((p) => p.addr === state.focus)) state.showAllInbound = true;
+        if (!state.showAllInbound) shown = peers.slice(0, INBOUND_LIMIT);
+      }
       const tbody = document.createElement("tbody");
-      for (const p of peers) {
+      for (const p of shown) {
         const tr = document.createElement("tr");
         if (state.focus && p.addr === state.focus) tr.className = "focus";
         // The peer that brought the newest block, for as long as the star
@@ -1688,6 +1697,22 @@
       table.appendChild(tbody);
       wrap.appendChild(table);
       card.appendChild(wrap);
+      if (limited) {
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "more";
+        more.textContent = state.showAllInbound ? `Show top ${INBOUND_LIMIT} only` : `Show all ${peers.length}`;
+        more.addEventListener("click", () => {
+          const collapsing = state.showAllInbound;
+          state.showAllInbound = !state.showAllInbound;
+          renderTables();
+          // Collapsing takes away most of the page under the reader; bring
+          // the card back into view if it went off the top.
+          const c = $("group-inbound");
+          if (collapsing && c && c.getBoundingClientRect().top < 0) c.scrollIntoView({ block: "start", behavior: "smooth" });
+        });
+        card.appendChild(more);
+      }
       root.appendChild(card);
     }
     fitTables();
@@ -1704,12 +1729,24 @@
   // then far shorter: Safari clamps the scroll position to it and keeps it
   // there, so a reader far down was thrown up on every refresh. The position
   // is put back before anything is painted.
+  //
+  // Before that, a tight table gives up its least important columns a step at
+  // a time - Net, then Operator, then Connected (see [data-drops] in
+  // style.css). Cards came far too early otherwise: a laptop window a little
+  // under 1200px already stacked every peer into five or six lines.
+  const DROP_LEVELS = 3;
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
     for (const w of wraps) w.classList.remove("cards");
-    const tight = wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
-    for (const w of wraps) w.classList.toggle("cards", tight);
+    const tight = () => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
+    let level = 0;
+    for (; ; level++) {
+      for (const w of wraps) w.dataset.drops = String(level);
+      if (level === DROP_LEVELS || !tight()) break;
+    }
+    const cards = level === DROP_LEVELS && tight();
+    for (const w of wraps) w.classList.toggle("cards", cards);
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
   let fitTimer = null;
