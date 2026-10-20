@@ -354,6 +354,7 @@ func TestProtocolMismatch(t *testing.T) {
 		{"/Satoshi:31.99.0/", 70017, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", 70016, "Node (Core)", ""},
 		{"/Satoshi:0.20.1/", 70015, "Node (Core)", ""},
+		{"/Satoshi:0.20.99/", 70016, "Node (Core)", ""}, // a 0.21 development build
 		{"/Satoshi:0.13.2/", 70014, "Node (Core)", ""},
 		{"/Satoshi:31.1.0/", 0, "Node (Core)", ""},         // Core did not report it
 		{"/Satoshi:1.14.5(2x)/", 70015, "Node (Core)", ""}, // not a Core release number: left alone

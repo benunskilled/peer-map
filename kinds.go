@@ -60,9 +60,9 @@ var kindRules = []struct {
 	// "mempool" inside the brackets does not count: "(mempool.guide)" is a
 	// node's own label, not a pool (seen on the node this was written for).
 	// /CKCoinD:/ is ckcoind, ckolivas' mining fork of Core (UA_NAME in its
-	// clientversion.cpp). /ckp2p:/ is ckpool's own block relay: ckp2p.c by Con Kolivas, on the
-	// p2pcrawler and nodrop branches of github.com/ckolivas/ckpool (not on
-	// master, which is why it was once taken for someone else's).
+	// clientversion.cpp). /ckp2p:/ is ckpool's own block relay: ckp2p.c on
+	// the p2pcrawler and nodrop branches of github.com/ckolivas/ckpool (not
+	// on master, which is why it was once taken for someone else's).
 	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
@@ -306,13 +306,17 @@ func coreAtLeast(subver string, major, minor int) bool {
 }
 
 // protocolMismatch is a peer whose protocol version does not match the Core
-// release it names: Core 0.21 and later send 70016 (development builds
-// 70017), every release before sends 70015 or less. On one node, in four
+// release it names: Core 0.21 to 31 send 70016 (later ones 70017 or more),
+// every release before sends 70015 or less. Development builds (x.99) are
+// left alone: "0.20.99" was already 0.21 under way. On one node, in four
 // days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
 // "/Satoshi:31.0.0/" fleet with 70015 - and no real Core node either way.
+// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
+var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
+
 func protocolMismatch(subver string, version int) string {
 	maj, mnr, ok := coreRelease(subver)
-	if !ok || version == 0 {
+	if !ok || version == 0 || devBuild.MatchString(subver) {
 		return ""
 	}
 	newer := maj >= 22 || mnr >= 21
