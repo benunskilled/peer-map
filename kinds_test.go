@@ -38,7 +38,7 @@ func TestKindOf(t *testing.T) {
 		"/bitnodes.io:0.3/":                 "Crawler",
 		"/GlobalNodeMap:2.1/":               "Crawler",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/":   "Research scanner",
-		"/ckp2p:2.0/":                       "Other",
+		"/ckp2p:2.0/":                       "Pool node",
 		// The operator's own word, in the comment part - above the software.
 		"/Satoshi:29.1.0(PyBLOCK-POOL)/Knots:20250903/": "Pool node",
 		"/Satoshi:31.0.0(pool)/":                        "Pool node",

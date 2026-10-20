@@ -59,10 +59,10 @@ var kindRules = []struct {
 	// Only the brackets count: outside them "pool" is also in "mempool".
 	// "mempool" inside the brackets does not count: "(mempool.guide)" is a
 	// node's own label, not a pool (seen on the node this was written for).
-	// /ckp2p:/ used to be here as "ckpool's relay", but nothing named ckp2p
-	// exists in ckpool's source and nothing public explains it, so it is no
-	// longer called a pool; see aboutRules for what was actually observed.
-	{"Pool node", regexp.MustCompile(`(?i)ckpool|\([^)]*pool[^)]*\)`), true},
+	// /ckp2p:/ is ckpool's own block relay: ckp2p.c by Con Kolivas, on the
+	// p2pcrawler and nodrop branches of github.com/ckolivas/ckpool (not on
+	// master, which is why it was once taken for someone else's).
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own.
@@ -140,7 +140,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
-	{regexp.MustCompile(`(?i)ckp2p`), "Fetches blocks only, never transactions, from data centres; the operator is unknown and it is probably not part of ckpool"},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, the block relay of ckpool (Con Kolivas): fetches blocks only, never transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
