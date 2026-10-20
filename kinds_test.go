@@ -166,7 +166,7 @@ func TestFakeWallet(t *testing.T) {
 		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: a crawler"},
 		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: a scanner or node that hides"},
 		// Only a wallet name can be fake: a node offering blocks is a node.
-		{"/Satoshi:31.1.0/", []string{"NETWORK", "P2P_V2"}, "Node (Core)", ""},
+		{"/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Node (Core)", ""},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -201,6 +201,9 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
 		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
+		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "without the pruned-node service"},
+		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
+		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
 		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
 		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
 	}
@@ -270,7 +273,7 @@ func TestCoreOfferingNothing(t *testing.T) {
 	if len(got) != 1 || got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, offersNothingAbout) {
 		t.Fatalf("Core offering nothing: %+v", got)
 	}
-	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS"}, {"NETWORK_LIMITED", "WITNESS"}} {
+	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS", "NETWORK_LIMITED"}, {"NETWORK_LIMITED", "WITNESS"}} {
 		got := convert([]rawPeer{{Addr: "198.51.100.8:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: svc}})
 		if len(got) != 1 || got[0].Kind != "Node (Core)" {
 			t.Errorf("services %v: kind %q, want Node (Core)", svc, got[0].Kind)
@@ -326,5 +329,40 @@ func TestLinkingLionFlag(t *testing.T) {
 	})
 	if !got[0].LinkingLion || !got[1].LinkingLion || got[2].LinkingLion {
 		t.Fatalf("flags: %v %v %v", got[0].LinkingLion, got[1].LinkingLion, got[2].LinkingLion)
+	}
+}
+
+// Every Core release sends one protocol version: 70016 from 0.21 (70017 in
+// development builds), 70015 or less before.
+func TestProtocolMismatch(t *testing.T) {
+	core := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
+	cases := []struct {
+		subver  string
+		version int
+		kind    string
+		says    string
+	}{
+		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: unknown software - it speaks protocol 70015, older than any Core since 0.21"},
+		{"/Satoshi:0.21.0/", 70015, "Disguised", "protocol 70015"},
+		{"/Satoshi:0.13.2/", 70016, "Disguised", "which Core 0.13 never did"},
+		{"/Satoshi:25.1.0/Knots:20231115/", 70015, "Disguised", "Claims: Bitcoin Knots"},
+		{"/Satoshi:31.1.0/", 70016, "Node (Core)", ""},
+		{"/Satoshi:31.99.0/", 70017, "Node (Core)", ""},
+		{"/Satoshi:0.21.0/", 70016, "Node (Core)", ""},
+		{"/Satoshi:0.20.1/", 70015, "Node (Core)", ""},
+		{"/Satoshi:0.13.2/", 70014, "Node (Core)", ""},
+		{"/Satoshi:31.1.0/", 0, "Node (Core)", ""},         // Core did not report it
+		{"/Satoshi:1.14.5(2x)/", 70015, "Node (Core)", ""}, // not a Core release number: left alone
+	}
+	for _, c := range cases {
+		svc := core
+		if strings.HasPrefix(c.subver, "/Satoshi:0.13") {
+			svc = []string{"NETWORK", "WITNESS"} // before NETWORK_LIMITED
+		}
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, ServicesNames: svc, Version: c.version}})[0]
+		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
+			t.Errorf("%s %d: got %q / %q, want %q containing %q", c.subver, c.version, got.Kind, got.About, c.kind, c.says)
+		}
 	}
 }

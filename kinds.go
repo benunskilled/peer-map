@@ -271,8 +271,52 @@ func anachronism(subver string, services []string) string {
 			}
 		}
 	}
+	// Core 0.16 and later always offer NETWORK_LIMITED, pruned or not, so a
+	// newer Core offering NETWORK without it is not Core. Seen on one node as
+	// a "/Satoshi:31.0.0/" fleet that otherwise offered nothing.
+	if has["NETWORK"] && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
+		return "unknown software - it offers full blocks without the pruned-node service, which Core has always added since 0.16"
+	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
+	}
+	return ""
+}
+
+// coreRelease reads a user agent that names a real Core release number:
+// 0.x up to 0.21, then 22 and later. "/Satoshi:1.14.5(2x)/" (btc1) and other
+// numbers Core never used return ok == false and are left alone.
+func coreRelease(subver string) (maj, mnr int, ok bool) {
+	m := claimedCore.FindStringSubmatch(subver)
+	if m == nil {
+		return 0, 0, false
+	}
+	maj, _ = strconv.Atoi(m[1])
+	mnr, _ = strconv.Atoi(m[2])
+	return maj, mnr, maj == 0 || maj >= 22
+}
+
+func coreAtLeast(subver string, major, minor int) bool {
+	maj, mnr, ok := coreRelease(subver)
+	return ok && (maj > major || maj == major && mnr >= minor)
+}
+
+// protocolMismatch is a peer whose protocol version does not match the Core
+// release it names: Core 0.21 and later send 70016 (development builds
+// 70017), every release before sends 70015 or less. On one node, in four
+// days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
+// "/Satoshi:31.0.0/" fleet with 70015 - and no real Core node either way.
+func protocolMismatch(subver string, version int) string {
+	maj, mnr, ok := coreRelease(subver)
+	if !ok || version == 0 {
+		return ""
+	}
+	newer := maj >= 22 || mnr >= 21
+	switch {
+	case newer && version < 70016:
+		return fmt.Sprintf("unknown software - it speaks protocol %d, older than any Core since 0.21", version)
+	case !newer && version >= 70016:
+		return fmt.Sprintf("unknown software - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
 	}
 	return ""
 }
