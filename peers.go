@@ -285,6 +285,13 @@ func convert(raw []rawPeer) []Peer {
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
+		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):
+			claim := claimOf(r.Subver)
+			if p.About != "" {
+				claim, _, _ = strings.Cut(p.About, ",")
+				claim = "the wallet " + claim
+			}
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:
