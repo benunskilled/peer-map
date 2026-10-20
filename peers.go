@@ -3,6 +3,7 @@ package main
 import (
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
@@ -291,7 +292,7 @@ func convert(raw []rawPeer) []Peer {
 				claim, _, _ = strings.Cut(p.About, ",")
 				claim = "the wallet " + claim
 			}
-			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:

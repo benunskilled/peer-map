@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestKindOf(t *testing.T) {
@@ -381,8 +382,8 @@ func TestBitcoinjTooNew(t *testing.T) {
 		kind    string
 		about   string
 	}{
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: posing as a wallet but acting unlike one"},
-		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: posing as a wallet"},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: a fake - protocol too new for this wallet"},
+		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: a fake"},
 		// Another program on bitcoinj could set its own number, a later
 		// bitcoinj could raise it: both are left alone.
 		{"/bitcoinj:0.16/", 70016, "Wallet", ""},
@@ -422,5 +423,28 @@ func TestOtherAbouts(t *testing.T) {
 		if !strings.HasPrefix(got.About, c.about) {
 			t.Errorf("%q %d: about %q, want %q", c.subver, c.version, got.About, c.about)
 		}
+	}
+}
+
+// The time connected is added once it is a day or more, never on its own.
+func TestStayedLong(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	cases := []struct {
+		hours float64
+		want  string
+	}{
+		{1.4, ""},
+		{23.9, ""},
+		{24, ", connected for a day"},
+		{278, ", connected 11 days"},
+	}
+	for _, c := range cases {
+		start := now.Add(-time.Duration(c.hours * float64(time.Hour))).Unix()
+		if got := stayedLong(start, now); got != c.want {
+			t.Errorf("%.1f h: %q, want %q", c.hours, got, c.want)
+		}
+	}
+	if got := stayedLong(0, now); got != "" {
+		t.Errorf("no conntime: %q", got)
 	}
 }
