@@ -485,6 +485,7 @@
           const td = document.createElement("td");
           td.className = c;
           td.textContent = v;
+          if (c === "miss" && v) td.title = v;
           tr.appendChild(td);
         }
         t.appendChild(tr);

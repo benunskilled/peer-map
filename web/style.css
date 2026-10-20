@@ -132,7 +132,10 @@ body {
 .rt-list tr:last-child td { border-bottom: 0; }
 .rt-list .n { font-weight: 600; color: var(--text); white-space: nowrap; }
 .rt-list .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
-.rt-list .miss { color: var(--muted); }
+/* One line on a phone too: a long provider ("Hesse · Amazon.com, Inc.") is cut
+   with … and kept whole in the tooltip. max-width: 0 lets the cell take the
+   rest of the row instead of widening the table. */
+.rt-list .miss { color: var(--muted); max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rt-list tr.pool .n, .rt-list tr.own .n, .rt-list tr.own .num { color: var(--accent); }
 .block-route .note { margin: 0; font-size: 13px; color: var(--muted); }
 .block-card .b-height { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
