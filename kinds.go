@@ -59,10 +59,11 @@ var kindRules = []struct {
 	// Only the brackets count: outside them "pool" is also in "mempool".
 	// "mempool" inside the brackets does not count: "(mempool.guide)" is a
 	// node's own label, not a pool (seen on the node this was written for).
-	// /ckp2p:/ used to be here as "ckpool's relay", but nothing named ckp2p
-	// exists in ckpool's source and nothing public explains it, so it is no
-	// longer called a pool; see aboutRules for what was actually observed.
-	{"Pool node", regexp.MustCompile(`(?i)ckpool|\([^)]*pool[^)]*\)`), true},
+	// /CKCoinD:/ is ckcoind, ckolivas' mining fork of Core (UA_NAME in its
+	// clientversion.cpp). /ckp2p:/ is ckpool's own block relay: ckp2p.c on
+	// the p2pcrawler and nodrop branches of github.com/ckolivas/ckpool (not
+	// on master, which is why it was once taken for someone else's).
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own.
@@ -74,7 +75,7 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -140,7 +141,9 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
-	{regexp.MustCompile(`(?i)ckp2p`), "Fetches blocks only, never transactions, from data centres; the operator is unknown and it is probably not part of ckpool"},
+	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool"},
+	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder"},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
@@ -271,8 +274,57 @@ func anachronism(subver string, services []string) string {
 			}
 		}
 	}
+	// Core 0.16 and later always offer NETWORK_LIMITED, pruned or not, so a
+	// newer Core offering something but not that is not Core. Seen on one
+	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
+	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
+	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
+		return "unknown software - it lacks the pruned-node service, which Core has always offered since 0.16"
+	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
+	}
+	return ""
+}
+
+// coreRelease reads a user agent that names a real Core release number:
+// 0.x up to 0.21, then 22 and later. "/Satoshi:1.14.5(2x)/" (btc1) and other
+// numbers Core never used return ok == false and are left alone.
+func coreRelease(subver string) (maj, mnr int, ok bool) {
+	m := claimedCore.FindStringSubmatch(subver)
+	if m == nil {
+		return 0, 0, false
+	}
+	maj, _ = strconv.Atoi(m[1])
+	mnr, _ = strconv.Atoi(m[2])
+	return maj, mnr, maj == 0 || maj >= 22
+}
+
+func coreAtLeast(subver string, major, minor int) bool {
+	maj, mnr, ok := coreRelease(subver)
+	return ok && (maj > major || maj == major && mnr >= minor)
+}
+
+// protocolMismatch is a peer whose protocol version does not match the Core
+// release it names: Core 0.21 to 31 send 70016 (later ones 70017 or more),
+// every release before sends 70015 or less. Development builds (x.99) are
+// left alone: "0.20.99" was already 0.21 under way. On one node, in four
+// days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
+// "/Satoshi:31.0.0/" fleet with 70015 - and no real Core node either way.
+// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
+var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
+
+func protocolMismatch(subver string, version int) string {
+	maj, mnr, ok := coreRelease(subver)
+	if !ok || version == 0 || devBuild.MatchString(subver) {
+		return ""
+	}
+	newer := maj >= 22 || mnr >= 21
+	switch {
+	case newer && version < 70016:
+		return fmt.Sprintf("unknown software - it speaks protocol %d, older than any Core since 0.21", version)
+	case !newer && version >= 70016:
+		return fmt.Sprintf("unknown software - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
 	}
 	return ""
 }
