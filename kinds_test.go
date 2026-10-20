@@ -203,9 +203,11 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
 		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "without the pruned-node service"},
+		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks the pruned-node service"},
 		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
+		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks the pruned-node service"},
+		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks the pruned-node service"},
 		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
 		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
 	}

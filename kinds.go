@@ -275,10 +275,11 @@ func anachronism(subver string, services []string) string {
 		}
 	}
 	// Core 0.16 and later always offer NETWORK_LIMITED, pruned or not, so a
-	// newer Core offering NETWORK without it is not Core. Seen on one node as
-	// a "/Satoshi:31.0.0/" fleet that otherwise offered nothing.
-	if has["NETWORK"] && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
-		return "unknown software - it offers full blocks without the pruned-node service, which Core has always added since 0.16"
+	// newer Core offering something but not that is not Core. Seen on one
+	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
+	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
+	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
+		return "unknown software - it lacks the pruned-node service, which Core has always offered since 0.16"
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
