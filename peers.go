@@ -303,7 +303,11 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
 			}
 		}
-		if p.Kind == noAgentKind {
+		// Core reports version 0 until the peer's version message arrives:
+		// with a version, the peer did introduce itself, only without a name.
+		if p.Kind == noAgentKind && r.Version > 0 {
+			p.About = "Introduced itself but left its name empty: software that keeps quiet about what it is"
+		} else if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
