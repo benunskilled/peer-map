@@ -123,6 +123,27 @@ func offersWhatNoWalletCan(services []string) bool {
 	return false
 }
 
+// bitcoinjTooNew is a peer naming Bitcoin Wallet (Schildbach's Android app)
+// that speaks a newer protocol than its bitcoinj ever has: bitcoinj's version
+// message sends a constant, 70001 up to 0.14, 70012 in 0.15 and 70013 from
+// 0.16 to 0.17.1 and master (ProtocolVersion CURRENT). The app has never set
+// its own in fifteen years of history. Only bitcoinj up to 0.17 counts, so a
+// later bitcoinj that raises the number is not taken for a fake, and only the
+// app: another program on bitcoinj could change the number itself. On the node
+// this was written for, in four days: every bitcoinj offering nothing sent
+// 70013 or 70001, except two sessions of "Bitcoin Wallet 9.26" with 70016
+// from one university address, connected for eleven days without asking for
+// a single header.
+const bitcoinjMaxProtocol = 70013
+
+var walletOnOldBitcoinj = regexp.MustCompile(`(?i)^/bitcoinj:0\.(1[0-7]|[0-9])[./][^/]*/Bitcoin Wallet:`)
+
+func bitcoinjTooNew(subver string, version int) bool {
+	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
+}
+
+const bitcoinjTooNewAbout = "posing as a wallet but acting unlike one - it speaks a newer protocol than any version of this wallet ever did"
+
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already
 // covers the rest.
