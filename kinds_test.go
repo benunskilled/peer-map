@@ -382,8 +382,8 @@ func TestBitcoinjTooNew(t *testing.T) {
 		kind    string
 		about   string
 	}{
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: a fake - protocol too new for this wallet"},
-		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: a fake"},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: a fake wallet - speaks a newer protocol than this wallet ever did"},
+		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: a fake wallet"},
 		// Another program on bitcoinj could set its own number, a later
 		// bitcoinj could raise it: both are left alone.
 		{"/bitcoinj:0.16/", 70016, "Wallet", ""},
@@ -435,8 +435,8 @@ func TestStayedLong(t *testing.T) {
 	}{
 		{1.4, ""},
 		{23.9, ""},
-		{24, ", connected for a day"},
-		{278, ", connected 11 days"},
+		{24, ", and has stayed connected for a day"},
+		{278, ", and has stayed connected for 11 days"},
 	}
 	for _, c := range cases {
 		start := now.Add(-time.Duration(c.hours * float64(time.Hour))).Unix()
