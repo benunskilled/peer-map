@@ -4,7 +4,7 @@ The release notes of every Peer Map version published on GitHub, newest first, a
 
 ## 2.0.2 – 2026-10-20
 
-ckp2p is a pool node again: it is ckpool's block relay. ckcoind is listed as a pool node and dnsseed-rust as a crawler. Disguised now also catches peers whose protocol version doesn't match the Core release they name, which finds LinkingLion outside its known address ranges too, and Core peers since 0.16 that lack the pruned-node service.
+ckp2p is a pool node again: it is ckpool's block relay. ckcoind is listed as a pool node and dnsseed-rust as a crawler. Disguised now also catches peers whose protocol version doesn't match the Core release they name, which finds LinkingLion outside its known address ranges too, and Core peers since 0.16 that lack the pruned-node service. Built with Go 1.27.3.
 
 ## 2.0.1 – 2026-10-18
 
