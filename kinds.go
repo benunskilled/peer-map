@@ -140,7 +140,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
-	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, the block relay of ckpool (Con Kolivas): fetches blocks only, never transactions"},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
