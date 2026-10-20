@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // What kind of software a peer runs, read off the user agent it sent in its
@@ -142,7 +143,25 @@ func bitcoinjTooNew(subver string, version int) bool {
 	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
 }
 
-const bitcoinjTooNewAbout = "posing as a wallet but acting unlike one - it speaks a newer protocol than any version of this wallet ever did"
+const bitcoinjTooNewAbout = "a fake - protocol too new for this wallet"
+
+// stayedLong adds how long the peer has been connected once that is a day or
+// more: the real wallet, a phone app, stayed 1.4 hours at most on the node
+// this was written for, the fake one eleven days. Only said alongside the
+// protocol, which is the proof - a phone left open for days is possible.
+func stayedLong(connTime int64, now time.Time) string {
+	if connTime <= 0 {
+		return ""
+	}
+	days := int(now.Sub(time.Unix(connTime, 0)).Hours() / 24)
+	switch {
+	case days < 1:
+		return ""
+	case days == 1:
+		return ", connected for a day"
+	}
+	return fmt.Sprintf(", connected %d days", days)
+}
 
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already

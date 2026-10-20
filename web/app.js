@@ -1110,7 +1110,7 @@
     "Node (Knots)": "its user agent says Knots",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
     "Other": "its user agent matches none of the known kinds",
-    "No user agent": "it has not sent a user agent - usually a port check, or a connection still starting",
+    "No user agent": "it has sent no user agent, or an empty one - usually a port check, a connection still starting, or a tool keeping quiet",
     "Node (btcd)": "its user agent says btcd",
     "Node (libbitcoin)": "its user agent says libbitcoin",
     "Node (bcoin)": "its user agent says bcoin",
