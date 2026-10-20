@@ -167,6 +167,13 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
+	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
+	// hands over one of its own transactions and leaves, introducing itself
+	// with this fixed name and no services so nobody can tell which node sent
+	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
+	// node this was written for came from a Tor exit, v2, offering nothing.
+	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving"},
+	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},

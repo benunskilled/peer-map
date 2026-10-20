@@ -402,3 +402,25 @@ func TestBitcoinjTooNew(t *testing.T) {
 		}
 	}
 }
+
+// Core's private broadcast and python-bitcoinlib say what they are; a peer
+// that introduced itself without a name is told apart from one still silent.
+func TestOtherAbouts(t *testing.T) {
+	cases := []struct {
+		subver  string
+		version int
+		about   string
+	}{
+		{"/pynode:0.0.1/", 70016, "Probably Bitcoin Core handing over a transaction privately"},
+		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
+		{"", 70016, "Introduced itself but left its name empty"},
+		{"", 0, "Has not said what it is"},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, Version: c.version, ServicesNames: []string{}}})[0]
+		if !strings.HasPrefix(got.About, c.about) {
+			t.Errorf("%q %d: about %q, want %q", c.subver, c.version, got.About, c.about)
+		}
+	}
+}
