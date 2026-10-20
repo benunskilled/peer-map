@@ -29,7 +29,10 @@ type rawPeer struct {
 	// offers nothing" are different answers and must not collapse into one.
 	ServicesNames []string `json:"servicesnames"`
 	RelayTxes     *bool    `json:"relaytxes"`
-	SyncedHeaders *int64   `json:"synced_headers"`
+	// The protocol version from the peer's version message (Core 0.21 and
+	// later send 70016). Zero when Core did not report it.
+	Version       int    `json:"version"`
+	SyncedHeaders *int64 `json:"synced_headers"`
 	// The address this peer sees us under. Read only to place this node on
 	// the map (see homeOf); never passed on.
 	AddrLocal string `json:"addrlocal"`
@@ -286,6 +289,8 @@ func convert(raw []rawPeer) []Peer {
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:
 			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+			} else if why := protocolMismatch(r.Subver, r.Version); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
