@@ -712,8 +712,9 @@
     const mode = state.paused ? "paused" : `every ${d.interval}s while open`;
     // Quietly, in the same line: how many of them are only looking, or
     // pretending. On the node this was written for, most of them.
-    // LinkingLion is counted on its own below, not here as well.
-    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind) && !p.linking_lion).length;
+    // LinkingLion is disguised too, so it is counted here and named as a part
+    // of it below: "13 disguised, 5 LinkingLion" read as if they were apart.
+    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind) || p.linking_lion).length;
     const of = lookers ? `, ${lookers} disguised or crawling` : "";
     // LinkingLion named on its own, with what it is a hover away: most people
     // have never heard the name, and it is the one entity here with a record.
@@ -721,7 +722,7 @@
     const el = $("status");
     el.textContent = `${d.peers.length} peers${of}`;
     if (lions) {
-      el.append(", ");
+      el.append(", including ");
       const a = document.createElement("a");
       a.href = "https://b10c.me/observations/06-linkinglion/";
       a.target = "_blank";
