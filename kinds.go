@@ -143,7 +143,7 @@ func bitcoinjTooNew(subver string, version int) bool {
 	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
 }
 
-const bitcoinjTooNewAbout = "a fake - protocol too new for this wallet"
+const bitcoinjTooNewAbout = "a fake wallet - speaks a newer protocol than this wallet ever did"
 
 // stayedLong adds how long the peer has been connected once that is a day or
 // more: the real wallet, a phone app, stayed 1.4 hours at most on the node
@@ -158,9 +158,9 @@ func stayedLong(connTime int64, now time.Time) string {
 	case days < 1:
 		return ""
 	case days == 1:
-		return ", connected for a day"
+		return ", and has stayed connected for a day"
 	}
-	return fmt.Sprintf(", connected %d days", days)
+	return fmt.Sprintf(", and has stayed connected for %d days", days)
 }
 
 // What a piece of software is, in a sentence, for the peers somebody is
