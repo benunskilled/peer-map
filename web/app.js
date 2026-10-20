@@ -703,35 +703,20 @@
     if (state.data.sibling) a.href = siblingURL(null);
   }
 
-  const LOOKERS = new Set(["Disguised", "Crawler", "Research scanner"]);
-  const LION_TITLE = "LinkingLion connects to many nodes and may link transactions to their IP addresses. Tracked by 0xB10C – click for details.";
+  // Nodes are what passes blocks on (every "Node (...)" kind and pool nodes),
+  // disguised is everything pretending, LinkingLion included; the rest -
+  // wallets, crawlers, indexers, unknown - are "others", so the three add up.
+  const isNode = (p) => p.kind.startsWith("Node (") || p.kind === "Pool node";
   function renderStatus() {
     const d = state.data;
     if (!d) return;
     const since = d.fetched_at ? ago(Date.now() / 1000 - d.fetched_at) + " ago" : "never";
     const mode = state.paused ? "paused" : `every ${d.interval}s while open`;
-    // Quietly, in the same line: how many of them are only looking, or
-    // pretending. On the node this was written for, most of them.
-    // LinkingLion is disguised too, so it is counted here and named as a part
-    // of it below: "13 disguised, 5 LinkingLion" read as if they were apart.
-    const lookers = d.peers.filter((p) => LOOKERS.has(p.kind) || p.linking_lion).length;
-    const of = lookers ? `, ${lookers} disguised or crawling` : "";
-    // LinkingLion named on its own, with what it is a hover away: most people
-    // have never heard the name, and it is the one entity here with a record.
-    const lions = d.peers.filter((p) => p.linking_lion).length;
+    const disguised = d.peers.filter((p) => p.kind === "Disguised" || p.linking_lion).length;
+    const nodes = d.peers.filter((p) => !(p.kind === "Disguised" || p.linking_lion) && isNode(p)).length;
+    const others = d.peers.length - nodes - disguised;
     const el = $("status");
-    el.textContent = `${d.peers.length} peers${of}`;
-    if (lions) {
-      el.append(", including ");
-      const a = document.createElement("a");
-      a.href = "https://b10c.me/observations/06-linkinglion/";
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.className = "lion";
-      a.textContent = `${lions} LinkingLion`;
-      a.title = LION_TITLE;
-      el.append(a);
-    }
+    el.textContent = `${d.peers.length} peers: ${nodes} nodes, ${disguised} disguised, ${others} others`;
     el.append(` · updated ${since} · ${mode}`);
   }
 
