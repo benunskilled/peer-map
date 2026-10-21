@@ -143,7 +143,7 @@ func bitcoinjTooNew(subver string, version int) bool {
 	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
 }
 
-const bitcoinjTooNewAbout = "a fake wallet - speaks a newer protocol than this wallet ever did"
+const bitcoinjTooNewAbout = "not a wallet - speaks a newer protocol than this wallet ever did"
 
 // stayedLong adds how long the peer has been connected once that is a day or
 // more: the real wallet, a phone app, stayed 1.4 hours at most on the node
