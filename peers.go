@@ -3,6 +3,7 @@ package main
 import (
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
@@ -285,6 +286,13 @@ func convert(raw []rawPeer) []Peer {
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
+		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):
+			claim := claimOf(r.Subver)
+			if p.About != "" {
+				claim, _, _ = strings.Cut(p.About, ",")
+				claim = "the wallet " + claim
+			}
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:
@@ -296,7 +304,11 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
 			}
 		}
-		if p.Kind == noAgentKind {
+		// Core reports version 0 until the peer's version message arrives:
+		// with a version, the peer did introduce itself, only without a name.
+		if p.Kind == noAgentKind && r.Version > 0 {
+			p.About = "Introduced itself but left its name empty: software that keeps quiet about what it is"
+		} else if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
