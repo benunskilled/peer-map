@@ -706,6 +706,8 @@
   // Nodes are what passes blocks on (every "Node (...)" kind and pool nodes),
   // disguised is everything pretending, LinkingLion included; the rest -
   // wallets, crawlers, indexers, unknown - are "others", so the three add up.
+  // Named once, in the tooltip and the Disguised explanation, not on every card.
+  const LION_CREDIT = "Tracked by 0xB10C, b10c.me";
   const isNode = (p) => p.kind.startsWith("Node (") || p.kind === "Pool node";
   function renderStatus() {
     const d = state.data;
@@ -1092,7 +1094,7 @@
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
-    "Disguised": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), a version offering what that version never had (v2 before Core 26), lacking what it must always offer, or speaking a protocol it never spoke, Core offering nothing, a wallet offering blocks or speaking a newer protocol than it can, or LinkingLion under a borrowed name",
+    "Disguised": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), a version offering what that version never had (v2 before Core 26), lacking what it must always offer, or speaking a protocol it never spoke, Core offering nothing, a wallet offering blocks or speaking a newer protocol than it can, or LinkingLion under a borrowed name (tracked by 0xB10C, b10c.me)",
     "Node (Knots)": "its user agent says Knots",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
     "Other": "its user agent matches none of the known kinds",
@@ -1515,7 +1517,7 @@
           pill.append(ico, " ");
         }
         pill.append(label);
-        fit(pill, label, [p.about, neverNote(p)].filter(Boolean).join("\n"));
+        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
         td.appendChild(pill);
         const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
         if (under) td.appendChild(fit(line("sub ua", under), under));
