@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestKindOf(t *testing.T) {
@@ -369,5 +370,81 @@ func TestProtocolMismatch(t *testing.T) {
 		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
 			t.Errorf("%s %d: got %q / %q, want %q containing %q", c.subver, c.version, got.Kind, got.About, c.kind, c.says)
 		}
+	}
+}
+
+// bitcoinj has never sent more than 70013, so a wallet name on 70016 is not
+// that wallet - even when it offers nothing, like the real one.
+func TestBitcoinjTooNew(t *testing.T) {
+	cases := []struct {
+		subver  string
+		version int
+		kind    string
+		about   string
+	}{
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: a fake wallet - speaks a newer protocol than this wallet ever did"},
+		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: a fake wallet"},
+		// Another program on bitcoinj could set its own number, a later
+		// bitcoinj could raise it: both are left alone.
+		{"/bitcoinj:0.16/", 70016, "Wallet", ""},
+		{"/bitcoinj:0.18.0/Bitcoin Wallet:12.0/", 70016, "Wallet", "Schildbach"},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70013, "Wallet", "Schildbach"},
+		{"/bitcoinj:0.14.6/", 70001, "Wallet", ""},
+		// A version Core did not report says nothing either way.
+		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
+		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
+		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Light client", "Neutrino"},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, Version: c.version, ServicesNames: []string{}}})[0]
+		if got.Kind != c.kind || !strings.Contains(got.About, c.about) {
+			t.Errorf("%s %d: %q / %q, want %q / %q", c.subver, c.version, got.Kind, got.About, c.kind, c.about)
+		}
+	}
+}
+
+// Core's private broadcast and python-bitcoinlib say what they are; a peer
+// that introduced itself without a name is told apart from one still silent.
+func TestOtherAbouts(t *testing.T) {
+	cases := []struct {
+		subver  string
+		version int
+		about   string
+	}{
+		{"/pynode:0.0.1/", 70016, "Probably Bitcoin Core handing over a transaction privately"},
+		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
+		{"", 70016, "Introduced itself but left its name empty"},
+		{"", 0, "Has not said what it is"},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, Version: c.version, ServicesNames: []string{}}})[0]
+		if !strings.HasPrefix(got.About, c.about) {
+			t.Errorf("%q %d: about %q, want %q", c.subver, c.version, got.About, c.about)
+		}
+	}
+}
+
+// The time connected is added once it is a day or more, never on its own.
+func TestStayedLong(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	cases := []struct {
+		hours float64
+		want  string
+	}{
+		{1.4, ""},
+		{23.9, ""},
+		{24, ", and has stayed connected for a day"},
+		{278, ", and has stayed connected for 11 days"},
+	}
+	for _, c := range cases {
+		start := now.Add(-time.Duration(c.hours * float64(time.Hour))).Unix()
+		if got := stayedLong(start, now); got != c.want {
+			t.Errorf("%.1f h: %q, want %q", c.hours, got, c.want)
+		}
+	}
+	if got := stayedLong(0, now); got != "" {
+		t.Errorf("no conntime: %q", got)
 	}
 }

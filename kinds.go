@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // What kind of software a peer runs, read off the user agent it sent in its
@@ -123,6 +124,45 @@ func offersWhatNoWalletCan(services []string) bool {
 	return false
 }
 
+// bitcoinjTooNew is a peer naming Bitcoin Wallet (Schildbach's Android app)
+// that speaks a newer protocol than its bitcoinj ever has: bitcoinj's version
+// message sends a constant, 70001 up to 0.14, 70012 in 0.15 and 70013 from
+// 0.16 to 0.17.1 and master (ProtocolVersion CURRENT). The app has never set
+// its own in fifteen years of history. Only bitcoinj up to 0.17 counts, so a
+// later bitcoinj that raises the number is not taken for a fake, and only the
+// app: another program on bitcoinj could change the number itself. On the node
+// this was written for, in four days: every bitcoinj offering nothing sent
+// 70013 or 70001, except two sessions of "Bitcoin Wallet 9.26" with 70016
+// from one university address, connected for eleven days without asking for
+// a single header.
+const bitcoinjMaxProtocol = 70013
+
+var walletOnOldBitcoinj = regexp.MustCompile(`(?i)^/bitcoinj:0\.(1[0-7]|[0-9])[./][^/]*/Bitcoin Wallet:`)
+
+func bitcoinjTooNew(subver string, version int) bool {
+	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
+}
+
+const bitcoinjTooNewAbout = "a fake wallet - speaks a newer protocol than this wallet ever did"
+
+// stayedLong adds how long the peer has been connected once that is a day or
+// more: the real wallet, a phone app, stayed 1.4 hours at most on the node
+// this was written for, the fake one eleven days. Only said alongside the
+// protocol, which is the proof - a phone left open for days is possible.
+func stayedLong(connTime int64, now time.Time) string {
+	if connTime <= 0 {
+		return ""
+	}
+	days := int(now.Sub(time.Unix(connTime, 0)).Hours() / 24)
+	switch {
+	case days < 1:
+		return ""
+	case days == 1:
+		return ", and has stayed connected for a day"
+	}
+	return fmt.Sprintf(", and has stayed connected for %d days", days)
+}
+
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already
 // covers the rest.
@@ -146,6 +186,13 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
+	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
+	// hands over one of its own transactions and leaves, introducing itself
+	// with this fixed name and no services so nobody can tell which node sent
+	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
+	// node this was written for came from a Tor exit, v2, offering nothing.
+	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving"},
+	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},
@@ -230,7 +277,9 @@ func isLinkingLion(addr string) bool {
 	return false
 }
 
-const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses (tracked by 0xB10C, b10c.me)"
+// The credit is not repeated on every card: the hover tooltip and the Disguised
+// explanation above the list carry it (LION_CREDIT in web/app.js).
+const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
 
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
