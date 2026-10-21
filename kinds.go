@@ -404,6 +404,57 @@ func offersNothingAsCore(subver string, services []string) bool {
 
 const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
 
+// What a peer does, not what it says. Core pings every two minutes
+// (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
+// connection (m_getaddr_sent); a peer naming Core and doing either far more
+// often runs other code. bitcoinj pings every two seconds, crawlers ask again
+// and again. The limits leave a wide margin: a ping every 10 seconds, three
+// requests.
+const (
+	behaviourMinAge = 10 * 60 // seconds connected before a ping rate means anything
+	pingFastSeconds = 10
+	getaddrTooMany  = 3
+)
+
+// msgCount turns Core's bytes per message type back into a count, for
+// messages that always have the same size. Core adds the 24-byte header on v1
+// and, on v2, the one-byte message id and BIP324's 20 bytes of length and tag
+// (m_raw_message_size in net.cpp). Anything else, "detecting" included, is
+// not counted.
+func msgCount(bytes int64, payload int64, transport string) int64 {
+	switch transport {
+	case "v1":
+		return bytes / (payload + 24)
+	case "v2":
+		return bytes / (payload + 21)
+	}
+	return 0
+}
+
+// behaviourAbout is why a peer naming Core is not Core, judged by what it has
+// sent, or "" when its behaviour fits. recv is getpeerinfo's bytesrecv_per_msg.
+func behaviourAbout(subver, transport string, recv map[string]int64, connTime int64, now time.Time) string {
+	if !claimedCore.MatchString(subver) || recv == nil {
+		return ""
+	}
+	if n := msgCount(recv["getaddr"], 0, transport); n >= getaddrTooMany {
+		return fmt.Sprintf("a crawler - it asked for addresses %d times, Core asks once", n)
+	}
+	age := now.Unix() - connTime
+	if connTime <= 0 || age < behaviourMinAge {
+		return ""
+	}
+	if n := msgCount(recv["ping"], 8, transport); n > 0 && age/n < pingFastSeconds {
+		every := age / n
+		unit := "seconds"
+		if every <= 1 {
+			every, unit = 1, "second"
+		}
+		return fmt.Sprintf("not Bitcoin Core - it pings every %d %s, Core every 2 minutes", every, unit)
+	}
+	return ""
+}
+
 // claimOf is the software a user agent names, readably: "/bcoin:v1.0.0/" is
 // "bcoin v1.0.0", Core and Knots are spelled out.
 func claimOf(subver string) string {
