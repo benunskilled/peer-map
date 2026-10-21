@@ -34,6 +34,9 @@ type rawPeer struct {
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
 	SyncedHeaders *int64 `json:"synced_headers"`
+	// Bytes received per message type. Read only to count pings and address
+	// requests (see behaviourAbout); nil when Core did not report it.
+	BytesRecvPerMsg map[string]int64 `json:"bytesrecv_per_msg"`
 	// The address this peer sees us under. Read only to place this node on
 	// the map (see homeOf); never passed on.
 	AddrLocal string `json:"addrlocal"`
@@ -302,6 +305,8 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
+			} else if why := behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()); why != "" {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
