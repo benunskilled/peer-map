@@ -416,6 +416,11 @@ func TestOtherAbouts(t *testing.T) {
 		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
 		{"", 70016, "Introduced itself but left its name empty"},
 		{"", 0, "Has not said what it is"},
+		{"/bitcoinj:0.17/", 70013, "bitcoinj, a Java library"},
+		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
+		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
+		{"/GlobalNodeMap:2.1/", 70016, "Probably a node map or counter"},
+		{"/reset-header-agent:1.0/", 70016, "Software with a name we don't recognise"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -446,5 +451,24 @@ func TestStayedLong(t *testing.T) {
 	}
 	if got := stayedLong(0, now); got != "" {
 		t.Errorf("no conntime: %q", got)
+	}
+}
+
+// A name nothing knows still gets a line: a full node's if it offers blocks.
+func TestOtherAboutOffersBlocks(t *testing.T) {
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/GrayersDad:1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS"}}})[0]
+	if got.Kind != "Other" || got.About != "Probably a full node under a name its operator chose" {
+		t.Errorf("kind %q about %q", got.Kind, got.About)
+	}
+}
+
+// bitcoinj without an app name, offering blocks, claims bitcoinj - not Core.
+func TestPlainBitcoinjOfferingBlocks(t *testing.T) {
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/bitcoinj:0.14.5/", Version: 70016, ServicesNames: []string{"NETWORK", "P2P_V2"}}})[0]
+	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
+	if got.Kind != "Disguised" || got.About != want {
+		t.Errorf("kind %q about %q", got.Kind, got.About)
 	}
 }

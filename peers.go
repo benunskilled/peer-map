@@ -304,6 +304,9 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
 			}
 		}
+		if p.Kind == "Other" && p.About == "" {
+			p.About = otherAbout(r.ServicesNames)
+		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
 		if p.Kind == noAgentKind && r.Version > 0 {
