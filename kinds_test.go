@@ -472,3 +472,59 @@ func TestPlainBitcoinjOfferingBlocks(t *testing.T) {
 		t.Errorf("kind %q about %q", got.Kind, got.About)
 	}
 }
+
+func TestBehaviourAbout(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	hour := now.Unix() - 3600
+	cases := []struct {
+		name      string
+		subver    string
+		transport string
+		recv      map[string]int64
+		connTime  int64
+		want      string
+	}{
+		{"bitcoinj's ping under Core's name", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 1800}, hour,
+			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
+		{"the same over v2", "/Satoshi:31.1.0/", "v2", map[string]int64{"ping": 29 * 1800}, hour,
+			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
+		{"faster than a second is said as one", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 7200}, hour,
+			"not Bitcoin Core - it pings every 1 second, Core every 2 minutes"},
+		{"Core's own two minutes", "/Satoshi:31.1.0/", "v2", map[string]int64{"ping": 29 * 31}, hour, ""},
+		{"a ping every 15 seconds is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 240}, hour, ""},
+		{"too young for a rate", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 30}, now.Unix() - 60, ""},
+		{"a crawler asking again and again", "/Satoshi:0.19.0.1/", "v1", map[string]int64{"getaddr": 24 * 58}, now.Unix() - 60,
+			"a crawler - it asked for addresses 58 times, Core asks once"},
+		{"the same over v2", "/Satoshi:30.0.0/", "v2", map[string]int64{"getaddr": 21 * 3}, hour,
+			"a crawler - it asked for addresses 3 times, Core asks once"},
+		{"Core asks once", "/Satoshi:31.1.0/", "v2", map[string]int64{"getaddr": 21}, hour, ""},
+		{"twice is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"getaddr": 48}, hour, ""},
+		{"Knots runs Core's code", "/Satoshi:29.3.0/Knots:20260507/", "v1", map[string]int64{"ping": 32 * 1800}, hour,
+			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
+		{"bitcoinj under its own name pings as it likes", "/bitcoinj:0.17/", "v1", map[string]int64{"ping": 32 * 1800}, hour, ""},
+		{"a transport not settled yet counts nothing", "/Satoshi:31.1.0/", "detecting", map[string]int64{"ping": 32 * 1800, "getaddr": 24 * 9}, hour, ""},
+		{"no bytes reported", "/Satoshi:31.1.0/", "v1", nil, hour, ""},
+	}
+	for _, c := range cases {
+		if got := behaviourAbout(c.subver, c.transport, c.recv, c.connTime, now); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestBehaviourMakesCoreDisguised(t *testing.T) {
+	conn := time.Now().Unix() - 3600
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
+		Transport: "v1", ConnTime: conn, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"},
+		BytesRecvPerMsg: map[string]int64{"ping": 32 * 1800}}})[0]
+	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 31.1.0\nProbably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes" {
+		t.Errorf("got %q / %q", got.Kind, got.About)
+	}
+	// The same peer pinging like Core stays a node.
+	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
+		Transport: "v1", ConnTime: conn, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"},
+		BytesRecvPerMsg: map[string]int64{"ping": 32 * 31, "getaddr": 24}}})[0]
+	if got.Kind != "Node (Core)" {
+		t.Errorf("an honest Core became %q: %q", got.Kind, got.About)
+	}
+}
