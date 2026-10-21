@@ -382,8 +382,8 @@ func TestBitcoinjTooNew(t *testing.T) {
 		kind    string
 		about   string
 	}{
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: a fake wallet - speaks a newer protocol than this wallet ever did"},
-		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: a fake wallet"},
+		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: not a wallet - speaks a newer protocol than this wallet ever did"},
+		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: not a wallet"},
 		// Another program on bitcoinj could set its own number, a later
 		// bitcoinj could raise it: both are left alone.
 		{"/bitcoinj:0.16/", 70016, "Wallet", ""},
