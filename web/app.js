@@ -1501,7 +1501,7 @@
         // that never can, red for a disguise or LinkingLion even when it could.
         // LinkingLion has its own pill whatever software it claims; the
         // software stays in the line under it.
-        pill.className = "kind " + (p.linking_lion ? "lion" : p.no_relay ? "never" : p.kind === "Disguised" ? "disg" : "first");
+        pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // Never-first peers: the kind and the fact in the pill; what Core saw
         // (no services, chain unknown) moves to the line under it, so the
         // pill is never cut before the words that matter.
