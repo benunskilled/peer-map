@@ -277,7 +277,9 @@ func isLinkingLion(addr string) bool {
 	return false
 }
 
-const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses (tracked by 0xB10C, b10c.me)"
+// The credit is not repeated on every card: the hover tooltip and the Disguised
+// explanation above the list carry it (LION_CREDIT in web/app.js).
+const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
 
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
