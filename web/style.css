@@ -416,7 +416,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .who b, .op-name { display: block; font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .op-name { font-weight: 400; max-width: 230px; }
 .peers small { display: block; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
-.peers small.sub { color: var(--faint); }
+/* The lines under a name tell peers apart (country, AS, software): readable, not faint. */
+.peers small.sub { color: var(--muted); }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
 .peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
