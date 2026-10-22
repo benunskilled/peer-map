@@ -1520,8 +1520,20 @@
         pill.append(label);
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
         td.appendChild(pill);
-        const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
-        if (under) td.appendChild(fit(line("sub ua", under), under));
+        // What Core saw stays grey; the name the peer sends is bright, it is
+        // what tells one "Other" from the next.
+        const seen = p.no_relay || p.linking_lion ? flags : "";
+        const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
+        if (under) {
+          const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
+          if (p.subver) {
+            const name = document.createElement("span");
+            name.className = "ua-name";
+            name.textContent = p.subver;
+            e.append(name);
+          }
+          td.appendChild(fit(e, under));
+        }
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then.
         if (state.kind && p.about) {

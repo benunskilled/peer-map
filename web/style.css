@@ -427,8 +427,9 @@ a.addr-txt:hover { color: var(--accent); }
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }
 .peers .kind.never { margin-left: 6px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
-/* The software a peer names tells peers apart: as bright as the country under the place. */
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; color: var(--muted); }
+/* The software a peer names tells peers apart: as bright as the operator. */
+.peers .ua-name { color: var(--text); }
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
 /* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab. */
 .peers .net.type { color: var(--outbound); background: rgba(26,158,143,.15); border-color: transparent; }
