@@ -10,7 +10,7 @@ Your live peers on a world map: their location, the provider that hosts them, an
 
 ## Not every peer is who it claims to be
 
-Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims.
+Some peers pretend to be Bitcoin Core or a wallet, but what Core observes, or how they behave, doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims.
 
 ## Explore your node's neighbourhood
 
