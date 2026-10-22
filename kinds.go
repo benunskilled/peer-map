@@ -419,15 +419,20 @@ const (
 
 // msgCount turns Core's bytes per message type back into a count, for
 // messages that always have the same size. Core adds the 24-byte header on v1
-// and, on v2, the one-byte message id and BIP324's 20 bytes of length and tag
-// (m_raw_message_size in net.cpp). Anything else, "detecting" included, is
-// not counted.
-func msgCount(bytes int64, payload int64, transport string) int64 {
+// and, on v2, the message type plus BIP324's 20 bytes of length and tag
+// (m_raw_message_size in net.cpp). The type is one byte for messages with a
+// BIP324 short id, such as ping, and 13 bytes for those without, such as
+// getaddr (V2_MESSAGE_IDS in net.cpp). Anything else, "detecting" included,
+// is not counted.
+func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 {
 	switch transport {
 	case "v1":
 		return bytes / (payload + 24)
 	case "v2":
-		return bytes / (payload + 21)
+		if shortID {
+			return bytes / (payload + 1 + 20)
+		}
+		return bytes / (payload + 13 + 20)
 	}
 	return 0
 }
@@ -438,14 +443,14 @@ func behaviourAbout(subver, transport string, recv map[string]int64, connTime in
 	if !claimedCore.MatchString(subver) || recv == nil {
 		return ""
 	}
-	if n := msgCount(recv["getaddr"], 0, transport); n >= getaddrTooMany {
+	if n := msgCount(recv["getaddr"], 0, transport, false); n >= getaddrTooMany {
 		return fmt.Sprintf("a crawler - it asked for addresses %d times, Core asks once", n)
 	}
 	age := now.Unix() - connTime
 	if connTime <= 0 || age < behaviourMinAge {
 		return ""
 	}
-	if n := msgCount(recv["ping"], 8, transport); n > 0 && age/n < pingFastSeconds {
+	if n := msgCount(recv["ping"], 8, transport, true); n > 0 && age/n < pingFastSeconds {
 		every := age / n
 		unit := "seconds"
 		if every <= 1 {
