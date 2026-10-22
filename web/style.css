@@ -268,9 +268,12 @@ td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 }
 .zoom button:hover { border-color: var(--accent); }
 @media (max-width: 600px) {
-  .zoom { right: 6px; bottom: 6px; gap: 2px; }
+  /* On a phone the world is small and the buttons covered Asia and Australia:
+     the box grows by a strip under the map, and the buttons sit in it, in a row. */
+  .map-wrap { padding-bottom: 36px; }
+  .zoom { right: 6px; bottom: 4px; gap: 4px; flex-direction: row; }
   .zoom button { width: 28px; height: 28px; }
-  .map-level { left: 6px; bottom: 6px; font-size: 11px; }
+  .map-level { left: 6px; bottom: 8px; font-size: 11px; }
   .map-level-hint { display: none; }
 }
 
