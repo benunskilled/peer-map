@@ -408,11 +408,12 @@ const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core
 // (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
 // connection (m_getaddr_sent); a peer naming Core and doing either far more
 // often runs other code. bitcoinj pings every two seconds, crawlers ask again
-// and again. The limits leave a wide margin: a ping every 10 seconds, three
-// requests.
+// and again. The limits leave a wide margin: a ping every 5 seconds, three
+// requests. Not 10: a Core development build (31.99) was seen pinging every
+// 10 seconds, still Core's code.
 const (
 	behaviourMinAge = 10 * 60 // seconds connected before a ping rate means anything
-	pingFastSeconds = 10
+	pingFastSeconds = 5
 	getaddrTooMany  = 3
 )
 
