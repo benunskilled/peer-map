@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // What kind of software a peer runs, read off the user agent it sent in its
@@ -123,6 +124,45 @@ func offersWhatNoWalletCan(services []string) bool {
 	return false
 }
 
+// bitcoinjTooNew is a peer naming Bitcoin Wallet (Schildbach's Android app)
+// that speaks a newer protocol than its bitcoinj ever has: bitcoinj's version
+// message sends a constant, 70001 up to 0.14, 70012 in 0.15 and 70013 from
+// 0.16 to 0.17.1 and master (ProtocolVersion CURRENT). The app has never set
+// its own in fifteen years of history. Only bitcoinj up to 0.17 counts, so a
+// later bitcoinj that raises the number is not taken for a fake, and only the
+// app: another program on bitcoinj could change the number itself. On the node
+// this was written for, in four days: every bitcoinj offering nothing sent
+// 70013 or 70001, except two sessions of "Bitcoin Wallet 9.26" with 70016
+// from one university address, connected for eleven days without asking for
+// a single header.
+const bitcoinjMaxProtocol = 70013
+
+var walletOnOldBitcoinj = regexp.MustCompile(`(?i)^/bitcoinj:0\.(1[0-7]|[0-9])[./][^/]*/Bitcoin Wallet:`)
+
+func bitcoinjTooNew(subver string, version int) bool {
+	return walletOnOldBitcoinj.MatchString(subver) && version > bitcoinjMaxProtocol
+}
+
+const bitcoinjTooNewAbout = "not a wallet - speaks a newer protocol than this wallet ever did"
+
+// stayedLong adds how long the peer has been connected once that is a day or
+// more: the real wallet, a phone app, stayed 1.4 hours at most on the node
+// this was written for, the fake one eleven days. Only said alongside the
+// protocol, which is the proof - a phone left open for days is possible.
+func stayedLong(connTime int64, now time.Time) string {
+	if connTime <= 0 {
+		return ""
+	}
+	days := int(now.Sub(time.Unix(connTime, 0)).Hours() / 24)
+	switch {
+	case days < 1:
+		return ""
+	case days == 1:
+		return ", and has stayed connected for a day"
+	}
+	return fmt.Sprintf(", and has stayed connected for %d days", days)
+}
+
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already
 // covers the rest.
@@ -137,6 +177,9 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)multibit`), "MultiBit, a desktop wallet discontinued in 2017"},
 	{regexp.MustCompile(`(?i)bither`), "Bither, a wallet for phone and desktop"},
 	{regexp.MustCompile(`(?i)wasabi`), "Wasabi Wallet, a desktop wallet"},
+	// The library alone, without a wallet app's name after it. After the
+	// wallet rules above, which also start with bitcoinj.
+	{regexp.MustCompile(`(?i)^/bitcoinj:`), "bitcoinj, a Java library that wallets and other tools use to talk to nodes"},
 	{regexp.MustCompile(`(?i)neutrino`), "Neutrino: Lightning wallets on lnd, such as Blixt or Zeus"},
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
@@ -146,8 +189,22 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
+	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
+	// hands over one of its own transactions and leaves, introducing itself
+	// with this fixed name and no services so nobody can tell which node sent
+	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
+	// node this was written for came from a Tor exit, v2, offering nothing.
+	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving"},
+	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
+	// Seen from one netcup address, offering nothing and gone after a second;
+	// the name fits a node map, but nothing public says whose.
+	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
+	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
+	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015"},
+	// btcd's wire library with the app name after it left empty.
+	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty"},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},
 	{regexp.MustCompile(`(?i)libbitcoin`), "libbitcoin, a full node written in C++, independent of Core"},
 	{regexp.MustCompile(`(?i)/bcoin:`), "bcoin, a full node written in JavaScript"},
@@ -163,7 +220,11 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 	if v := coreVersion.FindStringSubmatch(subver); v != nil {
 		claim += " " + v[1]
 	}
-	if walletAbout != "" {
+	wallet := walletAbout != ""
+	if strings.HasPrefix(walletAbout, "bitcoinj,") {
+		// The library without an app name claims bitcoinj, not Core or a wallet.
+		claim = claimOf(subver)
+	} else if wallet {
 		claim, _, _ = strings.Cut(walletAbout, ",")
 		claim = "the wallet " + claim
 	}
@@ -174,9 +235,9 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 		v2 = v2 || s == "P2P_V2"
 	}
 	switch {
-	case walletAbout != "" && blocks:
+	case wallet && blocks:
 		guess = "a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
-	case walletAbout != "" && v2:
+	case wallet && v2:
 		guess = "a scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
 	case services != nil && len(services) == 0:
 		guess = "a crawler - it offers nothing"
@@ -230,7 +291,9 @@ func isLinkingLion(addr string) bool {
 	return false
 }
 
-const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses (tracked by 0xB10C, b10c.me)"
+// The credit is not repeated on every card: the hover tooltip and the Disguised
+// explanation above the list carry it (LION_CREDIT in web/app.js).
+const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
 
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
@@ -341,6 +404,63 @@ func offersNothingAsCore(subver string, services []string) bool {
 
 const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
 
+// What a peer does, not what it says. Core pings every two minutes
+// (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
+// connection (m_getaddr_sent); a peer naming Core and doing either far more
+// often runs other code. bitcoinj pings every two seconds, crawlers ask again
+// and again. The limits leave a wide margin: a ping every 5 seconds, three
+// requests. Not 10: a Core development build (31.99) was seen pinging every
+// 10 seconds, still Core's code.
+const (
+	behaviourMinAge = 10 * 60 // seconds connected before a ping rate means anything
+	pingFastSeconds = 5
+	getaddrTooMany  = 3
+)
+
+// msgCount turns Core's bytes per message type back into a count, for
+// messages that always have the same size. Core adds the 24-byte header on v1
+// and, on v2, the message type plus BIP324's 20 bytes of length and tag
+// (m_raw_message_size in net.cpp). The type is one byte for messages with a
+// BIP324 short id, such as ping, and 13 bytes for those without, such as
+// getaddr (V2_MESSAGE_IDS in net.cpp). Anything else, "detecting" included,
+// is not counted.
+func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 {
+	switch transport {
+	case "v1":
+		return bytes / (payload + 24)
+	case "v2":
+		if shortID {
+			return bytes / (payload + 1 + 20)
+		}
+		return bytes / (payload + 13 + 20)
+	}
+	return 0
+}
+
+// behaviourAbout is why a peer naming Core is not Core, judged by what it has
+// sent, or "" when its behaviour fits. recv is getpeerinfo's bytesrecv_per_msg.
+func behaviourAbout(subver, transport string, recv map[string]int64, connTime int64, now time.Time) string {
+	if !claimedCore.MatchString(subver) || recv == nil {
+		return ""
+	}
+	if n := msgCount(recv["getaddr"], 0, transport, false); n >= getaddrTooMany {
+		return fmt.Sprintf("a crawler - it asked for addresses %d times, Core asks once", n)
+	}
+	age := now.Unix() - connTime
+	if connTime <= 0 || age < behaviourMinAge {
+		return ""
+	}
+	if n := msgCount(recv["ping"], 8, transport, true); n > 0 && age/n < pingFastSeconds {
+		every := age / n
+		unit := "seconds"
+		if every <= 1 {
+			every, unit = 1, "second"
+		}
+		return fmt.Sprintf("not Bitcoin Core - it pings every %d %s, Core every 2 minutes", every, unit)
+	}
+	return ""
+}
+
 // claimOf is the software a user agent names, readably: "/bcoin:v1.0.0/" is
 // "bcoin v1.0.0", Core and Knots are spelled out.
 func claimOf(subver string) string {
@@ -352,6 +472,17 @@ func claimOf(subver string) string {
 	}
 	first, _, _ := strings.Cut(strings.Trim(subver, "/"), "/")
 	return strings.Replace(first, ":", " ", 1)
+}
+
+// otherAbout is the line for a name none of the rules know, so no peer is left
+// without one. Said as what we know, not as what it is: others may know it.
+func otherAbout(services []string) string {
+	for _, s := range services {
+		if s == "NETWORK" {
+			return "Probably a full node under a name its operator chose"
+		}
+	}
+	return "Software with a name we don't recognise"
 }
 
 func aboutOf(subver string) string {

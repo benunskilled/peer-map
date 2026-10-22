@@ -3,6 +3,7 @@ package main
 import (
 	"net/netip"
 	"strings"
+	"time"
 
 	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
@@ -33,6 +34,9 @@ type rawPeer struct {
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
 	SyncedHeaders *int64 `json:"synced_headers"`
+	// Bytes received per message type. Read only to count pings and address
+	// requests (see behaviourAbout); nil when Core did not report it.
+	BytesRecvPerMsg map[string]int64 `json:"bytesrecv_per_msg"`
 	// The address this peer sees us under. Read only to place this node on
 	// the map (see homeOf); never passed on.
 	AddrLocal string `json:"addrlocal"`
@@ -285,6 +289,13 @@ func convert(raw []rawPeer) []Peer {
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
+		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):
+			claim := claimOf(r.Subver)
+			if p.About != "" {
+				claim, _, _ = strings.Cut(p.About, ",")
+				claim = "the wallet " + claim
+			}
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:
@@ -294,9 +305,18 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
+			} else if why := behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()); why != "" {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			}
 		}
-		if p.Kind == noAgentKind {
+		if p.Kind == "Other" && p.About == "" {
+			p.About = otherAbout(r.ServicesNames)
+		}
+		// Core reports version 0 until the peer's version message arrives:
+		// with a version, the peer did introduce itself, only without a name.
+		if p.Kind == noAgentKind && r.Version > 0 {
+			p.About = "Introduced itself but left its name empty: software that keeps quiet about what it is"
+		} else if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
