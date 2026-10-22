@@ -1521,8 +1521,9 @@
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
         td.appendChild(pill);
         // What Core saw stays grey; the name the peer sends is bright, it is
-        // what tells one "Other" from the next.
-        const seen = p.no_relay || p.linking_lion ? flags : "";
+        // what tells one "Other" from the next. The user's own apps on this
+        // Umbrel need no flags: nothing about them is a surprise.
+        const seen = !p.app && (p.no_relay || p.linking_lion) ? flags : "";
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under) {
           const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
