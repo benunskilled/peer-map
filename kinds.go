@@ -342,7 +342,7 @@ func anachronism(subver string, services []string) string {
 	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
 	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
 	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
-		return "unknown software - it lacks the pruned-node service, which Core has always offered since 0.16"
+		return "not Bitcoin Core - it lacks a service every Core since 0.16 offers"
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
@@ -385,9 +385,9 @@ func protocolMismatch(subver string, version int) string {
 	newer := maj >= 22 || mnr >= 21
 	switch {
 	case newer && version < 70016:
-		return fmt.Sprintf("unknown software - it speaks protocol %d, older than any Core since 0.21", version)
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, older than any Core since 0.21", version)
 	case !newer && version >= 70016:
-		return fmt.Sprintf("unknown software - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
 	}
 	return ""
 }
