@@ -299,14 +299,16 @@ func convert(raw []rawPeer) []Peer {
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		default:
-			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
+			// What a peer does says more than what it lacks: a crawler asking
+			// for addresses again and again is named that, whatever else is off.
+			if why := behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()); why != "" {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+			} else if why := anachronism(r.Subver, r.ServicesNames); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if why := protocolMismatch(r.Subver, r.Version); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
-			} else if why := behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()); why != "" {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
