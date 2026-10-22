@@ -202,7 +202,7 @@ var aboutRules = []struct {
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
-	{regexp.MustCompile(`(?i)kit\.edu`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015"},
+	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015"},
 	// btcd's wire library with the app name after it left empty.
 	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty"},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go"},
