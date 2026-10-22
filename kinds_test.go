@@ -204,11 +204,11 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
 		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks the pruned-node service"},
+		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
 		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks the pruned-node service"},
-		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks the pruned-node service"},
+		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
+		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks a service every Core since 0.16 offers"},
 		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
 		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
 	}
@@ -347,7 +347,7 @@ func TestProtocolMismatch(t *testing.T) {
 		kind    string
 		says    string
 	}{
-		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: unknown software - it speaks protocol 70015, older than any Core since 0.21"},
+		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it speaks protocol 70015, older than any Core since 0.21"},
 		{"/Satoshi:0.21.0/", 70015, "Disguised", "protocol 70015"},
 		{"/Satoshi:0.13.2/", 70016, "Disguised", "which Core 0.13 never did"},
 		{"/Satoshi:25.1.0/Knots:20231115/", 70015, "Disguised", "Claims: Bitcoin Knots"},
@@ -531,5 +531,12 @@ func TestBehaviourMakesCoreDisguised(t *testing.T) {
 		BytesRecvPerMsg: map[string]int64{"ping": 32 * 31, "getaddr": 24}}})[0]
 	if got.Kind != "Node (Core)" {
 		t.Errorf("an honest Core became %q: %q", got.Kind, got.About)
+	}
+	// Behaviour comes before a missing service: the crawler is named as one.
+	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:0.19.0.1/",
+		Transport: "v1", ConnTime: conn, ServicesNames: []string{"WITNESS"},
+		BytesRecvPerMsg: map[string]int64{"getaddr": 24 * 58}}})[0]
+	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once" {
+		t.Errorf("got %q / %q", got.Kind, got.About)
 	}
 }
