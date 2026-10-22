@@ -14,6 +14,7 @@ COPY go.mod ./
 COPY *.go ./
 COPY geo ./geo
 COPY asn ./asn
+COPY torexit ./torexit
 COPY web ./web
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o /out/peermap .
