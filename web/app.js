@@ -9,6 +9,8 @@
   const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
   const GROUPS = ["inbound", "outbound", "manual"];
   const INBOUND_LIMIT = 10;
+  // A peer reaching the node through Tor shows the exit's place and operator; the peer itself stays hidden behind it.
+  const TOR_EXIT_TITLE = "Tor exit: location and operator are the exit's, not the peer's";
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
@@ -370,7 +372,7 @@
       stops.push({
         kind: "peer", group: p ? p.group : "", t: s.core_ms - ping,
         name: hostOf(lead.addr) + more,
-        sub: p ? [where, p.operator].filter(Boolean) : ["no longer connected"],
+        sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
       });
     }
@@ -588,9 +590,9 @@
           const where = document.createElement("td");
           where.textContent = peer ? locLabel(peer) || "–" : "";
           const who = document.createElement("td");
-          who.textContent = peer ? peer.operator || "–" : "no longer connected";
+          who.textContent = peer ? (peer.operator || "–") + (peer.tor_exit ? " · Tor exit" : "") : "no longer connected";
           if (!peer) who.className = "miss";
-          if (peer && peer.asn) who.title = "AS" + peer.asn;
+          if (peer && peer.asn) who.title = "AS" + peer.asn + (peer.tor_exit ? "\n" + TOR_EXIT_TITLE : "");
           tr.append(a, where, who);
           t.appendChild(tr);
         }
@@ -1489,7 +1491,9 @@
         name.className += " op-name";
         name.textContent = p.operator || "";
         td.appendChild(name);
-        if (p.asn) td.appendChild(line("sub", "AS" + p.asn));
+        const sub = [p.asn ? "AS" + p.asn : "", p.tor_exit ? "Tor exit" : ""].filter(Boolean).join(" · ");
+        if (sub) td.appendChild(line("sub", sub));
+        if (p.tor_exit) td.title = TOR_EXIT_TITLE;
       },
     },
     {
