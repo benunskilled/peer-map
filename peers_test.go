@@ -398,3 +398,18 @@ func TestHomeOfFallsBackToInboundAndOtherwiseNil(t *testing.T) {
 func geoLookup(ip string) (geo.Location, bool) {
 	return geo.Lookup(netip.MustParseAddr(ip))
 }
+
+func TestTorExitPeer(t *testing.T) {
+	list, err := os.ReadFile("torexit/exits.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exit, _, _ := strings.Cut(string(list), "\n")
+	got := convert([]rawPeer{
+		{Addr: exit + ":51234", Network: "ipv4", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:30.2.0/"},
+		{Addr: "192.0.2.1:51234", Network: "ipv4", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:30.2.0/"},
+	})
+	if !got[0].TorExit || got[1].TorExit {
+		t.Errorf("tor_exit = %v, %v; want true, false", got[0].TorExit, got[1].TorExit)
+	}
+}
