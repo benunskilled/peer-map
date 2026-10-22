@@ -607,7 +607,7 @@
     if (!b.stratum || !(b.stratum.entries || []).length) {
       const p = document.createElement("p");
       p.className = "note";
-      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off, or it was not running.";
+      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off.";
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
