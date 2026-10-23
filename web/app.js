@@ -1522,13 +1522,22 @@
         // Umbrel need no flags: nothing about them is a surprise.
         const seen = p.app ? "" : flags;
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
-        if (under || never) {
+        if (under || never || p.tor_exit) {
           const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
           if (never) {
             const n = document.createElement("span");
             n.className = "never-sub";
             n.textContent = "never first" + (under ? " \u00b7 " : "");
             e.prepend(n);
+          }
+          // A phone card has no operator column, where "Tor exit" stands on a
+          // wide screen: it leads this line there instead.
+          if (p.tor_exit) {
+            const t = document.createElement("span");
+            t.className = "tor-sub tor-exit";
+            t.textContent = "Tor exit" + (under || never ? " \u00b7 " : "");
+            t.title = TOR_EXIT_TITLE;
+            e.prepend(t);
           }
           if (p.subver) {
             const name = document.createElement("span");
