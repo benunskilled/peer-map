@@ -426,7 +426,8 @@ const (
 // is not counted.
 func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 {
 	switch transport {
-	case "v1":
+	// Core before 26 has no transport field and speaks only v1.
+	case "v1", "":
 		return bytes / (payload + 24)
 	case "v2":
 		if shortID {
@@ -520,14 +521,24 @@ func relaysBlocks(subver string) bool {
 // "(mempool.guide)" label does not make a node a pool node.
 var mempoolWord = regexp.MustCompile(`(?i)mempool`)
 
+var bracketed = regexp.MustCompile(`\([^)]*\)`)
+
 func classify(subver string) (string, bool) {
 	if subver == "" {
 		return noAgentKind, true
 	}
+	// The bracketed comment is the operator's own label. It may say a node
+	// belongs to a pool, but a word like "monitor" or "electrs" in it says
+	// what the operator runs beside it, not what the peer is: those kinds
+	// read only the name outside the brackets.
+	bare := bracketed.ReplaceAllString(subver, "")
 	for _, r := range kindRules {
 		s := subver
-		if r.name == "Pool node" {
+		switch r.name {
+		case "Pool node":
 			s = mempoolWord.ReplaceAllString(subver, "")
+		case "Research scanner", "Crawler", "Indexer", "Wallet", "Light client":
+			s = bare
 		}
 		if r.re.MatchString(s) {
 			return r.name, r.relays
