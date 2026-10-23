@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -130,24 +129,6 @@ func TestRelaysBlocks(t *testing.T) {
 	} {
 		if got := relaysBlocks(subver); got != want {
 			t.Errorf("%q: relaysBlocks = %v, want %v", subver, got, want)
-		}
-	}
-}
-
-// The page explains each kind in a sentence (KIND_WHY in web/app.js). A kind
-// added here without a line there would show its filter with no reason given.
-func TestEveryKindIsExplainedOnThePage(t *testing.T) {
-	js, err := os.ReadFile("web/app.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	names := []string{"Other", noAgentKind, fakeWalletKind}
-	for _, r := range kindRules {
-		names = append(names, r.name)
-	}
-	for _, n := range names {
-		if !strings.Contains(string(js), `"`+n+`": `) {
-			t.Errorf("KIND_WHY in web/app.js has no line for %q", n)
 		}
 	}
 }

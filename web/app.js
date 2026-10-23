@@ -1081,34 +1081,7 @@
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
     $("kindFilterName").textContent = state.kind || "";
-    $("kindFilterWhy").textContent = state.kind && KIND_WHY[state.kind] ? "- " + KIND_WHY[state.kind] : "";
   }
-
-  // Why a peer lands in a kind, in words - the rule from kindRules in
-  // kinds.go. Shown beside the kind filter, because "Only Pool node" says
-  // what is left but not what put it there. kinds_test.go checks that every
-  // kind there has a line here.
-  const KIND_WHY = {
-    "Pool node": 'its user agent names ckpool software (ckpool, ckp2p, ckcoind), or has "pool" in brackets (not "mempool")',
-    "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
-    "Research scanner": "its user agent names a university or research network",
-    "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar",
-    "Indexer": "its user agent says electrs, electrum or esplora, or contains /mempool",
-    "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
-    "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
-    "Node (Floresta)": "its user agent says Floresta",
-    // Empty on purpose: each disguised peer says its own reason on its pill,
-    // and the list of every rule was half a phone screen long.
-    "Disguised": "",
-    "Node (Knots)": "its user agent says Knots",
-    "Node (Core)": 'its user agent starts with "/Satoshi:"',
-    "Other": "its user agent matches none of the known kinds",
-    "No user agent": "it has sent no user agent, or an empty one - usually a port check, a connection still starting, or a tool keeping quiet",
-    "Node (btcd)": "its user agent says btcd",
-    "Node (libbitcoin)": "its user agent says libbitcoin",
-    "Node (bcoin)": "its user agent says bcoin",
-    "Node (Gocoin)": "its user agent says Gocoin",
-  };
 
   // Both filters redraw the same three things, and the map is in that list on
   // purpose: after clicking "5 Pool node" the next question is where those
