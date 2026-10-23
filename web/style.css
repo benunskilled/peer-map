@@ -423,13 +423,14 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers .tor-exit { color: var(--text); }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
-.peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
+/* The pill hangs left by its own padding, so its words start where the line under it does. */
+.peers .kind { margin-left: -9px; display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
 .peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
 .peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: #e5534b; }
 /* On an orange or focused row, and on hover, the see-through red would mix into another colour; laid over the
    panel colour it stays the same red as on a plain row. */
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }
-.peers .kind.never { margin-left: 6px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
+.peers .kind.never { margin-left: -7px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; color: var(--muted); }
 /* The software a peer names tells peers apart: as bright as the operator. */
