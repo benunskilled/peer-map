@@ -1097,7 +1097,9 @@
     "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
-    "Disguised": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), a version offering what that version never had (v2 before Core 26), lacking what it must always offer, or speaking a protocol it never spoke, Core offering nothing, a wallet offering blocks or speaking a newer protocol than it can, or LinkingLion under a borrowed name (tracked by 0xB10C, b10c.me)",
+    // Empty on purpose: each disguised peer says its own reason on its pill,
+    // and the list of every rule was half a phone screen long.
+    "Disguised": "",
     "Node (Knots)": "its user agent says Knots",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
     "Other": "its user agent matches none of the known kinds",
