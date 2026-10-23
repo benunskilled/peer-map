@@ -398,3 +398,25 @@ func TestHomeOfFallsBackToInboundAndOtherwiseNil(t *testing.T) {
 func geoLookup(ip string) (geo.Location, bool) {
 	return geo.Lookup(netip.MustParseAddr(ip))
 }
+
+func TestRPCWithoutResultIsNotEmpty(t *testing.T) {
+	// A reply with no list used to read as "no peers" and replace the last good map.
+	for _, body := range []string{`{"result":null,"error":null}`, `{}`} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(body))
+		}))
+		c := &rpcClient{url: srv.URL + "/", http: srv.Client()}
+		if _, err := c.getPeerInfo(context.Background()); err == nil || !strings.Contains(err.Error(), "without a result") {
+			t.Errorf("%s: got %v", body, err)
+		}
+		srv.Close()
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"result":[],"error":null}`))
+	}))
+	defer srv.Close()
+	c := &rpcClient{url: srv.URL + "/", http: srv.Client()}
+	if peers, err := c.getPeerInfo(context.Background()); err != nil || len(peers) != 0 {
+		t.Errorf("an empty list is a real answer: got %v, %v", peers, err)
+	}
+}

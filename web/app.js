@@ -324,7 +324,10 @@
     const link = e.querySelector("a[data-tip]");
     const lines = [cut ? e.dataset.full : "", e.dataset.tip || ""];
     if (link) link.title = [...lines, link.dataset.tip].filter(Boolean).join("\n");
-    else e.title = lines.filter(Boolean).join("\n");
+    // No title at all rather than an empty one: an empty title hides the
+    // cell's own (the Tor exit explanation on the operator).
+    else if (lines.some(Boolean)) e.title = lines.filter(Boolean).join("\n");
+    else e.removeAttribute("title");
   });
 
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
@@ -1219,6 +1222,9 @@
   function setupPanZoom() {
     const svg = $("map");
     svg.addEventListener("wheel", (e) => {
+      // Zoomed all the way out, turning the wheel further out is the page's:
+      // over a map that fills the screen, scrolling past it was impossible.
+      if (state.view.k <= 1 && e.deltaY > 0) return;
       e.preventDefault();
       const p = toSvg(e.clientX, e.clientY);
       zoomAt(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
@@ -1752,7 +1758,9 @@
 
   // ---------- start ----------
   setupPanZoom();
-  loadWorld().then(() => { if (state.data) renderMarkers(); });
+  loadWorld()
+    .then(() => { if (state.data) renderMarkers(); })
+    .catch((e) => showError("The world map could not be loaded: " + e.message));
   startTicker();
   refresh();
 })();
