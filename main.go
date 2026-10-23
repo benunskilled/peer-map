@@ -166,6 +166,11 @@ func (c *rpcClient) getPeerInfo(ctx context.Context) ([]rawPeer, error) {
 		// transport error it names nothing about where the node lives.
 		return nil, &shownError{line: fmt.Sprintf("RPC error %d: %s", out.Error.Code, out.Error.Message)}
 	}
+	// A reply without a list is not "no peers": taking it as one replaced the
+	// last good list with an empty map. An empty list decodes as [], not nil.
+	if out.Result == nil {
+		return nil, &shownError{line: "sent no peer list", err: fmt.Errorf("RPC reply without a result (HTTP %d)", resp.StatusCode)}
+	}
 	return out.Result, nil
 }
 
