@@ -460,7 +460,7 @@ a.addr-txt:hover { color: var(--accent); }
    so a card is one row shorter. The pill stays short there - "never first"
    moves to the grey line - and that line starts under the place, not under
    the flag. */
-.never-sub { display: none; }
+.never-sub, .tor-sub { display: none; }
 .cards.cards table tr td.k-ping { display: none; }
 .cards.cards table tr td.k-kind { display: contents; }
 /* The pill lies over the place line only: country and address below it keep
@@ -470,6 +470,6 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
 .cards.cards .kind .never-txt { display: none; }
-.cards.cards .never-sub { display: inline; }
+.cards.cards .never-sub, .cards.cards .tor-sub { display: inline; }
 .cards.cards table tr { --card-indent: 39px; }
 .cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }
