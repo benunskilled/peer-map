@@ -98,7 +98,7 @@ func TestObservedFlags(t *testing.T) {
 		}, true, true, true},
 		// Still in its handshake: no version yet, so no services listed either.
 		// That is not the peer offering nothing.
-		{"handshake not done", rawPeer{ServicesNames: []string{}}, false, false, false},
+		{"handshake not done", rawPeer{ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne}, false, false, false},
 	}
 	for _, c := range cases {
 		c.raw.Addr = "1.0.0.1:8333"
