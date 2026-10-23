@@ -52,12 +52,18 @@ func TestKindOf(t *testing.T) {
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
 		// "mempool" in the brackets is a node's label, not a pool (seen on a real node)
 		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
-		"/mempool/":                     "Indexer",
-		"/mempool.space:1.0/":           "Indexer",
-		"/Bitcoin ABC:0.14.5(EB8.0)/":   "Other chain",
-		"/Floresta:0.9.1/":              "Node (Floresta)",
-		"/btcwire:0.5.0/hemi-soak:1.0/": "Other",
-		"":                              noAgentKind,
+		"/mempool/":                   "Indexer",
+		"/mempool.space:1.0/":         "Indexer",
+		"/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
+		// A word in the brackets is the operator's label, not what the peer is:
+		// these are Core nodes, not crawlers, scanners or indexers.
+		"/Satoshi:29.0.0(my-monitor)/":       "Node (Core)",
+		"/Satoshi:28.1.0(watchtower)/":       "Node (Core)",
+		"/Satoshi:27.0.0(uni-mainz)/":        "Node (Core)",
+		"/Satoshi:29.0.0(electrum-backend)/": "Node (Core)",
+		"/Floresta:0.9.1/":                   "Node (Floresta)",
+		"/btcwire:0.5.0/hemi-soak:1.0/":      "Other",
+		"":                                   noAgentKind,
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
@@ -87,8 +93,11 @@ func TestObservedFlags(t *testing.T) {
 			ServicesNames: []string{"NETWORK", "WITNESS"}, RelayTxes: &yes, SyncedHeaders: &height,
 		}, false, false, false},
 		{"offers nothing, wants nothing, chain unknown", rawPeer{
-			ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne,
+			Version: 70016, ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne,
 		}, true, true, true},
+		// Still in its handshake: no version yet, so no services listed either.
+		// That is not the peer offering nothing.
+		{"handshake not done", rawPeer{ServicesNames: []string{}}, false, false, false},
 	}
 	for _, c := range cases {
 		c.raw.Addr = "1.0.0.1:8333"
@@ -490,6 +499,8 @@ func TestBehaviourAbout(t *testing.T) {
 		{"bitcoinj under its own name pings as it likes", "/bitcoinj:0.17/", "v1", map[string]int64{"ping": 32 * 1800}, hour, ""},
 		{"a transport not settled yet counts nothing", "/Satoshi:31.1.0/", "detecting", map[string]int64{"ping": 32 * 1800, "getaddr": 24 * 9}, hour, ""},
 		{"no bytes reported", "/Satoshi:31.1.0/", "v1", nil, hour, ""},
+		{"a node on Core before 26 reports no transport: that is v1", "/Satoshi:31.1.0/", "", map[string]int64{"ping": 32 * 1800}, hour,
+			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
 	}
 	for _, c := range cases {
 		if got := behaviourAbout(c.subver, c.transport, c.recv, c.connTime, now); got != c.want {

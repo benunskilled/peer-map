@@ -284,7 +284,9 @@ func convert(raw []rawPeer) []Peer {
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
 		// is Core saying nothing. Only the first is worth showing.
-		p.NoServices = r.ServicesNames != nil && len(r.ServicesNames) == 0
+		// Before the version message arrives Core lists no services either: a
+		// peer still in its handshake has not said anything yet.
+		p.NoServices = r.Version > 0 && r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.RelayTxes != nil && !*r.RelayTxes
 		p.ChainUnknown = r.SyncedHeaders != nil && *r.SyncedHeaders < 0
 		// Offering nothing means no blocks to pass on, whatever the name says.
