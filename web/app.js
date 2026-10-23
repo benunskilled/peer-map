@@ -1506,7 +1506,15 @@
           ico.textContent = "⊘";
           pill.append(ico, " ");
         }
-        pill.append(label);
+        // On a phone card the pill sits beside the place and stays short:
+        // "never first" moves to the line under it there (style.css).
+        pill.append(p.linking_lion ? "LinkingLion" : p.kind);
+        if (never) {
+          const n = document.createElement("span");
+          n.className = "never-txt";
+          n.textContent = never;
+          pill.append(n);
+        }
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
         td.appendChild(pill);
         // What Core saw stays grey; the name the peer sends is bright, it is
@@ -1514,8 +1522,14 @@
         // Umbrel need no flags: nothing about them is a surprise.
         const seen = p.app ? "" : flags;
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
-        if (under) {
+        if (under || never) {
           const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
+          if (never) {
+            const n = document.createElement("span");
+            n.className = "never-sub";
+            n.textContent = "never first" + (under ? " \u00b7 " : "");
+            e.prepend(n);
+          }
           if (p.subver) {
             const name = document.createElement("span");
             name.className = "ua-name";
