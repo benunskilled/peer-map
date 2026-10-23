@@ -92,7 +92,7 @@
       state.data = await r.json();
       state.receivedAt = Date.now();
       next = state.data.next_in || state.data.interval || 10;
-      render();
+      renderWhenFree();
     } catch (e) {
       showError("Peer Map backend not reachable: " + e.message);
     } finally {
@@ -644,6 +644,43 @@
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
+
+  // Every refresh rebuilds the tables and the map, and with them whatever the
+  // reader had in hand: an address half selected for copying, a keyboard
+  // focus, a tooltip that kept showing the old numbers. So a refresh waits
+  // while something is selected, pressed or focused by keyboard - for 30 s at
+  // most - and comes the moment that is over. The tooltip is closed by it.
+  let pressedAt = 0;
+  let heldSince = 0;
+  let renderPending = false;
+  const HOLD_MAX_MS = 30000;
+  function busy() {
+    const sel = window.getSelection && window.getSelection();
+    if (sel && !sel.isCollapsed) return true;
+    if (pressedAt && Date.now() - pressedAt < 2000) return true;
+    const a = document.activeElement;
+    return Boolean(a && a !== document.body && a.matches && a.matches(":focus-visible") && a.closest(".peers, #map"));
+  }
+  function renderWhenFree() {
+    if (busy() && (!heldSince || Date.now() - heldSince < HOLD_MAX_MS)) {
+      if (!heldSince) heldSince = Date.now();
+      renderPending = true;
+      return;
+    }
+    heldSince = 0;
+    renderPending = false;
+    hideTip();
+    render();
+  }
+  const freed = () => { if (renderPending) setTimeout(renderWhenFree, 0); };
+  document.addEventListener("pointerdown", () => { pressedAt = Date.now(); }, true);
+  document.addEventListener("click", () => { pressedAt = 0; freed(); });
+  for (const t of ["pointerup", "pointercancel"]) {
+    document.addEventListener(t, () => setTimeout(() => { if (pressedAt) { pressedAt = 0; freed(); } }, 400), true);
+  }
+  document.addEventListener("selectionchange", freed);
+  document.addEventListener("focusout", freed);
+  window.addEventListener("blur", () => { pressedAt = 0; freed(); });
 
   function render() {
     // Read before anything changes: rebuilding the tables makes the page
