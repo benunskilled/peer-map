@@ -464,7 +464,7 @@ a.addr-txt:hover { color: var(--accent); }
 /* The pill lies over the place line only: country and address below it keep
    the whole width, and the place name gives way to the pill. */
 .cards.cards table tr td.k-peer { grid-column: 1 / -1; }
-.cards.cards table tr td.k-peer .who b { padding-right: 135px; }
+.cards.cards table tr td.k-peer .who b { padding-right: 150px; }
 .cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
 .cards.cards .kind .never-txt { display: none; }
