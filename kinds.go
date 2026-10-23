@@ -523,6 +523,10 @@ var mempoolWord = regexp.MustCompile(`(?i)mempool`)
 
 var bracketed = regexp.MustCompile(`\([^)]*\)`)
 
+// The kinds that read only the agent outside the brackets. Bitcoin Lab's
+// test reads this list, so both apps agree on it.
+var readsBareName = map[string]bool{"Research scanner": true, "Crawler": true, "Indexer": true, "Wallet": true, "Light client": true}
+
 func classify(subver string) (string, bool) {
 	if subver == "" {
 		return noAgentKind, true
@@ -534,10 +538,9 @@ func classify(subver string) (string, bool) {
 	bare := bracketed.ReplaceAllString(subver, "")
 	for _, r := range kindRules {
 		s := subver
-		switch r.name {
-		case "Pool node":
+		if r.name == "Pool node" {
 			s = mempoolWord.ReplaceAllString(subver, "")
-		case "Research scanner", "Crawler", "Indexer", "Wallet", "Light client":
+		} else if readsBareName[r.name] {
 			s = bare
 		}
 		if r.re.MatchString(s) {
