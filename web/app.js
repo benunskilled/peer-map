@@ -1494,12 +1494,12 @@
         // LinkingLion has its own pill whatever software it claims; the
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
-        // Never-first peers: the kind and the fact in the pill; what Core saw
-        // (no services, chain unknown) moves to the line under it, so the
-        // pill is never cut before the words that matter.
+        // The pill says the kind and nothing else, for every peer: what Core
+        // saw (no services, no tx, chain unknown) goes to the line under it.
+        // One layout in every row, and the pill is never cut.
         const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
         const never = p.no_relay ? " \u00b7 never first" : "";
-        const label = p.linking_lion ? "LinkingLion" + never : p.no_relay ? p.kind + never : kindLabel(p);
+        const label = (p.linking_lion ? "LinkingLion" : p.kind) + never;
         if (p.no_relay) {
           const ico = document.createElement("span");
           ico.className = "ico";
@@ -1512,7 +1512,7 @@
         // What Core saw stays grey; the name the peer sends is bright, it is
         // what tells one "Other" from the next. The user's own apps on this
         // Umbrel need no flags: nothing about them is a surprise.
-        const seen = !p.app && (p.no_relay || p.linking_lion) ? flags : "";
+        const seen = p.app ? "" : flags;
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under) {
           const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
