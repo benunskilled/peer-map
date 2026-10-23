@@ -654,7 +654,7 @@
     const y = window.scrollY;
     const d = state.data;
     $("demo").hidden = !d.demo;
-    showError(d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "");
+    showError([d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "", state.worldError || ""].filter(Boolean).join(" "));
     $("version").textContent = "v" + (d.version || "dev");
 
     const counts = { manual: 0, inbound: 0, outbound: 0 };
@@ -1224,7 +1224,9 @@
     svg.addEventListener("wheel", (e) => {
       // Zoomed all the way out, turning the wheel further out is the page's:
       // over a map that fills the screen, scrolling past it was impossible.
-      if (state.view.k <= 1 && e.deltaY > 0) return;
+      // A trackpad pinch arrives as a wheel with ctrlKey: still the map's, or
+      // the browser zooms the whole page.
+      if (state.view.k <= 1 && e.deltaY > 0 && !e.ctrlKey) return;
       e.preventDefault();
       const p = toSvg(e.clientX, e.clientY);
       zoomAt(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
@@ -1760,7 +1762,7 @@
   setupPanZoom();
   loadWorld()
     .then(() => { if (state.data) renderMarkers(); })
-    .catch((e) => showError("The world map could not be loaded: " + e.message));
+    .catch((e) => { state.worldError = "The world map could not be loaded: " + e.message; showError(state.worldError); });
   startTicker();
   refresh();
 })();
