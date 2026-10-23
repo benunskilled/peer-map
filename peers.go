@@ -7,6 +7,7 @@ import (
 
 	"github.com/benunskilled/peer-map/asn"
 	"github.com/benunskilled/peer-map/geo"
+	"github.com/benunskilled/peer-map/torexit"
 )
 
 // rawPeer is the part of Bitcoin Core's getpeerinfo this app reads.
@@ -130,6 +131,9 @@ type Peer struct {
 	// same provider. Empty for an address no network announces.
 	ASN      uint32 `json:"asn,omitempty"`
 	Operator string `json:"operator,omitempty"`
+	// The address is a Tor exit's: location and operator are the exit's, the
+	// peer itself is somewhere behind it.
+	TorExit bool `json:"tor_exit,omitempty"`
 	// The name of the app when the peer is one of Umbrel's own, such as electrs.
 	App     string `json:"app,omitempty"`
 	Subver  string `json:"subver"`
@@ -347,6 +351,9 @@ func convert(raw []rawPeer) []Peer {
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
+		}
+		if p.Network == "ipv4" || p.Network == "ipv6" {
+			p.TorExit = torexit.Is(hostOf(r.Addr))
 		}
 		if p.Network == "not_publicly_routable" {
 			p.Operator = "Your Umbrel's own network"

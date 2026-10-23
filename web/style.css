@@ -417,6 +417,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .op-name { font-weight: 400; max-width: 230px; }
 .peers small { display: block; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .peers small.sub { color: var(--faint); }
+/* A Tor exit changes what the row means; it should not sit as faint as the AS number. */
+.peers .tor-exit { color: var(--text); }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
 /* The pill hangs left by its own padding, so its words start where the line under it does. */
