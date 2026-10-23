@@ -1491,8 +1491,18 @@
         name.className += " op-name";
         name.textContent = p.operator || "";
         td.appendChild(name);
-        const sub = [p.asn ? "AS" + p.asn : "", p.tor_exit ? "Tor exit" : ""].filter(Boolean).join(" · ");
-        if (sub) td.appendChild(line("sub", sub));
+        // The AS number stays faint; "Tor exit" is bright, because it changes
+        // what the row means: the place and operator are the exit's.
+        if (p.asn || p.tor_exit) {
+          const e = line("sub", p.asn ? "AS" + p.asn + (p.tor_exit ? " · " : "") : "");
+          if (p.tor_exit) {
+            const tor = document.createElement("span");
+            tor.className = "tor-exit";
+            tor.textContent = "Tor exit";
+            e.append(tor);
+          }
+          td.appendChild(e);
+        }
         if (p.tor_exit) td.title = TOR_EXIT_TITLE;
       },
     },
