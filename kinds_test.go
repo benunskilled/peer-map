@@ -682,3 +682,22 @@ func TestLibreRelayAndGarbageman(t *testing.T) {
 		t.Errorf("no bit: got %q", got.Kind)
 	}
 }
+
+func TestNamesSeenOnce(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/dnsseedrs:0.2.0/":      "Crawler",
+		"/ckh-netsurvey:1.0/":    "Crawler",
+		"/bread:2.1/":            "Wallet",
+		"//":                     noAgentKind,
+		"/:1.1.0-dev+c1771608d/": noAgentKind,
+		"/Satoshi:31.1.0/":       "Node (Core)",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016, Subver: "//", ServicesNames: []string{}}})[0]
+	if !strings.HasPrefix(got.About, "Introduced itself but left its name empty") {
+		t.Errorf("// about: %q", got.About)
+	}
+}
