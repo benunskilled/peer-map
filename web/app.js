@@ -1759,11 +1759,12 @@
     const wraps = [...document.querySelectorAll("#tables .scroll")];
     const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
     for (const w of wraps) w.classList.remove("cards");
-    // Tight when one table overflows on its own, or when the shared widths
-    // (alignColumns) together are wider than the card.
+    // Tight when the shared widths (alignColumns) together are wider than
+    // the card. Each table is measured there too; asking whether one table
+    // overflows on its own counted Kind at its full length again.
     const tight = () => {
       unalign();
-      return wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1) || sharedTooWide(wraps);
+      return sharedTooWide(wraps);
     };
     let level = 0;
     for (; ; level++) {
@@ -1807,10 +1808,16 @@
     }
     return { tables, widths };
   }
+  // For the question whether columns must go, Kind counts as wide as an
+  // ordinary entry needs (a pill and /Satoshi:31.1.0/): one long text
+  // among two hundred peers took Operator, Net, Ping and Connected away from
+  // all three tables and left Outbound and Manual mostly empty. A longer
+  // text is cut and shown whole on hover.
+  const KIND_MIN = 200;
   function sharedTooWide(wraps) {
     const { tables, widths } = sharedWidths(wraps);
     let sum = 0;
-    for (const v of widths.values()) sum += v;
+    for (const [k, v] of widths) sum += k === "k-kind" ? Math.min(v, KIND_MIN) : v;
     return tables.some((t) => sum > t.parentElement.clientWidth + 1);
   }
   // Kind takes whatever the card has left over, so its text is cut only when
@@ -1823,7 +1830,7 @@
       const spare = t.parentElement.clientWidth - others;
       for (const th of t.tHead.rows[0].cells) {
         const k = colKey(th);
-        const w = k === "k-kind" ? Math.max(Math.ceil(widths.get(k)), spare) : Math.ceil(widths.get(k));
+        const w = k === "k-kind" ? Math.max(KIND_MIN, spare) : Math.ceil(widths.get(k));
         th.style.width = w + "px";
       }
       t.classList.add("aligned");
