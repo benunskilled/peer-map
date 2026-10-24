@@ -74,7 +74,11 @@ var kindRules = []struct {
 	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds_|^/Aurum:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-`), false},
+	// Pool Detective, MIT's Digital Currency Initiative watching what mining
+	// pools do: its block observer speaks btcd's old wire library and adds
+	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
+	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
@@ -92,14 +96,17 @@ var kindRules = []struct {
 	// is Unstoppable Wallet on iPhone (Peer.swift in
 	// horizontalsystems/BitcoinCore.Swift), /BitcoinKit:/ the same wallet on
 	// Android (VersionMessage.kt in horizontalsystems/bitcoin-kit-android).
-	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|^/Ladybug:|^/hodlwallet:`), false},
+	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|^/Ladybug:|^/hodlwallet:|/spvwallet:`), false},
 	// Lightning wallets on lnd that follow the chain through neutrino, its
 	// BIP157 client: Zeus and Blixt among them. Named apart from the other
 	// light clients so the wallets among the peers show as wallets. In
 	// peer-observer's record of the node this was written for, 21. to
 	// 24.10.2026: 403 sessions from 78 addresses, more than any other wallet
 	// besides Wasabi.
-	{"Lightning wallet", regexp.MustCompile(`(?i)neutrino`), false},
+	// lit, the Lightning node MIT's Digital Currency Initiative built with an
+	// SPV client of its own, says "/btcwire:0.4.1/lit:v0.1/" (uspv/init.go
+	// in mit-dci/lit, last changed in 2022).
+	{"Lightning wallet", regexp.MustCompile(`(?i)neutrino|/lit:v`), false},
 	// Other BIP157 light clients: Kyoto, which announces itself as
 	// "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
@@ -110,7 +117,9 @@ var kindRules = []struct {
 	// BtcLightClient.cs in VerifiedXBlockchain/VerifiedX-Core, from 9.0 of
 	// 24.10.2026). On the node this was written for, 12 of 238 peers that
 	// day, all inbound, from 12 addresses at six hosting companies.
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:`), false},
+	// nakamoto, cloudhead's light client on compact block filters, says
+	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -280,6 +289,16 @@ var aboutRules = []struct {
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
+	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
+	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
+	{regexp.MustCompile(`^/nakamoto:`), "nakamoto, a light client on compact block filters"},
+	{regexp.MustCompile(`(?i)/spvwallet:`), "spvwallet, the wallet of OpenBazaar, a marketplace closed in 2021"},
+	// Autarkysoft's C# toolkit (Configuration.cs); it pushes transactions
+	// under "/Satoshi:0.22.0/" instead, so only its own name lands here.
+	{regexp.MustCompile(`^/Denovo:`), "Denovo, a Bitcoin toolkit in C#: pushes transactions, mines on testnet"},
+	// network.py in jimmysong/programmingbitcoin and the course exercises.
+	{regexp.MustCompile(`^/programming(bitcoin|blockchain):`), "Code from Jimmy Song's book or course Programming Bitcoin"},
+	{regexp.MustCompile(`^/bip324-ts:`), "bip324-ts, a TypeScript library for encrypted v2 connections"},
 	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015"},
 	// btcd's wire library with the app name after it left empty.
 	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty"},
@@ -611,9 +630,23 @@ var gingerAgents = map[string]bool{
 // these names sent sendcmpct instead of sendaddrv2, unevenly spread: other
 // software, left Disguised.
 
+// virtu's p2p-crawler (github.com/virtu/p2p-crawler), which counts reachable
+// nodes for research, sends one fixed version message: "/Satoshi:23.0.0/" at
+// protocol 70015, no services, relay off, start height 0 (protocol.py). Core
+// 23 speaks 70016. In peer-observer's record of the node this was written
+// for, 21. to 24.10.2026: 6 sessions with exactly this, all inbound; the 27
+// others under that name spoke 70016.
+func p2pCrawlerSays(subver string, version int, services []string, relayTxes *bool) bool {
+	return subver == "/Satoshi:23.0.0/" && version == 70015 && services != nil && len(services) == 0 &&
+		relayTxes != nil && !*relayTxes
+}
+
 // behindCoreName is the kind and about for Wasabi, Ginger and Wasabi's peer
 // search, or "", "". recv is bytesrecv_per_msg. NBitcoin speaks 70016.
 func behindCoreName(subver string, version int, services []string, relayTxes *bool, recv map[string]int64) (string, string) {
+	if p2pCrawlerSays(subver, version, services, relayTxes) {
+		return "Crawler", "Claims: " + claimOf(subver) + "\nProbably: p2p-crawler, virtu's research crawler - its fixed version message: protocol 70015, no services, no transactions"
+	}
 	if services == nil || len(services) > 0 || relayTxes == nil || version < 70016 {
 		return "", ""
 	}

@@ -748,6 +748,10 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"Yuki / 0.0.1":                           "Light client",
 		"/VerifiedX:9.0.1/":                      "Light client",
 		"/WalletKit:0.1.0/":                      "Wallet",
+		"/btcwire:0.4.1/Satoshi:0.19/":           "Research scanner",
+		"/btcwire:0.4.1/lit:v0.1/":               "Lightning wallet",
+		"/nakamoto:0.3.0/":                       "Light client",
+		"/btcwire:0.5.0/spvwallet:0.1.0/":        "Wallet",
 		"/bread:2.1/":                            "Wallet",
 		"/bitcoinj:0.16.3/Elastum:0.1z/":         "Wallet",
 		"/LionSeed:0.1.0/":                       "Crawler",
@@ -764,6 +768,11 @@ func TestClientsFoundOn24October(t *testing.T) {
 	}
 	for subver, want := range map[string]string{
 		"/WalletKit:0.1.0/":              "Unstoppable Wallet on iPhone",
+		"/btcwire:0.4.1/Satoshi:0.19/":   "Pool Detective",
+		"/Denovo:0.7.0/":                 "Denovo",
+		"/programmingbitcoin:0.1/":       "Code from Jimmy Song",
+		"/programmingblockchain:0.1/":    "Code from Jimmy Song",
+		"/bip324-ts:0.0.1/":              "bip324-ts",
 		"/bread:2.1/":                    "BRD's wallet core",
 		"/breadwallet:0.6.7/":            "BRD (breadwallet)",
 		"/bitcoinj:0.16.3/Elastum:0.1z/": "Names Elastum",
@@ -774,5 +783,20 @@ func TestClientsFoundOn24October(t *testing.T) {
 	}
 	if got := aboutOf("libbtc 0.1"); !strings.HasPrefix(got, "libbtc") {
 		t.Errorf("libbtc about: %q", got)
+	}
+}
+
+func TestVirtusCrawlerBehindCore23(t *testing.T) {
+	no := false
+	r := rawPeer{Addr: "198.51.100.7:50000", ConnectionType: "inbound", Inbound: true, Version: 70015,
+		Subver: "/Satoshi:23.0.0/", ServicesNames: []string{}, RelayTxes: &no,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
+	got := convert([]rawPeer{r})[0]
+	if got.Kind != "Crawler" || !strings.Contains(got.About, "p2p-crawler") {
+		t.Errorf("virtu's crawler: got %q / %q", got.Kind, got.About)
+	}
+	r.Version = 70016
+	if got := convert([]rawPeer{r})[0]; strings.Contains(got.About, "p2p-crawler") {
+		t.Errorf("70016 is not the crawler: %q", got.About)
 	}
 }
