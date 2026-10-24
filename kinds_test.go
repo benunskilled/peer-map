@@ -166,8 +166,10 @@ func TestFakeWallet(t *testing.T) {
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", []string{}, "Wallet", "Schildbach"},
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", nil, "Wallet", "Schildbach"},
 		// Core's name misspelt: what it claims, and a guess from what it offers.
-		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: a crawler"},
-		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: a scanner or node that hides"},
+		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it writes Sat0shi with a zero and offers no services"},
+		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /Satoshi2:"},
+		{"/SatoshiX:0.18.0/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /SatoshiX:"},
+		{"Satoshi:22.0.0", []string{"NETWORK"}, fakeWalletKind, "Claims: Bitcoin Core 22.0.0\nProbably: not Bitcoin Core - Core writes its name between slashes: /Satoshi:22.0.0/"},
 		// Only a wallet name can be fake: a node offering blocks is a node.
 		{"/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Node (Core)", ""},
 	}
