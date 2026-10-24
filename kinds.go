@@ -424,7 +424,9 @@ func offersNothingAsCore(subver string, services []string) bool {
 	return services != nil && len(services) == 0 && claimedCore.MatchString(subver)
 }
 
-const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
+// offersNothingAbout names the services Core always offers, rather than
+// guessing what the peer is.
+const offersNothingAbout = "not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED"
 
 // Wasabi Wallet 2.8 connects to nodes itself, always through Tor since 2.8.2
 // (PR #15003), so it reaches a clearnet node from a Tor exit. Each connection
