@@ -542,7 +542,7 @@ func TestWasabiIsAWallet(t *testing.T) {
 		Subver: "/Satoshi:29.3.0/", Transport: "v1", ConnTime: conn, ServicesNames: []string{}, RelayTxes: &yes,
 		BytesRecvPerMsg: map[string]int64{"ping": 32 * 30, "getheaders": 1053 * 15, "getdata": 300000}}
 	got := convert([]rawPeer{wasabi})[0]
-	if got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 29.3.0\nProbably: Wasabi Wallet - one of its 13 borrowed Core names, offers nothing, wants transactions" || !got.NoRelay {
+	if got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 29.3.0\nProbably: Wasabi Wallet or a fork - one of its 13 borrowed Core names, offers nothing, wants transactions" || !got.NoRelay {
 		t.Errorf("Wasabi: got %q / %q / norelay %v", got.Kind, got.About, got.NoRelay)
 	}
 	// Without transaction relay it is no wallet.
