@@ -486,13 +486,14 @@ func walletBehindCoreName(subver string, services []string, relayTxes *bool) str
 	if services == nil || len(services) > 0 || relayTxes == nil || !*relayTxes {
 		return ""
 	}
+	claim := "Claims: " + claimOf(subver) + "\nProbably: "
 	switch {
 	case wasabiAgents[subver] && gingerAgents[subver]:
-		return "Probably Wasabi or Ginger Wallet: it borrows a Core name for privacy and offers nothing"
+		return claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
 	case wasabiAgents[subver]:
-		return "Probably Wasabi Wallet: it borrows a Core name for privacy and offers nothing"
+		return claim + fmt.Sprintf("Wasabi Wallet - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
 	case gingerAgents[subver]:
-		return "Probably Ginger Wallet (or an old Wasabi): it borrows a Core name for privacy and offers nothing"
+		return claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
 	}
 	return ""
 }
