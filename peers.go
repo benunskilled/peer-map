@@ -298,9 +298,9 @@ func convert(raw []rawPeer) []Peer {
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
-		case looksLikeWasabi(r.Subver, r.ServicesNames, r.RelayTxes) &&
+		case walletBehindCoreName(r.Subver, r.ServicesNames, r.RelayTxes) != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()) == "":
-			p.Kind, p.About = "Wallet", wasabiAbout
+			p.Kind, p.About = "Wallet", walletBehindCoreName(r.Subver, r.ServicesNames, r.RelayTxes)
 		default:
 			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
