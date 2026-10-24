@@ -720,6 +720,7 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, "Software with a name we don't recognise"},
 		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
 		{[]string{}, &no, map[string]int64{"getaddr": 24}, "Unknown software that collects addresses"},
+		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, "Unknown software that listens to transactions: fetches every one it hears of, announces none"},
 		{[]string{}, &no, nil, "Software with a name we don't recognise"},
 	} {
 		if got := otherAbout(c.svc, c.relay, c.recv); got != c.want {
