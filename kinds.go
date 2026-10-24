@@ -87,7 +87,9 @@ var kindRules = []struct {
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
-	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
+	// NBXplorer, BTCPay Server's indexer, names itself "NBXplorer-" and a
+	// random number (Backend/Indexer.cs in dgarage/NBXplorer).
+	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool|^NBXplorer-`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library. Most
 	// of them ask a node for their transactions through a bloom filter
 	// (BIP37), which Core leaves off by default: at such a node they leave
@@ -119,7 +121,7 @@ var kindRules = []struct {
 	// day, all inbound, from 12 addresses at six hosting companies.
 	// nakamoto, cloudhead's light client on compact block filters, says
 	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:`), false},
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -136,7 +138,7 @@ var kindRules = []struct {
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
 	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, and tbcd, the
 	// Hemi network's Bitcoin daemon (hemilabs/heminetwork).
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd):`), true},
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -291,6 +293,12 @@ var aboutRules = []struct {
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
+	{regexp.MustCompile(`^NBXplorer-`), "NBXplorer, the indexer behind BTCPay Server"},
+	// NodeConstants.scala in bitcoin-s/bitcoin-s; indexer.rs in stacks-core.
+	{regexp.MustCompile(`^/bitcoin-s:`), "bitcoin-s, a Bitcoin toolkit in Scala with a light client on compact block filters"},
+	{regexp.MustCompile(`^Stacks/`), "A Stacks node: follows Bitcoin's blocks for the Stacks chain built on it"},
+	{regexp.MustCompile(`/utreexod:`), "utreexod, a Utreexo full node built on btcd"},
+	{regexp.MustCompile(`^/python-bitcoinlib:`), "python-bitcoinlib, a Python library for scripts and tests"},
 	{regexp.MustCompile(`^/nakamoto:`), "nakamoto, a light client on compact block filters"},
 	{regexp.MustCompile(`(?i)/spvwallet:`), "spvwallet, the wallet of OpenBazaar, a marketplace closed in 2021"},
 	// Autarkysoft's C# toolkit (Configuration.cs); it pushes transactions
