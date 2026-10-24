@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -444,6 +445,45 @@ func offersNothingAsCore(subver string, services []string) bool {
 // offersNothingAbout names the services Core always offers, rather than
 // guessing what the peer is.
 const offersNothingAbout = "not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED"
+
+// Libre Relay (github.com/petertodd/bitcoin, branches libre-relay-v28.0 to
+// v31.1) is Core under Core's own name with service bit 29 added
+// (NODE_LIBRE_RELAY in protocol.h). Core lists that bit as "UNKNOWN[2^29]".
+// Libre Relay opens extra connections to nodes advertising it and drops them
+// at once when the bit is missing ("does not offer libre relay as expected").
+// Garbageman (github.com/chrisguida/bitcoin, branches garbageman-v28,
+// garbageman-v29, garbageman-29.3) is a Knots fork with the Knots part of
+// its name commented out, so it says "/Satoshi:29.1.0/" or 29.3.0, and it
+// advertises the same bit to draw Libre Relay nodes in and drop what they
+// send. Libre Relay has no 29.3 and Garbageman nothing past 29, so the
+// version tells them apart except up to 29.1. On the node this was written
+// for, 21. to 24.10.2026: 21 connections with the bit from 12 addresses,
+// 18 of them as 30.2.0, all gone straight after the version message.
+const libreRelayService = "UNKNOWN[2^29]"
+
+// libreRelay is the kind and about for a Core name offering bit 29, or "", "".
+func libreRelay(subver string, services []string) (string, string) {
+	if !slices.Contains(services, libreRelayService) {
+		return "", ""
+	}
+	m := claimedCore.FindStringSubmatch(subver)
+	if m == nil {
+		return "", ""
+	}
+	maj, _ := strconv.Atoi(m[1])
+	mnr, _ := strconv.Atoi(m[2])
+	garbageman := "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"
+	switch {
+	case strings.Contains(subver, "Knots:"):
+		// Libre Relay is Core; only a Garbageman built with its Knots name left in says Knots.
+		return fakeWalletKind, garbageman
+	case maj >= 30:
+		return "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"
+	case maj == 29 && mnr >= 2:
+		return fakeWalletKind, garbageman
+	}
+	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"
+}
 
 // Wasabi Wallet 2.8 connects to nodes itself, always through Tor since 2.8.2
 // (PR #15003), so it reaches a clearnet node from a Tor exit. Each connection
