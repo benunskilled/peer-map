@@ -540,7 +540,7 @@ func TestWasabiIsAWallet(t *testing.T) {
 		Subver: "/Satoshi:29.3.0/", Transport: "v1", ConnTime: conn, ServicesNames: []string{}, RelayTxes: &yes,
 		BytesRecvPerMsg: map[string]int64{"ping": 32 * 30, "getheaders": 1053 * 15, "getdata": 300000}}
 	got := convert([]rawPeer{wasabi})[0]
-	if got.Kind != "Wallet" || got.About != wasabiAbout || !got.NoRelay {
+	if got.Kind != "Wallet" || got.About != "Probably Wasabi Wallet: it borrows a Core name for privacy and offers nothing" || !got.NoRelay {
 		t.Errorf("Wasabi: got %q / %q / norelay %v", got.Kind, got.About, got.NoRelay)
 	}
 	// Without transaction relay it is no wallet.
@@ -560,6 +560,16 @@ func TestWasabiIsAWallet(t *testing.T) {
 	r.ServicesNames = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
 	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
 		t.Errorf("with services: got %q", got.Kind)
+	}
+	// Ginger's older list, and the one name on both.
+	r = wasabi
+	r.Subver = "/Satoshi:0.21.0/"
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Wallet" || !strings.HasPrefix(got.About, "Probably Ginger Wallet") {
+		t.Errorf("Ginger: got %q / %q", got.Kind, got.About)
+	}
+	r.Subver = "/Satoshi:26.0.0/"
+	if got := convert([]rawPeer{r})[0]; !strings.HasPrefix(got.About, "Probably Wasabi or Ginger Wallet") {
+		t.Errorf("26.0.0: got %q", got.About)
 	}
 	// Asking for addresses again and again is a crawler, whatever the name.
 	r = wasabi
