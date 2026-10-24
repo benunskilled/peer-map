@@ -333,6 +333,10 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 table.peers.measure { width: auto; }
 table.peers.aligned { table-layout: fixed; }
 .peers.aligned td { overflow: hidden; text-overflow: ellipsis; }
+/* Laid out, the kind's line may use the whole column (alignColumns gives it
+   the card's spare width); measured, it keeps its cap, so one long name does
+   not cost every table a column. */
+.peers.aligned small.ua { max-width: none; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
@@ -365,9 +369,14 @@ table.peers.aligned { table-layout: fixed; }
    labels are only for values that do not explain themselves. */
 /* A tight table drops columns before it turns into cards (fitTables). The
    doubled class outranks the card rules, which show every cell. */
-.scroll.scroll[data-drops="1"] .k-net,
-.scroll.scroll[data-drops="2"] .k-net, .scroll.scroll[data-drops="2"] .k-operator,
-.scroll.scroll[data-drops="3"] .k-net, .scroll.scroll[data-drops="3"] .k-operator, .scroll.scroll[data-drops="3"] .k-conntime { display: none; }
+.scroll.scroll[data-drops="1"] .k-conntime,
+.scroll.scroll[data-drops="2"] .k-conntime, .scroll.scroll[data-drops="2"] .k-ping,
+.scroll.scroll[data-drops="3"] .k-conntime, .scroll.scroll[data-drops="3"] .k-ping, .scroll.scroll[data-drops="3"] .k-net,
+.scroll.scroll[data-drops="4"] .k-conntime, .scroll.scroll[data-drops="4"] .k-ping, .scroll.scroll[data-drops="4"] .k-net,
+.scroll.scroll[data-drops="4"]:not(.cards) small.has-place .addr-txt,
+.scroll.scroll[data-drops="5"] .k-conntime, .scroll.scroll[data-drops="5"] .k-ping, .scroll.scroll[data-drops="5"] .k-net,
+.scroll.scroll[data-drops="5"] .k-operator,
+.scroll.scroll[data-drops="5"]:not(.cards) small.has-place .addr-txt { display: none; }
 .scroll.cards { overflow-x: visible; }
 .scroll.cards table, .scroll.cards tbody { display: block; }
 .scroll.cards thead { display: none; }
