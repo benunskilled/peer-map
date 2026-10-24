@@ -707,3 +707,24 @@ func TestP2aburnAbout(t *testing.T) {
 		t.Errorf("got %q / %q", kindOf("/p2aburn:1.0/"), got)
 	}
 }
+
+func TestOtherSaysWhatItDoes(t *testing.T) {
+	no, yes := false, true
+	for _, c := range []struct {
+		svc   []string
+		relay *bool
+		recv  map[string]int64
+		want  string
+	}{
+		{[]string{"NETWORK", "WITNESS"}, &yes, nil, "Probably a full node under a name its operator chose"},
+		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, "Unknown software that pushes transactions without announcing them"},
+		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, "Software with a name we don't recognise"},
+		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
+		{[]string{}, &no, map[string]int64{"getaddr": 24}, "Unknown software that collects addresses"},
+		{[]string{}, &no, nil, "Software with a name we don't recognise"},
+	} {
+		if got := otherAbout(c.svc, c.relay, c.recv); got != c.want {
+			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
+		}
+	}
+}

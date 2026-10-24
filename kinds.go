@@ -638,11 +638,24 @@ func claimOf(subver string) string {
 
 // otherAbout is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string) string {
+func otherAbout(services []string, relayTxes *bool, recv map[string]int64) string {
 	for _, s := range services {
 		if s == "NETWORK" {
 			return "Probably a full node under a name its operator chose"
 		}
+	}
+	// What it did, where Core counted it: a name nobody knows still says
+	// little, its messages say more. Seen on the node this was written for,
+	// 21. to 24.10.2026: /pwsh-pusher/ and /p2aburn/ pushing transactions
+	// nobody asked for, a family of /reset-header-.../ names and others
+	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time.
+	switch {
+	case recv["tx"] > 0 && recv["inv"] == 0:
+		return "Unknown software that pushes transactions without announcing them"
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
+	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
+		return "Unknown software that collects addresses"
 	}
 	return "Software with a name we don't recognise"
 }

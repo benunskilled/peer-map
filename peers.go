@@ -319,7 +319,7 @@ func convert(raw []rawPeer) []Peer {
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
-			p.About = otherAbout(r.ServicesNames)
+			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
