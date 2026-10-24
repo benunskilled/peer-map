@@ -196,6 +196,10 @@ var aboutRules = []struct {
 	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
 	// node this was written for came from a Tor exit, v2, offering nothing.
 	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving"},
+	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
+	// rune 1:0 in chains of transactions; on the node this was written for it
+	// pushed unannounced 66-byte transactions, the size of such a sweep.
+	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet, pushing the transactions unannounced"},
 	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},

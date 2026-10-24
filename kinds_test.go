@@ -701,3 +701,9 @@ func TestNamesSeenOnce(t *testing.T) {
 		t.Errorf("// about: %q", got.About)
 	}
 }
+
+func TestP2aburnAbout(t *testing.T) {
+	if got := aboutOf("/p2aburn:1.0/"); !strings.HasPrefix(got, "p2aburn, a bot that sweeps P2A anchors") || kindOf("/p2aburn:1.0/") != "Other" {
+		t.Errorf("got %q / %q", kindOf("/p2aburn:1.0/"), got)
+	}
+}
