@@ -38,6 +38,9 @@ type rawPeer struct {
 	// Bytes received per message type. Read only to count pings and address
 	// requests (see behaviourAbout); nil when Core did not report it.
 	BytesRecvPerMsg map[string]int64 `json:"bytesrecv_per_msg"`
+	// Bytes sent per message type. Read only to tell whether a peer that
+	// asked for data was given transactions or blocks (see otherAbout).
+	BytesSentPerMsg map[string]int64 `json:"bytessent_per_msg"`
 	// The address this peer sees us under. Read only to place this node on
 	// the map (see homeOf); never passed on.
 	AddrLocal string `json:"addrlocal"`
@@ -329,7 +332,7 @@ func convert(raw []rawPeer) []Peer {
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
-			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
+			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg)
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.

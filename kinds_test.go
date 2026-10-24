@@ -713,17 +713,21 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		svc   []string
 		relay *bool
 		recv  map[string]int64
+		sent  map[string]int64
 		want  string
 	}{
-		{[]string{"NETWORK", "WITNESS"}, &yes, nil, "Probably a full node under a name its operator chose"},
-		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, "Unknown software that pushes transactions without announcing them"},
-		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, "Software with a name we don't recognise"},
-		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
-		{[]string{}, &no, map[string]int64{"getaddr": 24}, "Unknown software that collects addresses"},
-		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, "Unknown software that listens to transactions: fetches every one it hears of, announces none"},
-		{[]string{}, &no, nil, "Software with a name we don't recognise"},
+		{[]string{"NETWORK", "WITNESS"}, &yes, nil, nil, "Probably a full node under a name its operator chose"},
+		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Unknown software that pushes transactions without announcing them"},
+		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, nil, "Software with a name we don't recognise"},
+		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
+		{[]string{}, &no, map[string]int64{"getaddr": 24}, nil, "Unknown software that collects addresses"},
+		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, map[string]int64{"inv": 17521264, "tx": 5292757}, "Unknown software that listens to transactions: fetches every one it hears of, announces none"},
+		// A VerifiedX validator before it had a name here: asks for blocks,
+		// is sent blocks, no transactions.
+		{[]string{}, &yes, map[string]int64{"getdata": 1647, "getheaders": 354039}, map[string]int64{"block": 21269099, "inv": 565744}, "Software with a name we don't recognise"},
+		{[]string{}, &no, nil, nil, "Software with a name we don't recognise"},
 	} {
-		if got := otherAbout(c.svc, c.relay, c.recv); got != c.want {
+		if got := otherAbout(c.svc, c.relay, c.recv, c.sent); got != c.want {
 			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
 		}
 	}
@@ -741,6 +745,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/blueberry:2026.08.17/":                 "Wallet",
 		"/BitcoinKit:0.1.0/":                     "Wallet",
 		"Yuki / 0.0.1":                           "Light client",
+		"/VerifiedX:9.0.1/":                      "Light client",
 		"/LionSeed:0.1.0/":                       "Crawler",
 		"/gnoban:1.3.1/":                         "Crawler",
 		"/Aurum:0.12.4/":                         "Other chain",
