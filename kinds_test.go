@@ -747,6 +747,9 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/BitcoinKit:0.1.0/":                     "Wallet",
 		"Yuki / 0.0.1":                           "Light client",
 		"/VerifiedX:9.0.1/":                      "Light client",
+		"/WalletKit:0.1.0/":                      "Wallet",
+		"/bread:2.1/":                            "Wallet",
+		"/bitcoinj:0.16.3/Elastum:0.1z/":         "Wallet",
 		"/LionSeed:0.1.0/":                       "Crawler",
 		"/gnoban:1.3.1/":                         "Crawler",
 		"/Aurum:0.12.4/":                         "Other chain",
@@ -758,6 +761,16 @@ func TestClientsFoundOn24October(t *testing.T) {
 	}
 	if got := aboutOf("/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/"); !strings.HasPrefix(got, "Bisq") {
 		t.Errorf("Bisq about: %q", got)
+	}
+	for subver, want := range map[string]string{
+		"/WalletKit:0.1.0/":              "Unstoppable Wallet on iPhone",
+		"/bread:2.1/":                    "BRD's wallet core",
+		"/breadwallet:0.6.7/":            "BRD (breadwallet)",
+		"/bitcoinj:0.16.3/Elastum:0.1z/": "Names Elastum",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
+			t.Errorf("%s about: %q", subver, got)
+		}
 	}
 	if got := aboutOf("libbtc 0.1"); !strings.HasPrefix(got, "libbtc") {
 		t.Errorf("libbtc about: %q", got)
