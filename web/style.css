@@ -377,10 +377,7 @@ table.peers.aligned { table-layout: fixed; }
 .scroll.scroll[data-drops="2"] .k-conntime, .scroll.scroll[data-drops="2"] .k-ping,
 .scroll.scroll[data-drops="3"] .k-conntime, .scroll.scroll[data-drops="3"] .k-ping, .scroll.scroll[data-drops="3"] .k-net,
 .scroll.scroll[data-drops="4"] .k-conntime, .scroll.scroll[data-drops="4"] .k-ping, .scroll.scroll[data-drops="4"] .k-net,
-.scroll.scroll[data-drops="4"]:not(.cards) small.has-place .addr-txt,
-.scroll.scroll[data-drops="5"] .k-conntime, .scroll.scroll[data-drops="5"] .k-ping, .scroll.scroll[data-drops="5"] .k-net,
-.scroll.scroll[data-drops="5"] .k-operator,
-.scroll.scroll[data-drops="5"]:not(.cards) small.has-place .addr-txt { display: none; }
+.scroll.scroll[data-drops="4"] .k-operator { display: none; }
 .scroll.cards { overflow-x: visible; }
 .scroll.cards table, .scroll.cards tbody { display: block; }
 .scroll.cards thead { display: none; }
