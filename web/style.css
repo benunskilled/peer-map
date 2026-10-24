@@ -329,6 +329,12 @@ td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 
 .scroll { overflow-x: auto; }
 table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+/* The three groups share their column widths (alignColumns in app.js): each
+   table is measured at its natural width, then laid out fixed so the same
+   widths land in the same places. */
+table.peers.measure { width: auto; }
+table.peers.aligned { table-layout: fixed; }
+.peers.aligned td { overflow: hidden; text-overflow: ellipsis; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
