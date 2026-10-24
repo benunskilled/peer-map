@@ -404,6 +404,30 @@ func offersNothingAsCore(subver string, services []string) bool {
 
 const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
 
+// Wasabi Wallet 2.8 connects to nodes itself, always through Tor since 2.8.2
+// (PR #15003), so it reaches a clearnet node from a Tor exit. Each connection
+// names one of these Core versions at random (Constants.UserAgents in
+// WalletWasabi/Helpers/Constants.cs, used by P2pConnectionManager.cs), offers
+// nothing and asks for transactions. On the node this was written for, on
+// 24.10.2026: 27 such peers at once, 23 of them from Tor exits, every version
+// from this list and none outside it, each fetching transactions and headers
+// for hours, some also compact block filters. A crawler borrowing one of
+// these names usually turns transaction relay off; one that keeps it on is
+// counted here as Wasabi.
+var wasabiAgents = map[string]bool{
+	"/Satoshi:30.2.0/": true, "/Satoshi:30.0.0/": true,
+	"/Satoshi:29.3.0/": true, "/Satoshi:29.2.0/": true, "/Satoshi:29.0.0/": true,
+	"/Satoshi:28.1.0/": true, "/Satoshi:28.0.0/": true,
+	"/Satoshi:27.2.0/": true, "/Satoshi:27.1.0/": true, "/Satoshi:27.0.0/": true,
+	"/Satoshi:26.2.0/": true, "/Satoshi:26.1.0/": true, "/Satoshi:26.0.0/": true,
+}
+
+func looksLikeWasabi(subver string, services []string, relayTxes *bool) bool {
+	return wasabiAgents[subver] && services != nil && len(services) == 0 && relayTxes != nil && *relayTxes
+}
+
+const wasabiAbout = "Probably Wasabi Wallet: it borrows a Core name for privacy and offers nothing"
+
 // What a peer does, not what it says. Core pings every two minutes
 // (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
 // connection (m_getaddr_sent); a peer naming Core and doing either far more
