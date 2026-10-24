@@ -1727,8 +1727,15 @@
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
-    for (const w of wraps) w.classList.remove("cards");
-    const tight = () => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
+    for (const w of wraps) {
+      w.classList.remove("cards");
+      const t = w.querySelector("table.peers");
+      if (t) t.classList.remove("aligned");
+    }
+    // Tight when one table overflows on its own, or when the shared widths
+    // (alignColumns) together are wider than the card.
+    const tight = () => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1) ||
+      sharedTooWide(wraps);
     let level = 0;
     for (; ; level++) {
       for (const w of wraps) w.dataset.drops = String(level);
@@ -1736,7 +1743,45 @@
     }
     const cards = level === DROP_LEVELS && tight();
     for (const w of wraps) w.classList.toggle("cards", cards);
+    if (!cards) alignColumns(wraps);
     if (window.scrollY !== y) window.scrollTo(0, y);
+  }
+
+  // Inbound, Outbound and Manual have the same columns, and each table sized
+  // them to its own content: Operator, Kind, Net and Ping stood in a
+  // different place in every group, so the page read as three. Each column
+  // now gets the widest of the three natural widths, the same in every
+  // table, and fixed layout spreads the rest of the card's width the same way
+  // in each. A closed group has no width to measure and is left out until it
+  // opens (the toggle listener runs this again).
+  const colKey = (th) => [...th.classList].find((c) => c.startsWith("k-")) || String(th.cellIndex);
+  function sharedWidths(wraps) {
+    const tables = wraps.map((w) => w.querySelector("table.peers")).filter((t) => t && t.offsetWidth);
+    const widths = new Map();
+    for (const t of tables) {
+      t.classList.add("measure");
+      for (const th of t.tHead.rows[0].cells) th.style.width = "";
+    }
+    for (const t of tables) {
+      for (const th of t.tHead.rows[0].cells) {
+        widths.set(colKey(th), Math.max(widths.get(colKey(th)) || 0, th.getBoundingClientRect().width));
+      }
+      t.classList.remove("measure");
+    }
+    return { tables, widths };
+  }
+  function sharedTooWide(wraps) {
+    const { tables, widths } = sharedWidths(wraps);
+    let sum = 0;
+    for (const v of widths.values()) sum += v;
+    return tables.some((t) => sum > t.parentElement.clientWidth + 1);
+  }
+  function alignColumns(wraps) {
+    const { tables, widths } = sharedWidths(wraps);
+    for (const t of tables) {
+      for (const th of t.tHead.rows[0].cells) th.style.width = Math.ceil(widths.get(colKey(th))) + "px";
+      t.classList.add("aligned");
+    }
   }
   let fitTimer = null;
   // Only a change of width can change whether the tables fit; on an iPhone the
