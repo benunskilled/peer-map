@@ -84,8 +84,15 @@ var kindRules = []struct {
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
 	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
-	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
-	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/Ladybug:|^/hodlwallet:`), false},
+	// SPV and mobile wallets. bitcoinj is the Android wallet's library. Most
+	// of them ask a node for their transactions through a bloom filter
+	// (BIP37), which Core leaves off by default: at such a node they leave
+	// within a second (peer-observer, 21. to 24.10.2026: Bitcoin Wallet a
+	// median 0.1 s, BRD 0.3 s), at one that offers it they stay. /WalletKit:/
+	// is Unstoppable Wallet on iPhone (Peer.swift in
+	// horizontalsystems/BitcoinCore.Swift), /BitcoinKit:/ the same wallet on
+	// Android (VersionMessage.kt in horizontalsystems/bitcoin-kit-android).
+	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|^/Ladybug:|^/hodlwallet:`), false},
 	// Lightning wallets on lnd that follow the chain through neutrino, its
 	// BIP157 client: Zeus and Blixt among them. Named apart from the other
 	// light clients so the wallets among the peers show as wallets. In
@@ -197,6 +204,9 @@ var aboutRules = []struct {
 }{
 	{regexp.MustCompile(`(?i)seeder|dnsseed`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from"},
 	{regexp.MustCompile(`(?i)census|survey|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes"},
+	// One address, 142 sessions in four days, each gone after its version
+	// message. Elastum was an exchange; elastum.io no longer resolves.
+	{regexp.MustCompile(`(?i)/Elastum:`), "Names Elastum, a former exchange; talks to nodes through bitcoinj"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
@@ -218,7 +228,8 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)hemi-soak`), "A soak test of the Hemi network's Bitcoin code"},
 	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly"},
 	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly; its census dials every reachable node daily under the same name"},
-	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet and others)"},
+	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet on Android and others)"},
+	{regexp.MustCompile(`^/WalletKit:`), "Unstoppable Wallet on iPhone"},
 	{regexp.MustCompile(`(?i)^/Ladybug:`), "Ladybug, a wallet built on bitcoinj"},
 	{regexp.MustCompile(`(?i)^/hodlwallet:`), "HODL Wallet, a phone wallet"},
 	{regexp.MustCompile(`^Yuki /`), "Yuki, a light client by Impervious built on Kyoto"},
@@ -233,7 +244,10 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools; offers Libre Relay's service bit and came only through Tor"},
 	{regexp.MustCompile(`(?i)^/Aurum:`), "Aurumcoin, an altcoin built on Bitcoin Core 0.12"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
-	{regexp.MustCompile(`(?i)breadwallet|/bread:`), "BRD (breadwallet), a phone wallet shut down in 2022"},
+	// breadwallet-core sends "/bread:" with its own version, 2.1 since 2019
+	// (BRPeer.h), also in BRD's later WalletKit (blockset-corp/walletkit).
+	{regexp.MustCompile(`^/bread:`), "BRD's wallet core: the BRD app, shut down in 2022, or a wallet built on its code"},
+	{regexp.MustCompile(`(?i)breadwallet`), "BRD (breadwallet), a phone wallet shut down in 2022"},
 	{regexp.MustCompile(`(?i)multibit`), "MultiBit, a desktop wallet discontinued in 2017"},
 	{regexp.MustCompile(`(?i)bither`), "Bither, a wallet for phone and desktop"},
 	{regexp.MustCompile(`(?i)wasabi`), "Wasabi Wallet, a desktop wallet"},
