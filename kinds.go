@@ -90,7 +90,13 @@ var kindRules = []struct {
 	// Kyoto, which announces itself as "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
 	// stays out here and is caught by "Other" below.
-	{"Light client", regexp.MustCompile(`(?i)neutrino|BIP-157|kyoto|^Yuki /`), false},
+	// VerifiedX, a sidechain that holds bitcoin: each of its validators keeps
+	// eight Bitcoin peers to follow the chain itself, asking for headers and
+	// now and then a block, never a transaction (BtcSources.cs and
+	// BtcLightClient.cs in VerifiedXBlockchain/VerifiedX-Core, from 9.0 of
+	// 24.10.2026). On the node this was written for, 12 of 238 peers that
+	// day, all inbound, from 12 addresses at six hosting companies.
+	{"Light client", regexp.MustCompile(`(?i)neutrino|BIP-157|kyoto|^Yuki /|^/VerifiedX:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -209,6 +215,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/Ladybug:`), "Ladybug, a wallet built on bitcoinj"},
 	{regexp.MustCompile(`(?i)^/hodlwallet:`), "HODL Wallet, a phone wallet"},
 	{regexp.MustCompile(`^Yuki /`), "Yuki, a light client by Impervious built on Kyoto"},
+	{regexp.MustCompile(`^/VerifiedX:`), "A VerifiedX validator: a sidechain that holds bitcoin and follows the chain for it. Asks for headers about every 10 seconds, sometimes a block, takes no transactions"},
 	{regexp.MustCompile(`(?i)^/LionSeed:`), "LionSeed, a DNS seeder that lists only the nodes of one fork"},
 	{regexp.MustCompile(`(?i)^/gnoban:`), "gnoban, a tool that scores nodes and bans the ones its operator does not want"},
 	{regexp.MustCompile(`^libbtc `), "libbtc, a small C library for Bitcoin wallets and tools"},
@@ -683,7 +690,7 @@ func claimOf(subver string) string {
 
 // otherAbout is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string, relayTxes *bool, recv map[string]int64) string {
+func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64) string {
 	for _, s := range services {
 		if s == "NETWORK" {
 			return "Probably a full node under a name its operator chose"
@@ -700,7 +707,9 @@ func otherAbout(services []string, relayTxes *bool, recv map[string]int64) strin
 		return "Unknown software that pushes transactions without announcing them"
 	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
 		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
-	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
+	// Asking for data alone is no sign of listening: a peer that fetches
+	// blocks asks the same way. Only transactions sent to it count.
+	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
 		return "Unknown software that listens to transactions: fetches every one it hears of, announces none"
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
 		return "Unknown software that collects addresses"
