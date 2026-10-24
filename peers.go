@@ -305,6 +305,9 @@ func convert(raw []rawPeer) []Peer {
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
+		case looksLikeWasabi(r.Subver, r.ServicesNames, r.RelayTxes) &&
+			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()) == "":
+			p.Kind, p.About = "Wallet", wasabiAbout
 		default:
 			// What a peer does says more than what it lacks: a crawler asking
 			// for addresses again and again is named that, whatever else is off.
