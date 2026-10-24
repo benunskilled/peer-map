@@ -286,6 +286,7 @@ func convert(raw []rawPeer) []Peer {
 		// Offering nothing means no blocks to pass on, whatever the name says.
 		// Bitcoin Lab strikes the same peers.
 		p.NoRelay = p.NoRelay || p.NoServices
+		borrowedKind, borrowedAbout := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
@@ -298,9 +299,9 @@ func convert(raw []rawPeer) []Peer {
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
-		case walletBehindCoreName(r.Subver, r.ServicesNames, r.RelayTxes) != "" &&
+		case borrowedKind != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()) == "":
-			p.Kind, p.About = "Wallet", walletBehindCoreName(r.Subver, r.ServicesNames, r.RelayTxes)
+			p.Kind, p.About = borrowedKind, borrowedAbout
 		default:
 			if why := anachronism(r.Subver, r.ServicesNames); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why

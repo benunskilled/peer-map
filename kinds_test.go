@@ -627,3 +627,34 @@ func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
 		t.Errorf("no counts: got %q", got.Kind)
 	}
 }
+
+func TestWasabiPeerSearch(t *testing.T) {
+	no, yes := false, true
+	search := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:27.0.0/", Transport: "v1", ConnTime: time.Now().Unix() - 5, ServicesNames: []string{}, RelayTxes: &no,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24, "getaddr": 24}}
+	got := convert([]rawPeer{search})[0]
+	if got.Kind != "Crawler" || got.About != "Claims: Bitcoin Core 27.0.0\nProbably: Wasabi Wallet's peer search - one of its 13 borrowed Core names, offers nothing, asks only for addresses" {
+		t.Errorf("peer search: got %q / %q", got.Kind, got.About)
+	}
+	for name, change := range map[string]func(r *rawPeer){
+		"sendcmpct instead of sendaddrv2": func(r *rawPeer) {
+			r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendcmpct": 33, "verack": 24, "getaddr": 24}
+		},
+		"Ginger's name only": func(r *rawPeer) { r.Subver = "/Satoshi:0.21.0/" },
+		"protocol 70015":     func(r *rawPeer) { r.Version = 70015 },
+	} {
+		r := search
+		change(&r)
+		if got := convert([]rawPeer{r})[0]; got.Kind == "Crawler" || strings.Contains(got.About, "Wasabi") {
+			t.Errorf("%s: got %q / %q", name, got.Kind, got.About)
+		}
+	}
+	// A wallet that sends wtxidrelay is not on NBitcoin.
+	r := search
+	r.RelayTxes = &yes
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24}
+	if got := convert([]rawPeer{r})[0]; got.Kind == "Wallet" {
+		t.Errorf("wtxidrelay wallet: got %q / %q", got.Kind, got.About)
+	}
+}

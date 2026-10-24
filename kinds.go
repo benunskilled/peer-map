@@ -482,22 +482,44 @@ var gingerAgents = map[string]bool{
 	"/Satoshi:0.16.2/": true, "/Satoshi:0.16.1/": true, "/Satoshi:0.16.0/": true,
 }
 
-// walletBehindCoreName is the about for a peer that offers nothing, asks for
-// transactions and names a Core version from one of these lists, or "".
-func walletBehindCoreName(subver string, services []string, relayTxes *bool) string {
-	if services == nil || len(services) > 0 || relayTxes == nil || !*relayTxes {
-		return ""
+// Wasabi also searches for nodes: each wallet runs ten crawlers that connect
+// through Tor with the same random name and transaction relay off, take the
+// address list and leave within 15 seconds (CreateCrawler in
+// P2pConnectionManager.cs). Ginger has no such crawler. Both speak through
+// NBitcoin, whose handshake sends sendaddrv2 and verack and nothing else
+// (Node.cs): no wtxidrelay, no sendcmpct. In peer-observer's record of the
+// node this was written for, 21. to 24.10.2026: 3,247 such searches, the 13
+// names 228 to 289 times each, every one with start height 0 and asking for
+// addresses, and 402 wallet connections, 20 to 41 per name. Another 101 with
+// these names sent sendcmpct instead of sendaddrv2, unevenly spread: other
+// software, left Disguised.
+
+// behindCoreName is the kind and about for Wasabi, Ginger and Wasabi's peer
+// search, or "", "". recv is bytesrecv_per_msg. NBitcoin speaks 70016.
+func behindCoreName(subver string, version int, services []string, relayTxes *bool, recv map[string]int64) (string, string) {
+	if services == nil || len(services) > 0 || relayTxes == nil || version < 70016 {
+		return "", ""
+	}
+	// Anything beyond NBitcoin's handshake is other software.
+	if recv["wtxidrelay"] > 0 || recv["sendcmpct"] > 0 {
+		return "", ""
 	}
 	claim := "Claims: " + claimOf(subver) + "\nProbably: "
+	if !*relayTxes {
+		if wasabiAgents[subver] && recv["sendaddrv2"] > 0 {
+			return "Crawler", claim + fmt.Sprintf("Wasabi Wallet's peer search - one of its %d borrowed Core names, offers nothing, asks only for addresses", len(wasabiAgents))
+		}
+		return "", ""
+	}
 	switch {
 	case wasabiAgents[subver] && gingerAgents[subver]:
-		return claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
+		return "Wallet", claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
 	case wasabiAgents[subver]:
-		return claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
+		return "Wallet", claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
 	case gingerAgents[subver]:
-		return claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
+		return "Wallet", claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
 	}
-	return ""
+	return "", ""
 }
 
 // What a peer does, not what it says. Core pings every two minutes
