@@ -455,7 +455,9 @@ const offersNothingAbout = "not Bitcoin Core - it offers no services at all; Cor
 // for hours, some also compact block filters. In five weeks before: 1,420
 // such sessions, 73% from Tor exits. A crawler borrowing one of these names
 // usually turns transaction relay off; one that keeps it on is counted here
-// as a wallet.
+// as a wallet. Forks carry lists of their own in between
+// (Zecure: 18 names from 0.20.0 to 28.1.0, each on this list or Ginger's),
+// so the about says "or a fork".
 var wasabiAgents = map[string]bool{
 	"/Satoshi:30.2.0/": true, "/Satoshi:30.0.0/": true,
 	"/Satoshi:29.3.0/": true, "/Satoshi:29.2.0/": true, "/Satoshi:29.0.0/": true,
@@ -491,7 +493,7 @@ func walletBehindCoreName(subver string, services []string, relayTxes *bool) str
 	case wasabiAgents[subver] && gingerAgents[subver]:
 		return claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
 	case wasabiAgents[subver]:
-		return claim + fmt.Sprintf("Wasabi Wallet - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
+		return claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
 	case gingerAgents[subver]:
 		return claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
 	}
