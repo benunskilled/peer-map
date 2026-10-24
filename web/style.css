@@ -444,8 +444,10 @@ a.addr-txt:hover { color: var(--accent); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; }
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
-/* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab. */
-.peers .net.type { color: var(--outbound); background: rgba(26,158,143,.15); border-color: transparent; }
+/* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab.
+   On a line of its own: only outbound peers have one, and beside the other
+   two tags it set Net's width for all three tables - empty space in two. */
+.peers .net.type { color: var(--outbound); background: rgba(26,158,143,.15); border-color: transparent; display: block; width: max-content; margin-top: 3px; }
 .peers tr.weak .who b { color: var(--muted); font-weight: 500; }
 
 /* Cards (a phone): the peer on top with its ping beside it on the right,
