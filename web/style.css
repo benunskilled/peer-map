@@ -429,6 +429,7 @@ table.peers.aligned { table-layout: fixed; }
 /* Rows: two lines each. */
 .peers td { vertical-align: middle; }
 .peers td.peer, .peers td.op { max-width: 280px; overflow: visible; }
+.peers td.peer { max-width: 360px; }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .who .flag { font-size: 15px; line-height: 1; margin: 0 7px 0 0; vertical-align: -1px; }
 .who-text { min-width: 0; }
@@ -438,6 +439,10 @@ table.peers.aligned { table-layout: fixed; }
 .peers small.sub { color: var(--faint); }
 /* A Tor exit changes what the row means; it should not sit as faint as the AS number. */
 .peers .tor-exit { color: var(--text); }
+/* Place and address on one line: room for "United States" and a full IPv4
+   address with its port, taken from Kind's spare room - Kind still gets
+   whatever is left over. */
+.peers td.peer small.sub { max-width: 320px; }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
 /* The pill hangs left by its own padding, so its words start where the line under it does. */
