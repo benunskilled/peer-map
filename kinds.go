@@ -77,13 +77,13 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
 	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
-	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|bither|multibit|wasabi|Bitcoin Wallet`), false},
+	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet`), false},
 	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
 	// Kyoto, which announces itself as "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
@@ -171,8 +171,8 @@ var aboutRules = []struct {
 	re   *regexp.Regexp
 	text string
 }{
-	{regexp.MustCompile(`(?i)seeder`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from"},
-	{regexp.MustCompile(`(?i)census|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes"},
+	{regexp.MustCompile(`(?i)seeder|dnsseed`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from"},
+	{regexp.MustCompile(`(?i)census|survey|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
 	{regexp.MustCompile(`(?i)breadwallet|/bread:`), "BRD (breadwallet), a phone wallet shut down in 2022"},
 	{regexp.MustCompile(`(?i)multibit`), "MultiBit, a desktop wallet discontinued in 2017"},
@@ -678,8 +678,13 @@ func relaysBlocks(subver string) bool {
 // "(mempool.guide)" label does not make a node a pool node.
 var mempoolWord = regexp.MustCompile(`(?i)mempool`)
 
+// emptyName is a user agent with nothing in it but slashes, or a version
+// without a name before it: "//" came 523 times in three days from two
+// addresses, "/:1.1.0-dev+c1771608d/" ten times - nothing said, as with none.
+var emptyName = regexp.MustCompile(`^/*$|^/:[^/]*/$`)
+
 func classify(subver string) (string, bool) {
-	if subver == "" {
+	if subver == "" || emptyName.MatchString(subver) {
 		return noAgentKind, true
 	}
 	for _, r := range kindRules {
