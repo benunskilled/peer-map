@@ -392,6 +392,28 @@ func protocolMismatch(subver string, version int) string {
 	return ""
 }
 
+// skipsWtxidrelay is a peer naming Core 0.21 or later that finished its
+// handshake without sending wtxidrelay. Every Core since 0.21 sends it right
+// after the version message to a peer speaking 70016 or later
+// (net_processing.cpp, WTXID_RELAY_VERSION; unchanged in 25.1 and 28.1), and
+// getpeerinfo counts it under bytesrecv_per_msg. On the node this was written
+// for, on 24.10.2026: all 18 outbound Core and Knots peers and 74 inbound ones
+// sent it; of those that did not, 26 were Wasabi, two followed blocks for
+// hours offering nothing, and two passed for nodes.
+func skipsWtxidrelay(subver string, version int, recv map[string]int64) bool {
+	return recv != nil && recv["verack"] > 0 && recv["wtxidrelay"] == 0 &&
+		version >= 70016 && coreAtLeast(subver, 0, 21)
+}
+
+// skippedHandshakeAbout names what the peer left out. sendaddrv2 is sent
+// under the same condition as wtxidrelay, so it is named when it is missing too.
+func skippedHandshakeAbout(recv map[string]int64) string {
+	if recv["sendaddrv2"] == 0 {
+		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21"
+	}
+	return "not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21"
+}
+
 // offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no
 // service at all. Core always offers at least WITNESS and NETWORK or
 // NETWORK_LIMITED, so the name is borrowed. On the node this was written for:

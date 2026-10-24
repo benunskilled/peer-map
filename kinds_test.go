@@ -578,3 +578,49 @@ func TestWasabiIsAWallet(t *testing.T) {
 		t.Errorf("getaddr crawler: got %q", got.Kind)
 	}
 }
+
+func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
+	conn := time.Now().Unix() - 3600
+	all := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	core := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:28.0.0/", Transport: "v1", ConnTime: conn, ServicesNames: all,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24, "ping": 32 * 30}}
+	if got := convert([]rawPeer{core})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("Core sending wtxidrelay: got %q / %q", got.Kind, got.About)
+	}
+	r := core
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind ||
+		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21" {
+		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
+	}
+	// With sendaddrv2 sent, only wtxidrelay is named.
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
+	if got := convert([]rawPeer{r})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21" {
+		t.Errorf("only wtxidrelay missing: got %q", got.About)
+	}
+	// Knots is Core underneath and sends it too.
+	r.Subver = "/Satoshi:29.2.0/Knots:20251110/"
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("Knots without wtxidrelay: got %q", got.Kind)
+	}
+	// Still in its handshake: nothing to judge yet.
+	r = core
+	r.BytesRecvPerMsg = map[string]int64{"version": 126}
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("before verack: got %q", got.Kind)
+	}
+	// Core before 0.21 never sent it.
+	r = core
+	r.Subver, r.Version, r.ServicesNames = "/Satoshi:0.20.1/", 70015, []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24}
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("Core 0.20: got %q / %q", got.Kind, got.About)
+	}
+	// No byte counts at all, as from an older Core: no judgement.
+	r = core
+	r.BytesRecvPerMsg = nil
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("no counts: got %q", got.Kind)
+	}
+}
