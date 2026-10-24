@@ -275,7 +275,7 @@ func TestLinkingLion(t *testing.T) {
 func TestCoreOfferingNothing(t *testing.T) {
 	no := []string{}
 	got := convert([]rawPeer{{Addr: "198.51.100.7:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: no}})
-	if len(got) != 1 || got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, offersNothingAbout) {
+	if len(got) != 1 || got[0].Kind != fakeWalletKind || got[0].About != "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED" {
 		t.Fatalf("Core offering nothing: %+v", got)
 	}
 	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS", "NETWORK_LIMITED"}, {"NETWORK_LIMITED", "WITNESS"}} {
