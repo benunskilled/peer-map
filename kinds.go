@@ -239,14 +239,31 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 		guess = "a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
 	case wallet && v2:
 		guess = "a scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
-	case services != nil && len(services) == 0:
-		guess = "a crawler - it offers nothing"
-	case blocks:
-		guess = "a scanner or node that hides what it runs - it offers blocks"
+	case misspeltCore(subver) != "":
+		guess = "not Bitcoin Core - " + misspeltCore(subver)
+		if services != nil && len(services) == 0 {
+			guess += " and offers no services"
+		}
 	default:
 		guess = "unknown software"
 	}
 	return "Claims: " + claim + "\nProbably: " + guess
+}
+
+var coreNameWithSuffix = regexp.MustCompile(`^/(Satoshi[0-9X]+):`)
+
+// misspeltCore says how a name imitating Core's differs from it, for the
+// three spellings the Disguised rule catches, or "".
+func misspeltCore(subver string) string {
+	switch {
+	case strings.HasPrefix(subver, "/Sat0shi:"):
+		return "it writes Sat0shi with a zero"
+	case coreNameWithSuffix.MatchString(subver):
+		return "Core calls itself /Satoshi:, this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
+	case strings.HasPrefix(subver, "Satoshi:"):
+		return "Core writes its name between slashes: /" + strings.Trim(subver, "/") + "/"
+	}
+	return ""
 }
 
 // LinkingLion opens connections to many nodes from a few address ranges and
