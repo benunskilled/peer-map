@@ -687,10 +687,34 @@
   document.addEventListener("focusout", freed);
   window.addEventListener("blur", () => { pressedAt = 0; freed(); });
 
+  // What the reader is looking at stays where it is on a refresh. Keeping
+  // the scroll position alone is not that: when anything above grows or
+  // shrinks - a kind chip wrapping to another line, the block card, the list
+  // of peers not on the map - everything below moves. Chrome makes up for it
+  // itself (scroll anchoring); Safari does not, and the page jumped up and
+  // down there on its own (Ben 24.10.). The anchor is the topmost table row
+  // on screen, else the topmost card.
+  function readAnchor() {
+    if (window.scrollY < 1) return null;
+    const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight; };
+    const e = [...document.querySelectorAll("#tables tr[data-anchor]")].find(onScreen)
+      || [...document.querySelectorAll("main .card[id]")].find(onScreen);
+    if (!e) return null;
+    return { sel: e.dataset.anchor ? `tr[data-anchor="${CSS.escape(e.dataset.anchor)}"]` : "#" + CSS.escape(e.id), top: e.getBoundingClientRect().top };
+  }
+  function holdAnchor(a) {
+    if (!a) return;
+    const e = document.querySelector(a.sel);
+    if (!e || !e.getBoundingClientRect().height) return;
+    const d = e.getBoundingClientRect().top - a.top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+
   function render() {
     // Read before anything changes: rebuilding the tables makes the page
     // shorter for a moment, and Safari clamps the scroll position to it.
     const y = window.scrollY;
+    const anchor = readAnchor();
     const d = state.data;
     $("demo").hidden = !d.demo;
     showError([d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "", state.worldError || ""].filter(Boolean).join(" "));
@@ -710,6 +734,7 @@
     renderUnplaced();
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
+    holdAnchor(anchor);
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
@@ -1466,7 +1491,11 @@
         b.textContent = title;
         if (HIDDEN[p.network]) b.dataset.tip = HIDDEN[p.network].tip;
         const sub = document.createElement("small");
-        if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
+        if (p.region && p.cc) {
+          sub.append(regionName(p.cc) + " ");
+          // The address is what a tight table gives up last (fitTables).
+          sub.classList.add("has-place");
+        }
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
@@ -1740,6 +1769,7 @@
       const tbody = document.createElement("tbody");
       for (const p of shown) {
         const tr = document.createElement("tr");
+        tr.dataset.anchor = g + " " + p.addr;
         if (state.focus && p.addr === state.focus) tr.className = "focus";
         // The peer that brought the newest block, for as long as the star
         // is up - one rule for "just delivered", in the row and on the map.
@@ -1802,33 +1832,50 @@
   // there, so a reader far down was thrown up on every refresh. The position
   // is put back before anything is painted.
   //
-  // Before that, a tight table gives up its least important columns a step at
-  // a time - Net, then Operator, then Connected (see [data-drops] in
-  // style.css). Cards came far too early otherwise: a laptop window a little
-  // under 1200px already stacked every peer into five or six lines.
-  const DROP_LEVELS = 3;
+  // Before that, a tight table gives up what matters least, a step at a time
+  // (see [data-drops] in style.css): Connected, then Ping, then Net, then the
+  // address under the place where there is one, and Operator last (Ben
+  // 24.10.: Ping and Connected matter less than anything else, and the
+  // kind's words more than an address). The first four steps are also taken
+  // when the tables would fit but the kind's text would be cut.
+  const DROP_LEVELS = 5, ADDR_LEVEL = 4;
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
-    for (const w of wraps) {
-      w.classList.remove("cards");
-      const t = w.querySelector("table.peers");
-      if (t) t.classList.remove("aligned");
-    }
+    const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
+    for (const w of wraps) w.classList.remove("cards");
     // Tight when one table overflows on its own, or when the shared widths
     // (alignColumns) together are wider than the card.
-    const tight = () => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1) ||
-      sharedTooWide(wraps);
+    const tight = () => {
+      unalign();
+      return wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1) || sharedTooWide(wraps);
+    };
     let level = 0;
     for (; ; level++) {
       for (const w of wraps) w.dataset.drops = String(level);
-      if (level === DROP_LEVELS || !tight()) break;
+      if (level === DROP_LEVELS) break;
+      if (tight()) continue;
+      if (level < ADDR_LEVEL) {
+        alignColumns(wraps);
+        if (kindCut(wraps)) continue;
+      }
+      break;
     }
     const cards = level === DROP_LEVELS && tight();
     for (const w of wraps) w.classList.toggle("cards", cards);
     if (!cards) alignColumns(wraps);
+    // Without the address on screen, the place says it on hover.
+    for (const w of wraps) {
+      for (const sub of w.querySelectorAll("td.k-peer small.has-place")) {
+        const b = sub.previousElementSibling;
+        if (level >= ADDR_LEVEL && !cards) b.dataset.tip = sub.dataset.full;
+        else delete b.dataset.tip;
+      }
+    }
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
+  const kindCut = (wraps) => wraps.some((w) =>
+    [...w.querySelectorAll("td.k-kind small.ua")].some((e) => e.offsetWidth && e.scrollWidth > e.clientWidth + 1));
 
   // Inbound, Outbound and Manual have the same columns, and each table sized
   // them to its own content: Operator, Kind, Net and Ping stood in a
@@ -1859,10 +1906,19 @@
     for (const v of widths.values()) sum += v;
     return tables.some((t) => sum > t.parentElement.clientWidth + 1);
   }
+  // Kind takes whatever the card has left over, so its text is cut only when
+  // there is truly no room.
   function alignColumns(wraps) {
     const { tables, widths } = sharedWidths(wraps);
+    let others = 0;
+    for (const [k, v] of widths) if (k !== "k-kind") others += Math.ceil(v);
     for (const t of tables) {
-      for (const th of t.tHead.rows[0].cells) th.style.width = Math.ceil(widths.get(colKey(th))) + "px";
+      const spare = t.parentElement.clientWidth - others;
+      for (const th of t.tHead.rows[0].cells) {
+        const k = colKey(th);
+        const w = k === "k-kind" ? Math.max(Math.ceil(widths.get(k)), spare) : Math.ceil(widths.get(k));
+        th.style.width = w + "px";
+      }
       t.classList.add("aligned");
     }
   }
