@@ -138,7 +138,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		// something calling itself Core that behaves like neither.
 		services, relay, headers := nodeServices, true, int64(967000+r.Intn(400))
 		switch kindOf(subver) {
-		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
+		case "Wallet", "Lightning wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
 			relay = r.Intn(3) > 0
 			if subver == fakeWallet {

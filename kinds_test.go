@@ -13,7 +13,7 @@ func TestKindOf(t *testing.T) {
 		"/Satoshi:29.3.0/Knots:20260507/":          "Node (Knots)",
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/":    "Wallet",
 		"/breadwallet:1.3.5/":                      "Wallet",
-		"/btcwire:0.5.0/neutrino:0.17.1/":          "Light client",
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "Lightning wallet",
 		"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Light client",
 		// Seen on a real node, all of them "Other" before.
 		"/bitcoin-seeder:0.01/":          "Crawler",
@@ -395,7 +395,7 @@ func TestBitcoinjTooNew(t *testing.T) {
 		// A version Core did not report says nothing either way.
 		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
 		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
-		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Light client", "Neutrino"},
+		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "Neutrino"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
