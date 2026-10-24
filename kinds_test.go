@@ -657,3 +657,27 @@ func TestWasabiPeerSearch(t *testing.T) {
 		t.Errorf("wtxidrelay wallet: got %q / %q", got.Kind, got.About)
 	}
 }
+
+func TestLibreRelayAndGarbageman(t *testing.T) {
+	bit := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2", "UNKNOWN[2^29]"}
+	for _, c := range []struct{ subver, kind, about string }{
+		{"/Satoshi:30.2.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
+		{"/Satoshi:31.1.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
+		{"/Satoshi:29.3.0/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
+		{"/Satoshi:29.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
+		{"/Satoshi:28.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
+		{"/Satoshi:29.1.0/Knots:20250903/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
+	} {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+			Subver: c.subver, Transport: "v2", ServicesNames: bit}})[0]
+		if got.Kind != c.kind || got.About != c.about {
+			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
+		}
+	}
+	// Without the bit it is plain Core.
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:30.2.0/", Transport: "v2", ServicesNames: bit[:4]}})[0]
+	if got.Kind != "Node (Core)" {
+		t.Errorf("no bit: got %q", got.Kind)
+	}
+}

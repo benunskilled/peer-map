@@ -294,6 +294,7 @@ func convert(raw []rawPeer) []Peer {
 		// Bitcoin Lab strikes the same peers.
 		p.NoRelay = p.NoRelay || p.NoServices
 		borrowedKind, borrowedAbout := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
+		libreKind, libreAbout := libreRelay(r.Subver, r.ServicesNames)
 		switch {
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
@@ -306,6 +307,8 @@ func convert(raw []rawPeer) []Peer {
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
+		case libreKind != "":
+			p.Kind, p.About = libreKind, libreAbout
 		case borrowedKind != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()) == "":
 			p.Kind, p.About = borrowedKind, borrowedAbout
