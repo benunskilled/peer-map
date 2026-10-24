@@ -533,3 +533,39 @@ func TestBehaviourMakesCoreDisguised(t *testing.T) {
 		t.Errorf("an honest Core became %q: %q", got.Kind, got.About)
 	}
 }
+
+func TestWasabiIsAWallet(t *testing.T) {
+	conn := time.Now().Unix() - 3600
+	yes, no := true, false
+	wasabi := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:29.3.0/", Transport: "v1", ConnTime: conn, ServicesNames: []string{}, RelayTxes: &yes,
+		BytesRecvPerMsg: map[string]int64{"ping": 32 * 30, "getheaders": 1053 * 15, "getdata": 300000}}
+	got := convert([]rawPeer{wasabi})[0]
+	if got.Kind != "Wallet" || got.About != wasabiAbout || !got.NoRelay {
+		t.Errorf("Wasabi: got %q / %q / norelay %v", got.Kind, got.About, got.NoRelay)
+	}
+	// Without transaction relay it is no wallet.
+	r := wasabi
+	r.RelayTxes = &no
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("no tx relay: got %q", got.Kind)
+	}
+	// A name outside Wasabi's list stays Disguised.
+	r = wasabi
+	r.Subver = "/Satoshi:31.0.0/"
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("31.0.0: got %q", got.Kind)
+	}
+	// Offering services, it is a node.
+	r = wasabi
+	r.ServicesNames = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("with services: got %q", got.Kind)
+	}
+	// Asking for addresses again and again is a crawler, whatever the name.
+	r = wasabi
+	r.BytesRecvPerMsg = map[string]int64{"getaddr": 24 * 20}
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("getaddr crawler: got %q", got.Kind)
+	}
+}
