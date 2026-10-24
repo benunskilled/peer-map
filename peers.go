@@ -147,6 +147,7 @@ type Peer struct {
 	// carries none of them.
 	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
 	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
+	NoTxWhy      string   `json:"no_tx_why,omitempty"`     // why, where it can be told
 	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
 	PingMs       *float64 `json:"ping_ms"`
 	// The lowest round trip Core has ever measured to this peer. Closer to
@@ -348,6 +349,9 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
 			}
 		}
+		if p.NoTxRelay {
+			p.NoTxWhy = noTxWhy(r, p.Kind)
+		}
 		if r.Inbound {
 			switch hostOf(r.Addr) {
 			case dockerGateway:
@@ -390,4 +394,27 @@ func convert(raw []rawPeer) []Peer {
 		out = append(out, p)
 	}
 	return out
+}
+
+// noTxWhy says why a peer wants no transactions, where that can be told.
+// Core asks a peer for addresses once on the connections it opens itself,
+// except on its two block-relay-only ones, which also send no transactions
+// (net_processing.cpp: SetupAddressRelay returns false for them, so no
+// getaddr). So a real Core or Knots that connected to this node with
+// transactions off and asked for addresses runs with blocksonly=1; one that
+// did not ask opened the connection for blocks only. Only once its handshake
+// is done (verack) and only for a node, not for software borrowing the name.
+func noTxWhy(r rawPeer, kind string) string {
+	if r.ConnectionType == "block-relay-only" {
+		return "Your node opened this connection for blocks only"
+	}
+	recv := r.BytesRecvPerMsg
+	if r.Inbound && (strings.HasPrefix(kind, "Node (") || kind == "Pool node") && claimedCore.MatchString(r.Subver) &&
+		recv["verack"] > 0 && recv["wtxidrelay"] > 0 {
+		if recv["getaddr"] > 0 {
+			return "Its node runs with blocksonly=1: no transactions at all"
+		}
+		return "Its node opened this connection for blocks only"
+	}
+	return "Wants no transactions from your node"
 }

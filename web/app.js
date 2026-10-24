@@ -1568,7 +1568,20 @@
         const seen = p.app ? "" : flags;
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under || never || p.tor_exit) {
-          const e = line("sub ua", seen && p.subver ? seen + " \u00b7 " : seen);
+          const e = line("sub ua", "");
+          // "no tx" says on hover why, where Core's messages tell it.
+          const parts = seen ? seen.split(", ") : [];
+          parts.forEach((f, i) => {
+            if (i) e.append(", ");
+            if (f === "no tx" && p.no_tx_why) {
+              const s = document.createElement("span");
+              s.className = "no-tx";
+              s.textContent = f;
+              s.title = p.no_tx_why;
+              e.append(s);
+            } else e.append(f);
+          });
+          if (seen && p.subver) e.append(" \u00b7 ");
           if (never) {
             const n = document.createElement("span");
             n.className = "never-sub";
