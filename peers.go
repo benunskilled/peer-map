@@ -317,6 +317,8 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if why := protocolMismatch(r.Subver, r.Version); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+			} else if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg) {
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+skippedHandshakeAbout(r.BytesRecvPerMsg)
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
 			}
