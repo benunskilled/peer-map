@@ -706,3 +706,53 @@ func TestP2aburnAbout(t *testing.T) {
 		t.Errorf("got %q / %q", kindOf("/p2aburn:1.0/"), got)
 	}
 }
+
+func TestOtherSaysWhatItDoes(t *testing.T) {
+	no, yes := false, true
+	for _, c := range []struct {
+		svc   []string
+		relay *bool
+		recv  map[string]int64
+		want  string
+	}{
+		{[]string{"NETWORK", "WITNESS"}, &yes, nil, "Probably a full node under a name its operator chose"},
+		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, "Unknown software that pushes transactions without announcing them"},
+		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, "Software with a name we don't recognise"},
+		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
+		{[]string{}, &no, map[string]int64{"getaddr": 24}, "Unknown software that collects addresses"},
+		{[]string{}, &no, nil, "Software with a name we don't recognise"},
+	} {
+		if got := otherAbout(c.svc, c.relay, c.recv); got != c.want {
+			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
+		}
+	}
+}
+
+func TestClientsFoundOn24October(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/P2Pool:17.0/":    "Pool node",
+		"/pydroid-pool:3/": "Pool node",
+		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
+		"/Ghost:1.11.42/":                        "Node (Ghost)",
+		"/CamlCoin:0.1.0/":                       "Node (other)",
+		"/rustoshi:0.1.0/":                       "Node (other)",
+		"/tbcd:2.1.0-dev/":                       "Node (other)",
+		"/blueberry:2026.08.17/":                 "Wallet",
+		"/BitcoinKit:0.1.0/":                     "Wallet",
+		"Yuki / 0.0.1":                           "Light client",
+		"/LionSeed:0.1.0/":                       "Crawler",
+		"/gnoban:1.3.1/":                         "Crawler",
+		"/Aurum:0.12.4/":                         "Other chain",
+		"/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/": "Wallet",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+	if got := aboutOf("/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/"); !strings.HasPrefix(got, "Bisq") {
+		t.Errorf("Bisq about: %q", got)
+	}
+	if got := aboutOf("libbtc 0.1"); !strings.HasPrefix(got, "libbtc") {
+		t.Errorf("libbtc about: %q", got)
+	}
+}
