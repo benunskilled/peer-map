@@ -86,8 +86,15 @@ var kindRules = []struct {
 	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
 	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/Ladybug:|^/hodlwallet:`), false},
-	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
-	// Kyoto, which announces itself as "Rust BIP-157". btcwire alone is only
+	// Lightning wallets on lnd that follow the chain through neutrino, its
+	// BIP157 client: Zeus and Blixt among them. Named apart from the other
+	// light clients so the wallets among the peers show as wallets. In
+	// peer-observer's record of the node this was written for, 21. to
+	// 24.10.2026: 403 sessions from 78 addresses, more than any other wallet
+	// besides Wasabi.
+	{"Lightning wallet", regexp.MustCompile(`(?i)neutrino`), false},
+	// Other BIP157 light clients: Kyoto, which announces itself as
+	// "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
 	// stays out here and is caught by "Other" below.
 	// VerifiedX, a sidechain that holds bitcoin: each of its validators keeps
@@ -96,7 +103,7 @@ var kindRules = []struct {
 	// BtcLightClient.cs in VerifiedXBlockchain/VerifiedX-Core, from 9.0 of
 	// 24.10.2026). On the node this was written for, 12 of 238 peers that
 	// day, all inbound, from 12 addresses at six hosting companies.
-	{"Light client", regexp.MustCompile(`(?i)neutrino|BIP-157|kyoto|^Yuki /|^/VerifiedX:`), false},
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
