@@ -1471,8 +1471,6 @@
         const sub = document.createElement("small");
         if (p.region && p.cc) {
           sub.append(regionName(p.cc) + " ");
-          // The address is what a tight table gives up last (fitTables).
-          sub.classList.add("has-place");
         }
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
@@ -1750,12 +1748,12 @@
   // is put back before anything is painted.
   //
   // Before that, a tight table gives up what matters least, a step at a time
-  // (see [data-drops] in style.css): Connected, then Ping, then Net, then the
-  // address under the place where there is one, and Operator last (Ben
-  // 24.10.: Ping and Connected matter less than anything else, and the
-  // kind's words more than an address). The first four steps are also taken
-  // when the tables would fit but the kind's text would be cut.
-  const DROP_LEVELS = 5, ADDR_LEVEL = 4;
+  // (see [data-drops] in style.css): Connected, then Ping, then Net, and
+  // Operator last (Ben 24.10.: Ping and Connected matter less than anything
+  // else). The first three steps are also taken when the tables would fit
+  // but the kind's text would be cut. The address always stays: it is the
+  // link into Bitcoin Lab.
+  const DROP_LEVELS = 4, KIND_LEVEL = 3;
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
@@ -1772,7 +1770,7 @@
       for (const w of wraps) w.dataset.drops = String(level);
       if (level === DROP_LEVELS) break;
       if (tight()) continue;
-      if (level < ADDR_LEVEL) {
+      if (level < KIND_LEVEL) {
         alignColumns(wraps);
         if (kindCut(wraps)) continue;
       }
@@ -1781,14 +1779,6 @@
     const cards = level === DROP_LEVELS && tight();
     for (const w of wraps) w.classList.toggle("cards", cards);
     if (!cards) alignColumns(wraps);
-    // Without the address on screen, the place says it on hover.
-    for (const w of wraps) {
-      for (const sub of w.querySelectorAll("td.k-peer small.has-place")) {
-        const b = sub.previousElementSibling;
-        if (level >= ADDR_LEVEL && !cards) b.dataset.tip = sub.dataset.full;
-        else delete b.dataset.tip;
-      }
-    }
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
   const kindCut = (wraps) => wraps.some((w) =>
