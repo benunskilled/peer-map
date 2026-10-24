@@ -142,7 +142,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 			relay = false
 		}
 		switch kindOf(subver) {
-		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
+		case "Wallet", "Lightning wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
 			relay = r.Intn(3) > 0
 			if subver == fakeWallet {
