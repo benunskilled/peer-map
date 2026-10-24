@@ -137,6 +137,10 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		// full node does both. The rare last case is the interesting one -
 		// something calling itself Core that behaves like neither.
 		services, relay, headers := nodeServices, true, int64(967000+r.Intn(400))
+		// A block-relay-only connection carries no transactions, by design.
+		if typ == "block-relay-only" {
+			relay = false
+		}
 		switch kindOf(subver) {
 		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
