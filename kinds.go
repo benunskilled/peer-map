@@ -411,9 +411,10 @@ const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core
 // nothing and asks for transactions. On the node this was written for, on
 // 24.10.2026: 27 such peers at once, 23 of them from Tor exits, every version
 // from this list and none outside it, each fetching transactions and headers
-// for hours, some also compact block filters. A crawler borrowing one of
-// these names usually turns transaction relay off; one that keeps it on is
-// counted here as Wasabi.
+// for hours, some also compact block filters. In five weeks before: 1,420
+// such sessions, 73% from Tor exits. A crawler borrowing one of these names
+// usually turns transaction relay off; one that keeps it on is counted here
+// as a wallet.
 var wasabiAgents = map[string]bool{
 	"/Satoshi:30.2.0/": true, "/Satoshi:30.0.0/": true,
 	"/Satoshi:29.3.0/": true, "/Satoshi:29.2.0/": true, "/Satoshi:29.0.0/": true,
@@ -422,11 +423,38 @@ var wasabiAgents = map[string]bool{
 	"/Satoshi:26.2.0/": true, "/Satoshi:26.1.0/": true, "/Satoshi:26.0.0/": true,
 }
 
-func looksLikeWasabi(subver string, services []string, relayTxes *bool) bool {
-	return wasabiAgents[subver] && services != nil && len(services) == 0 && relayTxes != nil && *relayTxes
+// Ginger Wallet, a fork of Wasabi, does the same with the older list Wasabi
+// had before 2.5 (Constants.UserAgents in GingerPrivacy/GingerWallet), also
+// through Tor. On the node this was written for, in five weeks: 161 sessions
+// with a name only on this list, offering nothing and relaying transactions,
+// 89% from Tor exits, the names spread evenly over the list.
+var gingerAgents = map[string]bool{
+	"/Satoshi:26.0.0/": true, "/Satoshi:25.1.0/": true, "/Satoshi:25.0.0/": true, "/Satoshi:24.2.0/": true,
+	"/Satoshi:24.1.0/": true, "/Satoshi:24.0.1/": true, "/Satoshi:24.0.0/": true, "/Satoshi:23.2.0/": true,
+	"/Satoshi:23.1.0/": true, "/Satoshi:23.0.0/": true, "/Satoshi:22.1.0/": true, "/Satoshi:22.0.0/": true,
+	"/Satoshi:0.21.2/": true, "/Satoshi:0.21.1/": true, "/Satoshi:0.21.0/": true, "/Satoshi:0.20.2/": true,
+	"/Satoshi:0.20.1/": true, "/Satoshi:0.20.0/": true, "/Satoshi:0.19.1/": true, "/Satoshi:0.19.0.1/": true,
+	"/Satoshi:0.19.0/": true, "/Satoshi:0.18.1/": true, "/Satoshi:0.18.0/": true, "/Satoshi:0.17.2/": true,
+	"/Satoshi:0.17.1/": true, "/Satoshi:0.17.0.1/": true, "/Satoshi:0.17.0/": true, "/Satoshi:0.16.3/": true,
+	"/Satoshi:0.16.2/": true, "/Satoshi:0.16.1/": true, "/Satoshi:0.16.0/": true,
 }
 
-const wasabiAbout = "Probably Wasabi Wallet: it borrows a Core name for privacy and offers nothing"
+// walletBehindCoreName is the about for a peer that offers nothing, asks for
+// transactions and names a Core version from one of these lists, or "".
+func walletBehindCoreName(subver string, services []string, relayTxes *bool) string {
+	if services == nil || len(services) > 0 || relayTxes == nil || !*relayTxes {
+		return ""
+	}
+	switch {
+	case wasabiAgents[subver] && gingerAgents[subver]:
+		return "Probably Wasabi or Ginger Wallet: it borrows a Core name for privacy and offers nothing"
+	case wasabiAgents[subver]:
+		return "Probably Wasabi Wallet: it borrows a Core name for privacy and offers nothing"
+	case gingerAgents[subver]:
+		return "Probably Ginger Wallet (or an old Wasabi): it borrows a Core name for privacy and offers nothing"
+	}
+	return ""
+}
 
 // What a peer does, not what it says. Core pings every two minutes
 // (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
