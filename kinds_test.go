@@ -728,3 +728,32 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		}
 	}
 }
+
+func TestClientsFoundOn24October(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/P2Pool:17.0/":    "Pool node",
+		"/pydroid-pool:3/": "Pool node",
+		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
+		"/Ghost:1.11.42/":                        "Node (Ghost)",
+		"/CamlCoin:0.1.0/":                       "Node (other)",
+		"/rustoshi:0.1.0/":                       "Node (other)",
+		"/tbcd:2.1.0-dev/":                       "Node (other)",
+		"/blueberry:2026.08.17/":                 "Wallet",
+		"/BitcoinKit:0.1.0/":                     "Wallet",
+		"Yuki / 0.0.1":                           "Light client",
+		"/LionSeed:0.1.0/":                       "Crawler",
+		"/gnoban:1.3.1/":                         "Crawler",
+		"/Aurum:0.12.4/":                         "Other chain",
+		"/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/": "Wallet",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+	if got := aboutOf("/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/"); !strings.HasPrefix(got, "Bisq") {
+		t.Errorf("Bisq about: %q", got)
+	}
+	if got := aboutOf("libbtc 0.1"); !strings.HasPrefix(got, "libbtc") {
+		t.Errorf("libbtc about: %q", got)
+	}
+}

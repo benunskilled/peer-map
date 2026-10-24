@@ -1087,7 +1087,7 @@
   // what is left but not what put it there. kinds_test.go checks that every
   // kind there has a line here.
   const KIND_WHY = {
-    "Pool node": 'its user agent names ckpool software (ckpool, ckp2p, ckcoind), or has "pool" in brackets (not "mempool")',
+    "Pool node": 'its user agent names pool software (ckpool, ckp2p, ckcoind, P2Pool) or a pool, or has "pool" in brackets (not "mempool")',
     "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
     "Research scanner": "its user agent names a university or research network",
     "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar, or it is Wasabi's peer search behind a borrowed Core name",
@@ -1096,6 +1096,8 @@
     "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
     "Node (Floresta)": "its user agent says Floresta",
     "Disguised": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), a version offering what that version never had (v2 before Core 26), lacking what it must always offer, or speaking a protocol it never spoke, Core offering nothing or skipping wtxidrelay, Garbageman posing as Libre Relay, a wallet offering blocks or speaking a newer protocol than it can, or LinkingLion under a borrowed name (tracked by 0xB10C, b10c.me)",
+    "Node (Ghost)": "its user agent says Ghost (Bitcoin Ghost, a fork of Core)",
+    "Node (other)": "its user agent names a full node written from scratch (CamlCoin, rustoshi, rbitcoin, rbtc, tbcd, ...)",
     "Node (Knots)": "its user agent says Knots",
     "Node (Libre Relay)": "it names Core and offers Libre Relay's service bit 29",
     "Node (Core)": 'its user agent starts with "/Satoshi:"',
