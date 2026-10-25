@@ -6,7 +6,7 @@ Your node talks to strangers all day. Each one says what software it runs, but i
 
 The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. Open port 8333 and more strangers come knocking.
 
-![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=2)
+![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=3)
 
 ## What gives them away
 
@@ -28,7 +28,7 @@ Some peers have no place on a map. Tor, I2P and CJDNS peers don't reveal where t
 
 Locations are roughly correct. A peer coming through a Tor exit is pinned where the exit stands, and marked as such.
 
-![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png?v=2)
+![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png?v=3)
 
 ## Follow a block through your node
 
