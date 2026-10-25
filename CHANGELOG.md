@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.0.4 – 2026-10-25
+
+Peers on another chain are flagged: nodes that set Knots' BIP110 or BLAKE2b bit can never bring you a block. Peers coming through a Tor exit are marked, since their place is the exit's. Peer Map now recognises Wasabi and Ginger behind their borrowed Core names, Libre Relay, Lightning wallets and many more clients. Hover over "no tx" to see why a peer wants no transactions. The three tables line up, and on phones the label sits next to the place.
+
 ## 2.0.3 – 2026-10-22
 
 Disguised now also looks at behaviour: a peer naming Bitcoin Core or Knots that asks for addresses again and again, or pings more often than every 5 seconds, is flagged. A Bitcoin Wallet peer speaking a newer protocol than the app ever did now says "not a wallet". Long provider names on phones end with "…".
