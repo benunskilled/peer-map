@@ -33,6 +33,7 @@ import (
 // Order matters: the first match wins, so a more specific pattern goes above
 // a more general one (Knots before Core - a Knots user agent contains
 // "Satoshi" too).
+//
 // relays says whether this kind of software passes blocks on at all. It is the
 // same distinction Bitcoin Lab paints red in its peer list, and it has to stay
 // the same in both apps: a colour that means two different things in two
@@ -507,15 +508,15 @@ func coreAtLeast(subver string, major, minor int) bool {
 	return ok && (maj > major || maj == major && mnr >= minor)
 }
 
+// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
+var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
+
 // protocolMismatch is a peer whose protocol version does not match the Core
 // release it names: Core 0.21 to 31 send 70016 (later ones 70017 or more),
 // every release before sends 70015 or less. Development builds (x.99) are
 // left alone: "0.20.99" was already 0.21 under way. On one node, in four
 // days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
 // "/Satoshi:31.0.0/" fleet with 70015 - and no real Core node either way.
-// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
-var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
-
 func protocolMismatch(subver string, version int) string {
 	maj, mnr, ok := coreRelease(subver)
 	if !ok || version == 0 || devBuild.MatchString(subver) {

@@ -93,18 +93,17 @@ func TestSiblingProbeOutlivesTheBrowserRequest(t *testing.T) {
 	}
 }
 
-// Two failures that must not be treated alike. A neighbour that refuses the
-// connection has answered - that is the normal case, remembered for five
-// minutes so a missing app costs no request per poll - while a probe cut off
-// mid-request learned nothing and has to be repeated.
-func TestSiblingRemembersARefusalButNotACancellation(t *testing.T) {
+// A neighbour that refuses the connection has answered - that is the normal
+// case, remembered for five minutes so a missing app costs no request per
+// poll. A cancellation cannot reach the probe: it runs detached from the
+// browser's request (TestSiblingProbeOutlivesTheBrowserRequest).
+func TestSiblingRemembersARefusal(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		err  error
 		want int
 	}{
 		{"a refused connection is an answer", errors.New("connect: connection refused"), 1},
-		{"a cancelled probe is not", context.Canceled, 2},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			tr := &stubNeighbour{err: c.err, calls: map[string]int{}}
@@ -121,14 +120,13 @@ func TestSiblingRemembersARefusalButNotACancellation(t *testing.T) {
 
 // The same rule one level down, where the cost of getting it wrong is an
 // empty block card for the rest of the poll interval.
-func TestSiblingBlockRemembersARefusalButNotACancellation(t *testing.T) {
+func TestSiblingBlockRemembersARefusal(t *testing.T) {
 	for _, c := range []struct {
 		name string
 		err  error
 		want int
 	}{
 		{"a refused connection is an answer", errors.New("connect: connection refused"), 1},
-		{"a cut-off request is not", context.Canceled, 2},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			tr := &stubNeighbour{healthOK: true, err: c.err, calls: map[string]int{}}
@@ -351,4 +349,9 @@ func TestSiblingLinkPort(t *testing.T) {
 			t.Errorf("PEERMAP_SIBLING_LINK_PORT=%q: got %d, want %d", v, got, want)
 		}
 	}
+}
+
+// offSibling is the check a test wants: no neighbour, no request, no timeout.
+func offSibling() *siblingCheck {
+	return &siblingCheck{url: "off", now: time.Now}
 }

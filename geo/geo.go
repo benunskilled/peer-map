@@ -133,7 +133,7 @@ func Lookup(a netip.Addr) (loc Location, ok bool) {
 	default:
 		return Location{}, false
 	}
-	if ri == 0 {
+	if ri == 0 || ri >= len(tbl.regions) {
 		return Location{}, false
 	}
 	return tbl.regions[ri], true
@@ -156,14 +156,6 @@ func validateIndexes(t table) error {
 		}
 	}
 	return nil
-}
-
-// Country is Lookup reduced to the country code, "" when unknown.
-func Country(a netip.Addr) string {
-	if loc, ok := Lookup(a); ok {
-		return loc.Country
-	}
-	return ""
 }
 
 // FindRegion returns the table entry for a region by country and displayed
