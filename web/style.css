@@ -308,7 +308,13 @@ td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 .mini .swatch { width: 8px; height: 8px; margin-right: 4px; }
 
 @media (max-width: 860px) {
-  .map-card { flex-direction: column; }
+  /* Stacked, the map takes the full width and the height that goes with it.
+     Still wrapping, the column was sized by the map's content, and the
+     browser took a map of no width yet as 300 px (131 high): in Chrome the
+     box stayed that low and the map ran over the legend, in Safari the map
+     itself shrank to 300 px, now one, now the other as the map redrew. */
+  .map-card { flex-direction: column; flex-wrap: nowrap; }
+  .map-wrap { flex: none; width: 100%; }
   .side-tab { width: auto; border-left: 0; border-top: 1px solid var(--border); padding: 8px 12px; text-align: left; }
   .side-tab-label { writing-mode: horizontal-tb; }
   .side-tab-label::after { content: "▾"; }
