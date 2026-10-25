@@ -202,6 +202,8 @@ code { font-size: 12px; background: var(--panel-2); border: 1px solid var(--bord
   font: inherit; cursor: pointer;
 }
 .chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+/* The count in a table head looks like a chip but does nothing when clicked. */
+.chip.count { cursor: default; }
 .chip[aria-pressed="false"] { color: var(--muted); }
 .chip[aria-pressed="false"] .swatch { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); }
 .chip:focus-visible, .zoom button:focus-visible, .side-tab:focus-visible, .btn:focus-visible,
@@ -214,7 +216,6 @@ th button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent
 
 .place-filter { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); margin-left: 4px; }
 .place-filter b { color: var(--text); font-weight: 600; }
-.place-filter .why { font-size: 13px; }
 td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 .linkish { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 4px 6px; }
 .linkish:hover { color: var(--text); }
@@ -268,9 +269,12 @@ td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 }
 .zoom button:hover { border-color: var(--accent); }
 @media (max-width: 600px) {
-  .zoom { right: 6px; bottom: 6px; gap: 2px; }
+  /* On a phone the world is small and the buttons covered Asia and Australia:
+     the box grows by a strip under the map, and the buttons sit in it, in a row. */
+  .map-wrap { padding-bottom: 36px; }
+  .zoom { right: 6px; bottom: 4px; gap: 4px; flex-direction: row; }
   .zoom button { width: 28px; height: 28px; }
-  .map-level { left: 6px; bottom: 6px; font-size: 11px; }
+  .map-level { left: 6px; bottom: 8px; font-size: 11px; }
   .map-level-hint { display: none; }
 }
 
@@ -327,6 +331,16 @@ td .about { font-size: 12px; color: var(--muted); white-space: pre-line; }
 
 .scroll { overflow-x: auto; }
 table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+/* The three groups share their column widths (alignColumns in app.js): each
+   table is measured at its natural width, then laid out fixed so the same
+   widths land in the same places. */
+table.peers.measure { width: auto; }
+table.peers.aligned { table-layout: fixed; }
+.peers.aligned td { overflow: hidden; text-overflow: ellipsis; }
+/* Laid out, the kind's line may use the whole column (alignColumns gives it
+   the card's spare width); measured, it keeps its cap, so one long name does
+   not cost every table a column. */
+.peers.aligned small.ua { max-width: none; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
 .peers th:first-child, .peers td:first-child { padding-left: 20px; }
@@ -334,6 +348,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .peers tbody tr:last-child td { border-bottom: 0; }
 .peers th { font-weight: 500; color: var(--faint); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
 .peers th button { all: unset; cursor: pointer; }
+/* After the reset above, which took the focus ring with it. */
+.peers th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .peers th[aria-sort="ascending"] button::after { content: " ↑"; }
 .peers th[aria-sort="descending"] button::after { content: " ↓"; }
 .peers .num { text-align: right; }
@@ -359,9 +375,11 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
    labels are only for values that do not explain themselves. */
 /* A tight table drops columns before it turns into cards (fitTables). The
    doubled class outranks the card rules, which show every cell. */
-.scroll.scroll[data-drops="1"] .k-net,
-.scroll.scroll[data-drops="2"] .k-net, .scroll.scroll[data-drops="2"] .k-operator,
-.scroll.scroll[data-drops="3"] .k-net, .scroll.scroll[data-drops="3"] .k-operator, .scroll.scroll[data-drops="3"] .k-conntime { display: none; }
+.scroll.scroll[data-drops="1"] .k-conntime,
+.scroll.scroll[data-drops="2"] .k-conntime, .scroll.scroll[data-drops="2"] .k-ping,
+.scroll.scroll[data-drops="3"] .k-conntime, .scroll.scroll[data-drops="3"] .k-ping, .scroll.scroll[data-drops="3"] .k-net,
+.scroll.scroll[data-drops="4"] .k-conntime, .scroll.scroll[data-drops="4"] .k-ping, .scroll.scroll[data-drops="4"] .k-net,
+.scroll.scroll[data-drops="4"] .k-operator { display: none; }
 .scroll.cards { overflow-x: visible; }
 .scroll.cards table, .scroll.cards tbody { display: block; }
 .scroll.cards thead { display: none; }
@@ -410,6 +428,7 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 /* Rows: two lines each. */
 .peers td { vertical-align: middle; }
 .peers td.peer, .peers td.op { max-width: 280px; overflow: visible; }
+.peers td.peer { max-width: 360px; }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .who .flag { font-size: 15px; line-height: 1; margin: 0 7px 0 0; vertical-align: -1px; }
 .who-text { min-width: 0; }
@@ -417,20 +436,31 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 .op-name { font-weight: 400; max-width: 230px; }
 .peers small { display: block; color: var(--muted); font-size: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
 .peers small.sub { color: var(--faint); }
+/* A Tor exit changes what the row means; it should not sit as faint as the AS number. */
+.peers .tor-exit { color: var(--text); }
+/* Place and address on one line: room for "United States" and a full IPv4
+   address with its port, taken from Kind's spare room - Kind still gets
+   whatever is left over. */
+.peers td.peer small.sub { max-width: 320px; }
 .addr-txt { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--faint); }
 a.addr-txt:hover { color: var(--accent); }
-.peers .kind { display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
+/* The pill hangs left by its own padding, so its words start where the line under it does. */
+.peers .kind { margin-left: -9px; display: inline-block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); }
 .peers .kind.first { background: rgba(31,191,171,.12); color: #7fe3d6; }
 .peers .kind.disg, .peers .kind.lion { background: rgba(248,81,73,.12); color: #e5534b; }
 /* On an orange or focused row, and on hover, the see-through red would mix into another colour; laid over the
    panel colour it stays the same red as on a plain row. */
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }
-.peers .kind.never { margin-left: 6px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
+.peers .kind.never { margin-left: -7px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
-.peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; }
+.peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; color: var(--muted); }
+/* The software a peer names tells peers apart: as bright as the operator. */
+.peers .ua-name { color: var(--text); }
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
-/* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab. */
-.peers .net.type { color: var(--outbound); background: rgba(26,158,143,.15); border-color: transparent; }
+/* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab.
+   On a line of its own: only outbound peers have one, and beside the other
+   two tags it set Net's width for all three tables - empty space in two. */
+.peers .net.type { color: var(--outbound); background: rgba(26,158,143,.15); border-color: transparent; display: block; width: max-content; margin-top: 3px; }
 .peers tr.weak .who b { color: var(--muted); font-weight: 500; }
 
 /* Cards (a phone): the peer on top with its ping beside it on the right,
@@ -450,3 +480,21 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-operator .sub { flex: 0 0 auto; margin-left: 6px; white-space: nowrap; }
 .cards.cards table tr td.k-peer .who, .cards.cards table tr td.k-peer .who-text { min-width: 0; max-width: 100%; }
 .cards.cards table tr td.k-peer small.sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Phone cards: the kind pill takes the place of the ping, beside the place,
+   so a card is one row shorter. The pill stays short there - "never first"
+   moves to the grey line - and that line starts under the place, not under
+   the flag. */
+.never-sub, .tor-sub { display: none; }
+.cards.cards table tr td.k-ping { display: none; }
+.cards.cards table tr td.k-kind { display: contents; }
+/* The pill lies over the place line only: country and address below it keep
+   the whole width, and the place name gives way to the pill. */
+.cards.cards table tr td.k-peer { grid-column: 1 / -1; }
+.cards.cards table tr td.k-peer .who b { padding-right: 150px; }
+.cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
+.cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
+.cards.cards .kind .never-txt { display: none; }
+.cards.cards .never-sub, .cards.cards .tor-sub { display: inline; }
+.cards.cards table tr { --card-indent: 39px; }
+.cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }

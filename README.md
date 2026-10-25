@@ -2,76 +2,63 @@
 
 [![Tests](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml/badge.svg)](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/benunskilled/peer-map)](https://github.com/benunskilled/peer-map/releases)
 
-**Ever wondered who all these connections are? Peer Map shows where your node's peers are, who runs them and what they are.**
+Your node talks to strangers all day. Each one says what software it runs, but is it telling the truth? Peer Map takes a closer look: what the peer offers, whether it wants your transactions, how often it pings or asks for addresses, which chain it is on. A normal node, a wallet, a crawler, or a spy in disguise? Find out.
 
-Your live peers on a world map: their location, the provider that hosts them, and what they run – nodes, pool nodes, wallets, crawlers or scanners. Manual, outbound and inbound connections stay separate.
+The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. Open port 8333 and more strangers come knocking.
 
 ![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=2)
 
-## Not every peer is who it claims to be
+## What gives them away
 
-Some peers pretend to be Bitcoin Core or a wallet, but what Core observes doesn't match. Peer Map flags them as disguised. One of them has a name: LinkingLion, tracked by [0xB10C](https://b10c.me/observations/06-linkinglion/), connects to many nodes and may link transactions to their IP addresses. Peer Map shows each LinkingLion peer in its own red pill, whatever software it claims.
+A name is easy to fake. Behaviour is harder. Peer Map, for example, catches an ancient "Bitcoin Core" offering encryption that Core only got years later, a "Sat0shi" written with a zero, and a "Bitcoin Core" that keeps asking for your addresses because it is collecting them. It also spots a wallet speaking a protocol its app never knew.
 
-## Explore your node's neighbourhood
+Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawlers, university scanners and disguised peers. Hover over a label to see why the peer got it. Peers that can never bring you a block are marked, so you know who is just taking up a seat.
 
-Zoom from countries down to states and regions, click one to filter the tables, or show only inbound, outbound or manual connections.
+Some disguised peers even have a name. [LinkingLion](https://b10c.me/observations/06-linkinglion/), which may link transactions to the IP addresses they came from, gets its own red pill.
 
-The three groups show how each connection got there:
+It is a best guess from what one node can see, so a label can be wrong. Know better about one? [Open an issue](https://github.com/benunskilled/peer-map/issues) and I will happily fix it.
 
-| Group | What it means |
-|---|---|
-| **Manual** | Connections established through Core's `addnode` interface |
-| **Outbound** | Connections Core opened automatically – eight full-relay and two block-relay-only |
-| **Inbound** | Connections another peer opened to your node |
+## Where your peers are
 
-Each table includes the address, location, hosting provider, software, network, P2P transport, ping and time connected. The outbound table also shows which of the two kinds each connection is.
+Zoom from countries down to regions and click one to filter the tables. Your connections come in three groups: the manual peers you chose, the outbound peers Core picked for you, and the inbound peers that found you on their own.
 
-## Look beyond the map
+Peers spread across the world can still all live at one hosting company. If that company goes down, so do they. Sort by provider and you see it right away.
 
-**See which networks your peers use.** Three peers in three different countries may still be hosted by the same provider. Sort by provider to bring those connections together. The count of providers and countries above each table shows how widely your manual peers, for example, are spread.
+Some peers have no place on a map. Tor, I2P and CJDNS peers don't reveal where they sit, so they are counted beside it, together with the apps on your own Umbrel. Inbound IPv6 peers end up there too, because Docker hides their real address.
 
-**Understand the mix of software your peers run.** Peer Map recognises node software, pool nodes, wallets, light clients, crawlers and more. Each connection group shows a summary of that mix, with categories not expected to relay blocks marked in the tables.
-
-The labels come from each peer's own user agent, so they are what the peer claims. Next to them, Peer Map shows what Core itself observed: whether the peer offers services, relays transactions and follows a chain Core knows. Together, these details give you a fuller picture of who's connected.
-
-**Keep unplaced peers in view.** Tor, I2P and CJDNS peers have no public-IP location to plot. On Umbrel, Tor and I2P peers are shown as hidden, marked 🧅 and 🌐, and so are inbound IPv6 peers, whose real address Docker hides. Peers that come from your own Umbrel, such as its indexers, are marked 🏠 and named after their app. These connections are counted in a separate panel beside the map.
-
-The map uses approximate IP locations, with country labels generally more reliable than regional positions.
+Locations are roughly correct. A peer coming through a Tor exit is pinned where the exit stands, and marked as such.
 
 ![The peer tables, one per connection group](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/2.png?v=2)
 
 ## Follow a block through your node
 
-With [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) installed on the same node, a card above the map follows the newest block: which pool mined it and which of your peers delivered it first. With Stratum Race switched on and your own pool added to it, the card also follows the block all the way to your pool's mining job. The peers that delivered it are starred on the map and turn orange in the peer tables for two minutes; every peer that has ever delivered a block first keeps its address in green. Without Bitcoin Lab the card does not appear.
+Install [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) next to it and every new block gets its own story: which pool mined it and which of your peers brought it to you first. That peer lights up on the map, and its address stays green in the tables from then on.
 
-![Block 968,560 from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
+Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all the way to your mining job: your peer, Core, the block template, your pool. You see how much of the time each step takes.
 
-*Block 968,560 on my node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c).*
+![A block from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
-On that route the card draws each stretch to scale – from the first job any pool sent, through your peer, Core and the block template, to your own pool's job – and next to it the typical route over the last hundred blocks. You see which stretch takes the time. The template stretch also shows how many transactions it carried – that is what your own pool's time mostly depends on.
+*A block on my node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c).*
 
-## Local data, quiet operation
+## Quiet and local
 
-Peer Map reads your current connections. The map, geolocation and ASN data are bundled with the app, so looking up a peer does not send its address to an external service. Block details come from Bitcoin Lab on the same node, fetched alongside the peer list.
-
-The dashboard requests updates only while it is visible. Background tabs stop polling, and a dashboard with no mouse or keyboard activity for 30 minutes pauses until you resume it.
-
-There is no background collection job or stored peer history. The app is a single static Go binary using only the standard library, and on my node, with around 200 peers connected, it uses about 20 MB of RAM.
+No peer address goes to any outside service. The map and the location data are built into the app. Peer Map only asks Core for its peers when you're looking, and pauses after inactivity. It keeps no history and barely touches your node.
 
 ## Install on Umbrel
 
 Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store) and install **Peer Map**. It requires the official **Bitcoin Node** app. Tested with Bitcoin Core 31.1. Open it from Umbrel or at `<your-umbrel>:8791`.
 
-Curious which of your peers delivers new blocks first? [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab), in the same store, measures it. Both apps work on their own and complement each other.
+[Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) is in the same store. Both apps work on their own, but together they tell you even more.
 
 ## Data and attribution
 
-- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0 — data from October 2026.
-- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0 — data from October 2026.
+- Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0, data from October 2026.
+- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0, data from October 2026.
 - World map: Natural Earth, public domain.
+- Tor exits: the Tor Project's [bulk exit list](https://check.torproject.org/torbulkexitlist), bundled at build time.
 
-See [geo/SOURCE.md](geo/SOURCE.md) and [asn/SOURCE.md](asn/SOURCE.md) for data versions and update instructions.
+See [geo/SOURCE.md](geo/SOURCE.md), [asn/SOURCE.md](asn/SOURCE.md) and [torexit/SOURCE.md](torexit/SOURCE.md) for data versions and update instructions.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).

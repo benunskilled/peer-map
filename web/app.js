@@ -9,6 +9,8 @@
   const LAB_TARGET = window.matchMedia("(hover: none) and (pointer: coarse)").matches ? "_self" : "bitcoin-lab";
   const GROUPS = ["inbound", "outbound", "manual"];
   const INBOUND_LIMIT = 10;
+  // A peer reaching the node through Tor shows the exit's place and operator; the peer itself stays hidden behind it.
+  const TOR_EXIT_TITLE = "Tor exit: location and operator are the exit's, not the peer's";
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
@@ -92,7 +94,7 @@
       state.data = await r.json();
       state.receivedAt = Date.now();
       next = state.data.next_in || state.data.interval || 10;
-      render();
+      renderWhenFree();
     } catch (e) {
       showError("Peer Map backend not reachable: " + e.message);
     } finally {
@@ -143,7 +145,7 @@
         // Two minutes are up between two polls, and a paused dashboard never
         // polls again at all - so the star and the row colour take themselves
         // off rather than waiting for the next answer.
-        if (state.liveShown && !liveBlock()) render();
+        if (state.liveShown && !liveBlock()) renderWhenFree();
       }, 1000);
     }
   }
@@ -324,7 +326,10 @@
     const link = e.querySelector("a[data-tip]");
     const lines = [cut ? e.dataset.full : "", e.dataset.tip || ""];
     if (link) link.title = [...lines, link.dataset.tip].filter(Boolean).join("\n");
-    else e.title = lines.filter(Boolean).join("\n");
+    // No title at all rather than an empty one: an empty title hides the
+    // cell's own (the Tor exit explanation on the operator).
+    else if (lines.some(Boolean)) e.title = lines.filter(Boolean).join("\n");
+    else e.removeAttribute("title");
   });
 
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
@@ -370,7 +375,7 @@
       stops.push({
         kind: "peer", group: p ? p.group : "", t: s.core_ms - ping,
         name: hostOf(lead.addr) + more,
-        sub: p ? [where, p.operator].filter(Boolean) : ["no longer connected"],
+        sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
       });
     }
@@ -588,9 +593,9 @@
           const where = document.createElement("td");
           where.textContent = peer ? locLabel(peer) || "–" : "";
           const who = document.createElement("td");
-          who.textContent = peer ? peer.operator || "–" : "no longer connected";
+          who.textContent = peer ? (peer.operator || "–") + (peer.tor_exit ? " · Tor exit" : "") : "no longer connected";
           if (!peer) who.className = "miss";
-          if (peer && peer.asn) who.title = "AS" + peer.asn;
+          if (peer && peer.asn) who.title = "AS" + peer.asn + (peer.tor_exit ? "\n" + TOR_EXIT_TITLE : "");
           tr.append(a, where, who);
           t.appendChild(tr);
         }
@@ -607,7 +612,7 @@
     if (!b.stratum || !(b.stratum.entries || []).length) {
       const p = document.createElement("p");
       p.className = "note";
-      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off, or it was not running.";
+      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off.";
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
@@ -645,13 +650,74 @@
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
 
+  // Every refresh rebuilds the tables and the map, and with them whatever the
+  // reader had in hand: an address half selected for copying, a keyboard
+  // focus, a tooltip that kept showing the old numbers. So a refresh waits
+  // while something is selected, pressed or focused by keyboard - for 30 s at
+  // most - and comes the moment that is over. The tooltip is closed by it.
+  let pressedAt = 0;
+  let heldSince = 0;
+  let renderPending = false;
+  const HOLD_MAX_MS = 30000;
+  function busy() {
+    const sel = window.getSelection && window.getSelection();
+    if (sel && !sel.isCollapsed) return true;
+    if (pressedAt && Date.now() - pressedAt < 2000) return true;
+    const a = document.activeElement;
+    return Boolean(a && a !== document.body && a.matches && a.matches(":focus-visible") && a.closest(".peers, #map"));
+  }
+  function renderWhenFree() {
+    if (busy() && (!heldSince || Date.now() - heldSince < HOLD_MAX_MS)) {
+      if (!heldSince) heldSince = Date.now();
+      renderPending = true;
+      return;
+    }
+    heldSince = 0;
+    renderPending = false;
+    hideTip();
+    render();
+  }
+  const freed = () => { if (renderPending) setTimeout(renderWhenFree, 0); };
+  document.addEventListener("pointerdown", () => { pressedAt = Date.now(); }, true);
+  document.addEventListener("click", () => { pressedAt = 0; freed(); });
+  for (const t of ["pointerup", "pointercancel"]) {
+    document.addEventListener(t, () => setTimeout(() => { if (pressedAt) { pressedAt = 0; freed(); } }, 400), true);
+  }
+  document.addEventListener("selectionchange", freed);
+  document.addEventListener("focusout", freed);
+  window.addEventListener("blur", () => { pressedAt = 0; freed(); });
+
+  // What the reader is looking at stays where it is on a refresh. Keeping
+  // the scroll position alone is not that: when anything above grows or
+  // shrinks - a kind chip wrapping to another line, the block card, the list
+  // of peers not on the map - everything below moves. Chrome makes up for it
+  // itself (scroll anchoring); Safari does not, and the page jumped up and
+  // down there on its own (Ben 24.10.). The anchor is the topmost table row
+  // on screen, else the topmost card.
+  function readAnchor() {
+    if (window.scrollY < 1) return null;
+    const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight; };
+    const e = [...document.querySelectorAll("#tables tr[data-anchor]")].find(onScreen)
+      || [...document.querySelectorAll("main .card[id]")].find(onScreen);
+    if (!e) return null;
+    return { sel: e.dataset.anchor ? `tr[data-anchor="${CSS.escape(e.dataset.anchor)}"]` : "#" + CSS.escape(e.id), top: e.getBoundingClientRect().top };
+  }
+  function holdAnchor(a) {
+    if (!a) return;
+    const e = document.querySelector(a.sel);
+    if (!e || !e.getBoundingClientRect().height) return;
+    const d = e.getBoundingClientRect().top - a.top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+
   function render() {
     // Read before anything changes: rebuilding the tables makes the page
     // shorter for a moment, and Safari clamps the scroll position to it.
     const y = window.scrollY;
+    const anchor = readAnchor();
     const d = state.data;
     $("demo").hidden = !d.demo;
-    showError(d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "");
+    showError([d.error ? "Bitcoin Core: " + d.error + (d.fetched_at ? " - showing the last good peer list." : "") : "", state.worldError || ""].filter(Boolean).join(" "));
     $("version").textContent = "v" + (d.version || "dev");
 
     const counts = { manual: 0, inbound: 0, outbound: 0 };
@@ -668,6 +734,7 @@
     renderUnplaced();
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
+    holdAnchor(anchor);
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
@@ -1079,32 +1146,7 @@
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
     $("kindFilterName").textContent = state.kind || "";
-    $("kindFilterWhy").textContent = state.kind && KIND_WHY[state.kind] ? "- " + KIND_WHY[state.kind] : "";
   }
-
-  // Why a peer lands in a kind, in words - the rule from kindRules in
-  // kinds.go. Shown beside the kind filter, because "Only Pool node" says
-  // what is left but not what put it there. kinds_test.go checks that every
-  // kind there has a line here.
-  const KIND_WHY = {
-    "Pool node": 'its user agent names ckpool software (ckpool, ckp2p, ckcoind), or has "pool" in brackets (not "mempool")',
-    "Other chain": "its user agent names another chain (Bitcoin Cash clients such as ABC or Classic, Bitcoin SV, XT, and other forks)",
-    "Research scanner": "its user agent names a university or research network",
-    "Crawler": "its user agent says crawl, scan, seeder, census, monitor, watch, listener, bitnodes or similar",
-    "Indexer": "its user agent says electrs, electrum or esplora, or contains /mempool",
-    "Wallet": "its user agent names wallet software (bitcoinj, Wasabi, ...)",
-    "Light client": "its user agent says neutrino or Kyoto (Rust BIP-157)",
-    "Node (Floresta)": "its user agent says Floresta",
-    "Disguised": "it claims software it is not: Core misspelt (Sat0shi, Satoshi2, no slashes), a version offering what that version never had (v2 before Core 26), lacking what it must always offer, or speaking a protocol it never spoke, Core offering nothing, a wallet offering blocks or speaking a newer protocol than it can, or LinkingLion under a borrowed name (tracked by 0xB10C, b10c.me)",
-    "Node (Knots)": "its user agent says Knots",
-    "Node (Core)": 'its user agent starts with "/Satoshi:"',
-    "Other": "its user agent matches none of the known kinds",
-    "No user agent": "it has sent no user agent, or an empty one - usually a port check, a connection still starting, or a tool keeping quiet",
-    "Node (btcd)": "its user agent says btcd",
-    "Node (libbitcoin)": "its user agent says libbitcoin",
-    "Node (bcoin)": "its user agent says bcoin",
-    "Node (Gocoin)": "its user agent says Gocoin",
-  };
 
   // Both filters redraw the same three things, and the map is in that list on
   // purpose: after clicking "5 Pool node" the next question is where those
@@ -1219,6 +1261,11 @@
   function setupPanZoom() {
     const svg = $("map");
     svg.addEventListener("wheel", (e) => {
+      // Zoomed all the way out, turning the wheel further out is the page's:
+      // over a map that fills the screen, scrolling past it was impossible.
+      // A trackpad pinch arrives as a wheel with ctrlKey: still the map's, or
+      // the browser zooms the whole page.
+      if (state.view.k <= 1 && e.deltaY > 0 && !e.ctrlKey) return;
       e.preventDefault();
       const p = toSvg(e.clientX, e.clientY);
       zoomAt(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
@@ -1359,6 +1406,7 @@
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
     if (p.chain_unknown) flags.push("chain unknown");
+    if (p.fork) flags.push(p.fork);
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
@@ -1415,6 +1463,7 @@
   const placeTitle = (p) => p.network === "not_publicly_routable" ? (p.app || "This Umbrel")
     : p.region || (p.cc ? regionName(p.cc) : netLabel(p.network));
   const neverNote = (p) => !p.no_relay ? ""
+    : p.fork ? "On a chain of its own, not yours - it can never deliver one of your blocks first."
     : p.no_services ? "Offers no services, so it has no blocks to pass on - it can never deliver one first."
     : "Software that does not pass blocks on - this peer can never deliver one first.";
   const line = (cls, text) => {
@@ -1444,7 +1493,9 @@
         b.textContent = title;
         if (HIDDEN[p.network]) b.dataset.tip = HIDDEN[p.network].tip;
         const sub = document.createElement("small");
-        if (p.region && p.cc) sub.append(regionName(p.cc) + " ");
+        if (p.region && p.cc) {
+          sub.append(regionName(p.cc) + " ");
+        }
         // What the row colour means, said where the peer is named rather
         // than over every cell of the row.
         const got = deliveredNow.has(p.addr) ? "Delivered the newest block first"
@@ -1489,7 +1540,19 @@
         name.className += " op-name";
         name.textContent = p.operator || "";
         td.appendChild(name);
-        if (p.asn) td.appendChild(line("sub", "AS" + p.asn));
+        // The AS number stays faint; "Tor exit" is bright, because it changes
+        // what the row means: the place and operator are the exit's.
+        if (p.asn || p.tor_exit) {
+          const e = line("sub", p.asn ? "AS" + p.asn + (p.tor_exit ? " · " : "") : "");
+          if (p.tor_exit) {
+            const tor = document.createElement("span");
+            tor.className = "tor-exit";
+            tor.textContent = "Tor exit";
+            e.append(tor);
+          }
+          td.appendChild(e);
+        }
+        if (p.tor_exit) td.title = TOR_EXIT_TITLE;
       },
     },
     {
@@ -1505,23 +1568,74 @@
         // LinkingLion has its own pill whatever software it claims; the
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
-        // Never-first peers: the kind and the fact in the pill; what Core saw
-        // (no services, chain unknown) moves to the line under it, so the
-        // pill is never cut before the words that matter.
+        // The pill says the kind and nothing else, for every peer: what Core
+        // saw (no services, no tx, chain unknown) goes to the line under it.
+        // One layout in every row, and the pill is never cut.
         const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
         const never = p.no_relay ? " \u00b7 never first" : "";
-        const label = p.linking_lion ? "LinkingLion" + never : p.no_relay ? p.kind + never : kindLabel(p);
+        const label = (p.linking_lion ? "LinkingLion" : p.kind) + never;
         if (p.no_relay) {
           const ico = document.createElement("span");
           ico.className = "ico";
           ico.textContent = "⊘";
           pill.append(ico, " ");
         }
-        pill.append(label);
-        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
+        // On a phone card the pill sits beside the place and stays short:
+        // "never first" moves to the line under it there (style.css).
+        pill.append(p.linking_lion ? "LinkingLion" : p.kind);
+        if (never) {
+          const n = document.createElement("span");
+          n.className = "never-txt";
+          n.textContent = never;
+          pill.append(n);
+        }
+        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         td.appendChild(pill);
-        const under = [p.no_relay || p.linking_lion ? flags : "", p.subver].filter(Boolean).join(" \u00b7 ");
-        if (under) td.appendChild(fit(line("sub ua", under), under));
+        // What Core saw stays grey; the name the peer sends is bright, it is
+        // what tells one "Other" from the next. The user's own apps on this
+        // Umbrel need no flags: nothing about them is a surprise.
+        const seen = p.app ? "" : flags;
+        const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
+        if (under || never || p.tor_exit) {
+          const e = line("sub ua", "");
+          // "no tx" says on hover why, where Core's messages tell it.
+          const parts = seen ? seen.split(", ") : [];
+          parts.forEach((f, i) => {
+            if (i) e.append(", ");
+            // The same for other rules the peer says it enforces.
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
+            if (why) {
+              const s = document.createElement("span");
+              s.className = f === "no tx" ? "no-tx" : "no-tx fork";
+              s.textContent = f;
+              s.title = why;
+              e.append(s);
+            } else e.append(f);
+          });
+          if (seen && p.subver) e.append(" \u00b7 ");
+          if (never) {
+            const n = document.createElement("span");
+            n.className = "never-sub";
+            n.textContent = "never first" + (under ? " \u00b7 " : "");
+            e.prepend(n);
+          }
+          // A phone card has no operator column, where "Tor exit" stands on a
+          // wide screen: it leads this line there instead.
+          if (p.tor_exit) {
+            const t = document.createElement("span");
+            t.className = "tor-sub tor-exit";
+            t.textContent = "Tor exit" + (under || never ? " \u00b7 " : "");
+            t.title = TOR_EXIT_TITLE;
+            e.prepend(t);
+          }
+          if (p.subver) {
+            const name = document.createElement("span");
+            name.className = "ua-name";
+            name.textContent = p.subver;
+            e.append(name);
+          }
+          td.appendChild(fit(e, under));
+        }
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then.
         if (state.kind && p.about) {
@@ -1657,6 +1771,7 @@
       const tbody = document.createElement("tbody");
       for (const p of shown) {
         const tr = document.createElement("tr");
+        tr.dataset.anchor = g + " " + p.addr;
         if (state.focus && p.addr === state.focus) tr.className = "focus";
         // The peer that brought the newest block, for as long as the star
         // is up - one rule for "just delivered", in the row and on the map.
@@ -1719,24 +1834,94 @@
   // there, so a reader far down was thrown up on every refresh. The position
   // is put back before anything is painted.
   //
-  // Before that, a tight table gives up its least important columns a step at
-  // a time - Net, then Operator, then Connected (see [data-drops] in
-  // style.css). Cards came far too early otherwise: a laptop window a little
-  // under 1200px already stacked every peer into five or six lines.
-  const DROP_LEVELS = 3;
+  // Before that, a tight table gives up what matters least, a step at a time
+  // (see [data-drops] in style.css): Connected, then Ping, then Net, and
+  // Operator last (Ben 24.10.: Ping and Connected matter less than anything
+  // else). The first three steps are also taken when the tables would fit
+  // but the kind's text would be cut. The address always stays: it is the
+  // link into Bitcoin Lab.
+  const DROP_LEVELS = 4, KIND_LEVEL = 3;
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
+    const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
     for (const w of wraps) w.classList.remove("cards");
-    const tight = () => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
+    // Tight when the shared widths (alignColumns) together are wider than
+    // the card. Each table is measured there too; asking whether one table
+    // overflows on its own counted Kind at its full length again.
+    const tight = () => {
+      unalign();
+      return sharedTooWide(wraps);
+    };
     let level = 0;
     for (; ; level++) {
       for (const w of wraps) w.dataset.drops = String(level);
-      if (level === DROP_LEVELS || !tight()) break;
+      if (level === DROP_LEVELS) break;
+      if (tight()) continue;
+      if (level < KIND_LEVEL) {
+        alignColumns(wraps);
+        if (kindCut(wraps)) continue;
+      }
+      break;
     }
     const cards = level === DROP_LEVELS && tight();
     for (const w of wraps) w.classList.toggle("cards", cards);
+    if (!cards) alignColumns(wraps);
     if (window.scrollY !== y) window.scrollTo(0, y);
+  }
+  const kindCut = (wraps) => wraps.some((w) =>
+    [...w.querySelectorAll("td.k-kind small.ua")].some((e) => e.offsetWidth && e.scrollWidth > e.clientWidth + 1));
+
+  // Inbound, Outbound and Manual have the same columns, and each table sized
+  // them to its own content: Operator, Kind, Net and Ping stood in a
+  // different place in every group, so the page read as three. Each column
+  // now gets the widest of the three natural widths, the same in every
+  // table, and fixed layout spreads the rest of the card's width the same way
+  // in each. A closed group has no width to measure and is left out until it
+  // opens (the toggle listener runs this again).
+  const colKey = (th) => [...th.classList].find((c) => c.startsWith("k-")) || String(th.cellIndex);
+  function sharedWidths(wraps) {
+    const tables = wraps.map((w) => w.querySelector("table.peers")).filter((t) => t && t.offsetWidth);
+    const widths = new Map();
+    for (const t of tables) {
+      t.classList.add("measure");
+      for (const th of t.tHead.rows[0].cells) th.style.width = "";
+    }
+    for (const t of tables) {
+      for (const th of t.tHead.rows[0].cells) {
+        widths.set(colKey(th), Math.max(widths.get(colKey(th)) || 0, th.getBoundingClientRect().width));
+      }
+      t.classList.remove("measure");
+    }
+    return { tables, widths };
+  }
+  // For the question whether columns must go, Kind counts as wide as an
+  // ordinary entry needs (a pill and /Satoshi:31.1.0/): one long text
+  // among two hundred peers took Operator, Net, Ping and Connected away from
+  // all three tables and left Outbound and Manual mostly empty. A longer
+  // text is cut and shown whole on hover.
+  const KIND_MIN = 200;
+  function sharedTooWide(wraps) {
+    const { tables, widths } = sharedWidths(wraps);
+    let sum = 0;
+    for (const [k, v] of widths) sum += k === "k-kind" ? Math.min(v, KIND_MIN) : v;
+    return tables.some((t) => sum > t.parentElement.clientWidth + 1);
+  }
+  // Kind takes whatever the card has left over, so its text is cut only when
+  // there is truly no room.
+  function alignColumns(wraps) {
+    const { tables, widths } = sharedWidths(wraps);
+    let others = 0;
+    for (const [k, v] of widths) if (k !== "k-kind") others += Math.ceil(v);
+    for (const t of tables) {
+      const spare = t.parentElement.clientWidth - others;
+      for (const th of t.tHead.rows[0].cells) {
+        const k = colKey(th);
+        const w = k === "k-kind" ? Math.max(KIND_MIN, spare) : Math.ceil(widths.get(k));
+        th.style.width = w + "px";
+      }
+      t.classList.add("aligned");
+    }
   }
   let fitTimer = null;
   // Only a change of width can change whether the tables fit; on an iPhone the
@@ -1752,7 +1937,9 @@
 
   // ---------- start ----------
   setupPanZoom();
-  loadWorld().then(() => { if (state.data) renderMarkers(); });
+  loadWorld()
+    .then(() => { if (state.data) renderMarkers(); })
+    .catch((e) => { state.worldError = "The world map could not be loaded: " + e.message; showError(state.worldError); });
   startTicker();
   refresh();
 })();

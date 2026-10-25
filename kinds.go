@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 // Order matters: the first match wins, so a more specific pattern goes above
 // a more general one (Knots before Core - a Knots user agent contains
 // "Satoshi" too).
+//
 // relays says whether this kind of software passes blocks on at all. It is the
 // same distinction Bitcoin Lab paints red in its peer list, and it has to stay
 // the same in both apps: a colour that means two different things in two
@@ -64,30 +66,63 @@ var kindRules = []struct {
 	// clientversion.cpp). /ckp2p:/ is ckpool's own block relay: ckp2p.c on
 	// the p2pcrawler and nodrop branches of github.com/ckolivas/ckpool (not
 	// on master, which is why it was once taken for someone else's).
-	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)`), true},
+	// P2Pool's bitcoind connection says /P2Pool:x/ (p2pool/bitcoin/p2p.py), and
+	// a name that is itself a pool - /pydroid-pool:3/ - is one too.
+	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds_`), false},
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-`), false},
+	// Pool Detective, MIT's Digital Currency Initiative watching what mining
+	// pools do: its block observer speaks btcd's old wire library and adds
+	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
+	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
-	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool`), false},
-	// SPV and mobile wallets. bitcoinj is the Android wallet's library.
-	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|bither|multibit|wasabi|Bitcoin Wallet`), false},
-	// BIP157 light clients: neutrino, which Lightning wallets on lnd use, and
-	// Kyoto, which announces itself as "Rust BIP-157". btcwire alone is only
+	// NBXplorer, BTCPay Server's indexer, names itself "NBXplorer-" and a
+	// random number (Backend/Indexer.cs in dgarage/NBXplorer).
+	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool|^NBXplorer-|^/symphony:`), false},
+	// SPV and mobile wallets. bitcoinj is the Android wallet's library. Most
+	// of them ask a node for their transactions through a bloom filter
+	// (BIP37), which Core leaves off by default: at such a node they leave
+	// within a second (peer-observer, 21. to 24.10.2026: Bitcoin Wallet a
+	// median 0.1 s, BRD 0.3 s), at one that offers it they stay. /WalletKit:/
+	// is Unstoppable Wallet on iPhone (Peer.swift in
+	// horizontalsystems/BitcoinCore.Swift), /BitcoinKit:/ the same wallet on
+	// Android (VersionMessage.kt in horizontalsystems/bitcoin-kit-android).
+	{"Wallet", regexp.MustCompile(`(?i)bitcoinj|breadwallet|/bread:|bither|multibit|wasabi|Bitcoin Wallet|^/blueberry:|^/winnow:|^/BitcoinKit:|^/WalletKit:|^/Ladybug:|^/hodlwallet:|/spvwallet:`), false},
+	// Lightning wallets on lnd that follow the chain through neutrino, its
+	// BIP157 client: Zeus and Blixt among them. Named apart from the other
+	// light clients so the wallets among the peers show as wallets. In
+	// peer-observer's record of the node this was written for, 21. to
+	// 24.10.2026: 403 sessions from 78 addresses, more than any other wallet
+	// besides Wasabi.
+	// lit, the Lightning node MIT's Digital Currency Initiative built with an
+	// SPV client of its own, says "/btcwire:0.4.1/lit:v0.1/" (uspv/init.go
+	// in mit-dci/lit, last changed in 2022).
+	{"Lightning wallet", regexp.MustCompile(`(?i)neutrino|/lit:v`), false},
+	// Other BIP157 light clients: Kyoto, which announces itself as
+	// "Rust BIP-157". btcwire alone is only
 	// the Go p2p library, which says nothing about the program using it, so it
 	// stays out here and is caught by "Other" below.
-	{"Light client", regexp.MustCompile(`(?i)neutrino|BIP-157|kyoto`), false},
+	// VerifiedX, a sidechain that holds bitcoin: each of its validators keeps
+	// eight Bitcoin peers to follow the chain itself, asking for headers and
+	// now and then a block, never a transaction (BtcSources.cs and
+	// BtcLightClient.cs in VerifiedXBlockchain/VerifiedX-Core, from 9.0 of
+	// 24.10.2026). On the node this was written for, 12 of 238 peers that
+	// day, all inbound, from 12 addresses at six hosting companies.
+	// nakamoto, cloudhead's light client on compact block filters, says
+	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -96,6 +131,15 @@ var kindRules = []struct {
 	{"Node (libbitcoin)", regexp.MustCompile(`(?i)libbitcoin`), true},
 	{"Node (bcoin)", regexp.MustCompile(`(?i)/bcoin:`), true},
 	{"Node (Gocoin)", regexp.MustCompile(`(?i)gocoin`), true},
+	// Bitcoin Ghost (github.com/bitcoin-ghost/ghost): ghostd, a fork of Core
+	// v30, UA_NAME "Ghost" in clientversion.cpp.
+	{"Node (Ghost)", regexp.MustCompile(`^/Ghost:`), true},
+	// Full nodes written from scratch, each sending its own name (checked in
+	// its source): the hashhog fleet of ten languages (github.com/hashhog),
+	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
+	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, and tbcd, the
+	// Hemi network's Bitcoin daemon (hemilabs/heminetwork).
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -170,10 +214,52 @@ var aboutRules = []struct {
 	re   *regexp.Regexp
 	text string
 }{
-	{regexp.MustCompile(`(?i)seeder`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from"},
-	{regexp.MustCompile(`(?i)census|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes"},
+	{regexp.MustCompile(`(?i)seeder|dnsseed`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from"},
+	{regexp.MustCompile(`(?i)census|survey|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes"},
+	// One address, 142 sessions in four days, each gone after its version
+	// message. Elastum was an exchange; elastum.io no longer resolves.
+	{regexp.MustCompile(`(?i)/Elastum:`), "Names Elastum, a former exchange; talks to nodes through bitcoinj"},
+	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
+	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
+	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
+	{regexp.MustCompile(`(?i)^/CamlCoin:`), "CamlCoin, a Bitcoin full node written in OCaml (hashhog)"},
+	{regexp.MustCompile(`(?i)^/rustoshi:`), "rustoshi, a Bitcoin full node written in Rust (hashhog)"},
+	{regexp.MustCompile(`(?i)^/LunarBlock:`), "LunarBlock, a Bitcoin full node written in Lua (hashhog)"},
+	{regexp.MustCompile(`^/Haskoin:`), "A Bitcoin full node written in Haskell (hashhog)"},
+	{regexp.MustCompile(`(?i)^/beamchain:`), "beamchain, a Bitcoin full node written in Erlang (hashhog)"},
+	{regexp.MustCompile(`(?i)^/blockbrew:`), "blockbrew, a Bitcoin full node written in Go (hashhog)"},
+	{regexp.MustCompile(`(?i)^/clearbit:`), "clearbit, a Bitcoin full node written in Zig (hashhog)"},
+	{regexp.MustCompile(`(?i)^/nimrod:`), "nimrod, a Bitcoin full node written in Nim (hashhog)"},
+	{regexp.MustCompile(`(?i)^/bitcoin-hybrid:`), "ouroboros, a Bitcoin full node written in Rust and Python (hashhog)"},
+	{regexp.MustCompile(`(?i)^/rbitcoin:`), "rbitcoin, a Bitcoin full node written in Rust (reardencode)"},
+	{regexp.MustCompile(`(?i)^/rbtc:`), "rbtc, Bitcoin Core rewritten in Rust"},
+	{regexp.MustCompile(`(?i)^/BitcoinEcho:`), "Bitcoin Echo, a full node in plain C, meant to be frozen as it is"},
+	{regexp.MustCompile(`(?i)^/BitcoinMachineCode:`), "Bitcoin Machine Code, a node written in x86 assembly, entirely AI-generated"},
+	{regexp.MustCompile(`(?i)^/kernel-node:`), "kernel-node, a node built on libbitcoinkernel, Core's validation engine as a library"},
+	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network"},
+	{regexp.MustCompile(`(?i)hemi-soak`), "A soak test of the Hemi network's Bitcoin code"},
+	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly"},
+	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly; its census dials every reachable node daily under the same name"},
+	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet on Android and others)"},
+	{regexp.MustCompile(`^/WalletKit:`), "Unstoppable Wallet on iPhone"},
+	{regexp.MustCompile(`(?i)^/Ladybug:`), "Ladybug, a wallet built on bitcoinj"},
+	{regexp.MustCompile(`(?i)^/hodlwallet:`), "HODL Wallet, a phone wallet"},
+	{regexp.MustCompile(`^Yuki /`), "Yuki, a light client by Impervious built on Kyoto"},
+	{regexp.MustCompile(`^/VerifiedX:`), "A VerifiedX validator: a sidechain that holds bitcoin and follows the chain for it. Asks for headers about every 10 seconds, sometimes a block, takes no transactions"},
+	{regexp.MustCompile(`(?i)^/LionSeed:`), "LionSeed, a DNS seeder that lists only the nodes of one fork"},
+	{regexp.MustCompile(`(?i)^/gnoban:`), "gnoban, a tool that scores nodes and bans the ones its operator does not want"},
+	{regexp.MustCompile(`^libbtc `), "libbtc, a small C library for Bitcoin wallets and tools"},
+	{regexp.MustCompile(`(?i)^/haskoin-btc:`), "Haskoin, a Haskell library for Bitcoin wallets and tools"},
+	{regexp.MustCompile(`(?i)^/sashimi:`), "sashimi, small Unix tools for Bitcoin by josibake"},
+	{regexp.MustCompile(`(?i)^/bridge:`), "Probably castor, Floresta's Utreexo bridge node"},
+	{regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project"},
+	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools; offers Libre Relay's service bit and came only through Tor"},
+	{regexp.MustCompile(`(?i)^/Aurum:`), "Aurumcoin, an altcoin built on Bitcoin Core 0.12"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
-	{regexp.MustCompile(`(?i)breadwallet|/bread:`), "BRD (breadwallet), a phone wallet shut down in 2022"},
+	// breadwallet-core sends "/bread:" with its own version, 2.1 since 2019
+	// (BRPeer.h), also in BRD's later WalletKit (blockset-corp/walletkit).
+	{regexp.MustCompile(`^/bread:`), "BRD's wallet core: the BRD app, shut down in 2022, or a wallet built on its code"},
+	{regexp.MustCompile(`(?i)breadwallet`), "BRD (breadwallet), a phone wallet shut down in 2022"},
 	{regexp.MustCompile(`(?i)multibit`), "MultiBit, a desktop wallet discontinued in 2017"},
 	{regexp.MustCompile(`(?i)bither`), "Bither, a wallet for phone and desktop"},
 	{regexp.MustCompile(`(?i)wasabi`), "Wasabi Wallet, a desktop wallet"},
@@ -186,7 +272,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets"},
 	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool"},
 	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder"},
-	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: picks up new blocks for the pool and pushes the pool's own blocks out fast; never relays transactions"},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
@@ -195,6 +281,10 @@ var aboutRules = []struct {
 	// it (net_processing.cpp, IsPrivateBroadcastConn). The one seen on the
 	// node this was written for came from a Tor exit, v2, offering nothing.
 	{regexp.MustCompile(`^/pynode:0\.0\.1/$`), "Probably Bitcoin Core handing over a transaction privately, then leaving"},
+	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
+	// rune 1:0 in chains of transactions; on the node this was written for it
+	// pushed unannounced 66-byte transactions, the size of such a sweep.
+	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet, pushing the transactions unannounced"},
 	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
@@ -202,6 +292,39 @@ var aboutRules = []struct {
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
+	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
+	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
+	// observer/src/protocol.rs in 0xB10C/p2p-observer, work in progress in
+	// October 2026; extractors/p2p in peer-observer/peer-observer, which a
+	// node connects to itself when told to (addnode).
+	// src/sync/stages/pull/peer.rs in maestro-org/maestro-symphony;
+	// src/crawl.rs in achow101/dnsseedrs; Satscraft/bip324-probe.
+	// Bitcoin Lab's record of the node this was written for, 13.9. to
+	// 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
+	// transactions, gone after 18 seconds at the median; the same handshake
+	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr).
+	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler, asks for addresses"},
+	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
+	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
+	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
+	{regexp.MustCompile(`^/p2p-observer:`), "p2p-observer, 0xB10C's tool that connects to nodes to watch the network"},
+	{regexp.MustCompile(`^/p2p-extractor:`), "peer-observer's p2p extractor: your node was told to connect to it, and it records what your node sends"},
+	{regexp.MustCompile(`^/AgenticBitcoin:`), "AgenticBitcoin, Bitcoin rewritten in Rust by AI agents"},
+	{regexp.MustCompile(`^/SatoshiSharp:`), "SatoshiSharp, parts of Bitcoin written in C#"},
+	{regexp.MustCompile(`^NBXplorer-`), "NBXplorer, the indexer behind BTCPay Server"},
+	// NodeConstants.scala in bitcoin-s/bitcoin-s; indexer.rs in stacks-core.
+	{regexp.MustCompile(`^/bitcoin-s:`), "bitcoin-s, a Bitcoin toolkit in Scala with a light client on compact block filters"},
+	{regexp.MustCompile(`^Stacks/`), "A Stacks node: follows Bitcoin's blocks for the Stacks chain built on it"},
+	{regexp.MustCompile(`/utreexod:`), "utreexod, a Utreexo full node built on btcd"},
+	{regexp.MustCompile(`^/python-bitcoinlib:`), "python-bitcoinlib, a Python library for scripts and tests"},
+	{regexp.MustCompile(`^/nakamoto:`), "nakamoto, a light client on compact block filters"},
+	{regexp.MustCompile(`(?i)/spvwallet:`), "spvwallet, the wallet of OpenBazaar, a marketplace closed in 2021"},
+	// Autarkysoft's C# toolkit (Configuration.cs); it pushes transactions
+	// under "/Satoshi:0.22.0/" instead, so only its own name lands here.
+	{regexp.MustCompile(`^/Denovo:`), "Denovo, a Bitcoin toolkit in C#: pushes transactions, mines on testnet"},
+	// network.py in jimmysong/programmingbitcoin and the course exercises.
+	{regexp.MustCompile(`^/programming(bitcoin|blockchain):`), "Code from Jimmy Song's book or course Programming Bitcoin"},
+	{regexp.MustCompile(`^/bip324-ts:`), "bip324-ts, a TypeScript library for encrypted v2 connections"},
 	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015"},
 	// btcd's wire library with the app name after it left empty.
 	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty"},
@@ -239,14 +362,31 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 		guess = "a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
 	case wallet && v2:
 		guess = "a scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
-	case services != nil && len(services) == 0:
-		guess = "a crawler - it offers nothing"
-	case blocks:
-		guess = "a scanner or node that hides what it runs - it offers blocks"
+	case misspeltCore(subver) != "":
+		guess = "not Bitcoin Core - " + misspeltCore(subver)
+		if services != nil && len(services) == 0 {
+			guess += " and offers no services"
+		}
 	default:
 		guess = "unknown software"
 	}
 	return "Claims: " + claim + "\nProbably: " + guess
+}
+
+var coreNameWithSuffix = regexp.MustCompile(`^/(Satoshi[0-9X]+):`)
+
+// misspeltCore says how a name imitating Core's differs from it, for the
+// three spellings the Disguised rule catches, or "".
+func misspeltCore(subver string) string {
+	switch {
+	case strings.HasPrefix(subver, "/Sat0shi:"):
+		return "it writes Sat0shi with a zero"
+	case coreNameWithSuffix.MatchString(subver):
+		return "Core calls itself /Satoshi:, this one /" + coreNameWithSuffix.FindStringSubmatch(subver)[1] + ":"
+	case strings.HasPrefix(subver, "Satoshi:"):
+		return "Core writes its name between slashes: /" + strings.Trim(subver, "/") + "/"
+	}
+	return ""
 }
 
 // LinkingLion opens connections to many nodes from a few address ranges and
@@ -342,7 +482,7 @@ func anachronism(subver string, services []string) string {
 	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
 	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
 	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
-		return "unknown software - it lacks the pruned-node service, which Core has always offered since 0.16"
+		return "not Bitcoin Core - it lacks a service every Core since 0.16 offers"
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
@@ -368,15 +508,15 @@ func coreAtLeast(subver string, major, minor int) bool {
 	return ok && (maj > major || maj == major && mnr >= minor)
 }
 
+// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
+var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
+
 // protocolMismatch is a peer whose protocol version does not match the Core
 // release it names: Core 0.21 to 31 send 70016 (later ones 70017 or more),
 // every release before sends 70015 or less. Development builds (x.99) are
 // left alone: "0.20.99" was already 0.21 under way. On one node, in four
 // days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
 // "/Satoshi:31.0.0/" fleet with 70015 - and no real Core node either way.
-// devBuild is a Core development build: 0.20.99 (0.21 under way) or 31.99.0.
-var devBuild = regexp.MustCompile(`^/Satoshi:[0-9]+\.([0-9]+\.)?99[./]`)
-
 func protocolMismatch(subver string, version int) string {
 	maj, mnr, ok := coreRelease(subver)
 	if !ok || version == 0 || devBuild.MatchString(subver) {
@@ -385,11 +525,36 @@ func protocolMismatch(subver string, version int) string {
 	newer := maj >= 22 || mnr >= 21
 	switch {
 	case newer && version < 70016:
-		return fmt.Sprintf("unknown software - it speaks protocol %d, older than any Core since 0.21", version)
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, older than any Core since 0.21", version)
 	case !newer && version >= 70016:
-		return fmt.Sprintf("unknown software - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
 	}
 	return ""
+}
+
+// skipsWtxidrelay is a peer naming Core 0.21 or later that finished its
+// handshake without sending wtxidrelay. Every Core since 0.21 sends it right
+// after the version message to a peer speaking 70016 or later
+// (net_processing.cpp, WTXID_RELAY_VERSION; unchanged in 25.1 and 28.1), and
+// getpeerinfo counts it under bytesrecv_per_msg. On the node this was written
+// for, on 24.10.2026: all 18 outbound Core and Knots peers and 74 inbound ones
+// sent it; of those that did not, 26 were Wasabi, two followed blocks for
+// hours offering nothing, and two passed for nodes.
+// Core sends it only when both sides speak 70016, so on a node older than
+// 0.21 no peer sends it at all: anySent, whether any peer in the list sent
+// one, keeps such a node from striking every modern peer.
+func skipsWtxidrelay(subver string, version int, recv map[string]int64, anySent bool) bool {
+	return anySent && recv != nil && recv["verack"] > 0 && recv["wtxidrelay"] == 0 &&
+		version >= 70016 && coreAtLeast(subver, 0, 21)
+}
+
+// skippedHandshakeAbout names what the peer left out. sendaddrv2 is sent
+// under the same condition as wtxidrelay, so it is named when it is missing too.
+func skippedHandshakeAbout(recv map[string]int64) string {
+	if recv["sendaddrv2"] == 0 {
+		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21"
+	}
+	return "not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21"
 }
 
 // offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no
@@ -402,7 +567,139 @@ func offersNothingAsCore(subver string, services []string) bool {
 	return services != nil && len(services) == 0 && claimedCore.MatchString(subver)
 }
 
-const offersNothingAbout = "a crawler or scanner - it offers nothing, which Core always does"
+// offersNothingAbout names the services Core always offers, rather than
+// guessing what the peer is.
+const offersNothingAbout = "not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED"
+
+// Libre Relay (github.com/petertodd/bitcoin, branches libre-relay-v28.0 to
+// v31.1) is Core under Core's own name with service bit 29 added
+// (NODE_LIBRE_RELAY in protocol.h). Core lists that bit as "UNKNOWN[2^29]".
+// Libre Relay opens extra connections to nodes advertising it and drops them
+// at once when the bit is missing ("does not offer libre relay as expected").
+// Garbageman (github.com/chrisguida/bitcoin, branches garbageman-v28,
+// garbageman-v29, garbageman-29.3) is a Knots fork with the Knots part of
+// its name commented out, so it says "/Satoshi:29.1.0/" or 29.3.0, and it
+// advertises the same bit to draw Libre Relay nodes in and drop what they
+// send. Libre Relay has no 29.3 and Garbageman nothing past 29, so the
+// version tells them apart except up to 29.1. On the node this was written
+// for, 21. to 24.10.2026: 21 connections with the bit from 12 addresses,
+// 18 of them as 30.2.0, all gone straight after the version message.
+const libreRelayService = "UNKNOWN[2^29]"
+
+// libreRelay is the kind and about for a Core name offering bit 29, or "", "".
+func libreRelay(subver string, services []string) (string, string) {
+	if !slices.Contains(services, libreRelayService) {
+		return "", ""
+	}
+	m := claimedCore.FindStringSubmatch(subver)
+	if m == nil {
+		return "", ""
+	}
+	maj, _ := strconv.Atoi(m[1])
+	mnr, _ := strconv.Atoi(m[2])
+	garbageman := "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"
+	switch {
+	case strings.Contains(subver, "Knots:"):
+		// Libre Relay is Core; only a Garbageman built with its Knots name left in says Knots.
+		return fakeWalletKind, garbageman
+	case maj >= 30:
+		return "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"
+	case maj == 29 && mnr >= 2:
+		return fakeWalletKind, garbageman
+	}
+	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"
+}
+
+// Wasabi Wallet 2.8 connects to nodes itself, always through Tor since 2.8.2
+// (PR #15003), so it reaches a clearnet node from a Tor exit. Each connection
+// names one of these Core versions at random (Constants.UserAgents in
+// WalletWasabi/Helpers/Constants.cs, used by P2pConnectionManager.cs), offers
+// nothing and asks for transactions. On the node this was written for, on
+// 24.10.2026: 27 such peers at once, 23 of them from Tor exits, every version
+// from this list and none outside it, each fetching transactions and headers
+// for hours, some also compact block filters. In five weeks before: 1,420
+// such sessions, 73% from Tor exits. A crawler borrowing one of these names
+// usually turns transaction relay off; one that keeps it on is counted here
+// as a wallet. Forks carry lists of their own in between
+// (Zecure: 18 names from 0.20.0 to 28.1.0, each on this list or Ginger's),
+// so the about says "or a fork".
+var wasabiAgents = map[string]bool{
+	"/Satoshi:30.2.0/": true, "/Satoshi:30.0.0/": true,
+	"/Satoshi:29.3.0/": true, "/Satoshi:29.2.0/": true, "/Satoshi:29.0.0/": true,
+	"/Satoshi:28.1.0/": true, "/Satoshi:28.0.0/": true,
+	"/Satoshi:27.2.0/": true, "/Satoshi:27.1.0/": true, "/Satoshi:27.0.0/": true,
+	"/Satoshi:26.2.0/": true, "/Satoshi:26.1.0/": true, "/Satoshi:26.0.0/": true,
+}
+
+// Ginger Wallet, a fork of Wasabi, does the same with the older list Wasabi
+// had before 2.5 (Constants.UserAgents in GingerPrivacy/GingerWallet), also
+// through Tor. On the node this was written for, in five weeks: 161 sessions
+// with a name only on this list, offering nothing and relaying transactions,
+// 89% from Tor exits, the names spread evenly over the list.
+var gingerAgents = map[string]bool{
+	"/Satoshi:26.0.0/": true, "/Satoshi:25.1.0/": true, "/Satoshi:25.0.0/": true, "/Satoshi:24.2.0/": true,
+	"/Satoshi:24.1.0/": true, "/Satoshi:24.0.1/": true, "/Satoshi:24.0.0/": true, "/Satoshi:23.2.0/": true,
+	"/Satoshi:23.1.0/": true, "/Satoshi:23.0.0/": true, "/Satoshi:22.1.0/": true, "/Satoshi:22.0.0/": true,
+	"/Satoshi:0.21.2/": true, "/Satoshi:0.21.1/": true, "/Satoshi:0.21.0/": true, "/Satoshi:0.20.2/": true,
+	"/Satoshi:0.20.1/": true, "/Satoshi:0.20.0/": true, "/Satoshi:0.19.1/": true, "/Satoshi:0.19.0.1/": true,
+	"/Satoshi:0.19.0/": true, "/Satoshi:0.18.1/": true, "/Satoshi:0.18.0/": true, "/Satoshi:0.17.2/": true,
+	"/Satoshi:0.17.1/": true, "/Satoshi:0.17.0.1/": true, "/Satoshi:0.17.0/": true, "/Satoshi:0.16.3/": true,
+	"/Satoshi:0.16.2/": true, "/Satoshi:0.16.1/": true, "/Satoshi:0.16.0/": true,
+}
+
+// Wasabi also searches for nodes: each wallet runs ten crawlers that connect
+// through Tor with the same random name and transaction relay off, take the
+// address list and leave within 15 seconds (CreateCrawler in
+// P2pConnectionManager.cs). Ginger has no such crawler. Both speak through
+// NBitcoin, whose handshake sends sendaddrv2 and verack and nothing else
+// (Node.cs): no wtxidrelay, no sendcmpct. In peer-observer's record of the
+// node this was written for, 21. to 24.10.2026: 3,247 such searches, the 13
+// names 228 to 289 times each, every one with start height 0 and asking for
+// addresses, and 402 wallet connections, 20 to 41 per name. Another 101 with
+// these names sent sendcmpct instead of sendaddrv2, unevenly spread: other
+// software, left Disguised.
+
+// virtu's p2p-crawler (github.com/virtu/p2p-crawler), which counts reachable
+// nodes for research, sends one fixed version message: "/Satoshi:23.0.0/" at
+// protocol 70015, no services, relay off, start height 0 (protocol.py). Core
+// 23 speaks 70016. In peer-observer's record of the node this was written
+// for, 21. to 24.10.2026: 6 sessions with exactly this, all inbound; the 27
+// others under that name spoke 70016.
+func p2pCrawlerSays(subver string, version int, services []string, relayTxes *bool) bool {
+	return subver == "/Satoshi:23.0.0/" && version == 70015 && services != nil && len(services) == 0 &&
+		relayTxes != nil && !*relayTxes
+}
+
+// behindCoreName is the kind and about for Wasabi, Ginger and Wasabi's peer
+// search, or "", "". recv is bytesrecv_per_msg. NBitcoin speaks 70016.
+func behindCoreName(subver string, version int, services []string, relayTxes *bool, recv map[string]int64) (string, string) {
+	if p2pCrawlerSays(subver, version, services, relayTxes) {
+		return "Crawler", "Claims: " + claimOf(subver) + "\nProbably: p2p-crawler, virtu's research crawler - its fixed version message: protocol 70015, no services, no transactions"
+	}
+	if services == nil || len(services) > 0 || relayTxes == nil || version < 70016 {
+		return "", ""
+	}
+	// Anything beyond NBitcoin's handshake is other software.
+	if recv["wtxidrelay"] > 0 || recv["sendcmpct"] > 0 {
+		return "", ""
+	}
+	claim := "Claims: " + claimOf(subver) + "\nProbably: "
+	if !*relayTxes {
+		if wasabiAgents[subver] && recv["sendaddrv2"] > 0 {
+			return "Crawler", claim + fmt.Sprintf("Wasabi Wallet's peer search - one of its %d borrowed Core names, offers nothing, asks only for addresses", len(wasabiAgents))
+		}
+		return "", ""
+	}
+	switch {
+	case wasabiAgents[subver] && gingerAgents[subver]:
+		return "Wallet", claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
+	case wasabiAgents[subver]:
+		return "Wallet", claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
+	case gingerAgents[subver]:
+		return "Wallet", claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
+	}
+	return "", ""
+}
 
 // What a peer does, not what it says. Core pings every two minutes
 // (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
@@ -426,7 +723,8 @@ const (
 // is not counted.
 func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 {
 	switch transport {
-	case "v1":
+	// Core before 26 has no transport field and speaks only v1.
+	case "v1", "":
 		return bytes / (payload + 24)
 	case "v2":
 		if shortID {
@@ -476,11 +774,29 @@ func claimOf(subver string) string {
 
 // otherAbout is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string) string {
+func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64) string {
 	for _, s := range services {
 		if s == "NETWORK" {
 			return "Probably a full node under a name its operator chose"
 		}
+	}
+	// What it did, where Core counted it: a name nobody knows still says
+	// little, its messages say more. Seen on the node this was written for,
+	// 21. to 24.10.2026: /pwsh-pusher/ and /p2aburn/ pushing transactions
+	// nobody asked for, a family of /reset-header-.../ names and others
+	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
+	// /relay-geo:0.1/ fetching every transaction and announcing none.
+	switch {
+	case recv["tx"] > 0 && recv["inv"] == 0:
+		return "Unknown software that pushes transactions without announcing them"
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
+	// Asking for data alone is no sign of listening: a peer that fetches
+	// blocks asks the same way. Only transactions sent to it count.
+	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
+		return "Unknown software that listens to transactions: fetches every one it hears of, announces none"
+	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
+		return "Unknown software that collects addresses"
 	}
 	return "Software with a name we don't recognise"
 }
@@ -520,18 +836,87 @@ func relaysBlocks(subver string) bool {
 // "(mempool.guide)" label does not make a node a pool node.
 var mempoolWord = regexp.MustCompile(`(?i)mempool`)
 
+var bracketed = regexp.MustCompile(`\([^)]*\)`)
+
+// The kinds that read only the agent outside the brackets. Bitcoin Lab's
+// test reads this list, so both apps agree on it.
+var readsBareName = map[string]bool{"Research scanner": true, "Crawler": true, "Indexer": true, "Wallet": true, "Lightning wallet": true, "Light client": true}
+
+// emptyName is a user agent with nothing in it but slashes, or a version
+// without a name before it: "//" came 523 times in three days from two
+// addresses, "/:1.1.0-dev+c1771608d/" ten times - nothing said, as with none.
+var emptyName = regexp.MustCompile(`^/*$|^/:[^/]*/$`)
+
 func classify(subver string) (string, bool) {
-	if subver == "" {
+	if subver == "" || emptyName.MatchString(subver) {
 		return noAgentKind, true
 	}
+	// The bracketed comment is the operator's own label. It may say a node
+	// belongs to a pool, but a word like "monitor" or "electrs" in it says
+	// what the operator runs beside it, not what the peer is: those kinds
+	// read only the name outside the brackets.
+	bare := bracketed.ReplaceAllString(subver, "")
 	for _, r := range kindRules {
 		s := subver
 		if r.name == "Pool node" {
 			s = mempoolWord.ReplaceAllString(subver, "")
+		} else if readsBareName[r.name] {
+			s = bare
 		}
 		if r.re.MatchString(s) {
 			return r.name, r.relays
 		}
 	}
 	return "Other", true
+}
+
+// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h on
+// its 29.x-knots branch): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
+// ReducedData rules, bit 28 NODE_BLAKE2B, a node enforcing a hard fork to
+// BLAKE2b proof of work (and ReducedData). Core lists them as UNKNOWN[2^n].
+// In peer-observer's record of the node this was written for, 21. to
+// 25.10.2026, with that node at height 973,026: 898 sessions offering bit 28
+// from 406 addresses reported start heights around 978,000, a chain of their
+// own; 2,719 offering bit 27 from 921 addresses reported around 961,000, the
+// BIP110 chain, which went its own way. Neither can deliver a block of this
+// node's chain, so both count as never first. The
+// node had also dialled 33 and 18 of them itself, each holding an outbound
+// slot for 40 to 65 seconds at the median, up to 22 minutes. Crawlers repeat
+// bits they saw elsewhere (/bitcoin-seeder:0.01/ sent both), so only nodes and
+// unknown software count.
+// forkTipSlack is how many blocks behind the tip a peer's headers may be and
+// still count as this chain: one block found while the answer was on its way,
+// with room to spare.
+const forkTipSlack = 6
+
+const (
+	reducedDataService = "UNKNOWN[2^27]"
+	blake2bService     = "UNKNOWN[2^28]"
+)
+
+// forkOf is the flag and its hover text for a peer offering one of those
+// bits, or "", "". A peer whose headers reach this node's tip follows this
+// chain whatever it offers, and is not flagged: in Bitcoin Lab's record of the
+// node this was written for, 3,945 of 3,947 sessions with bit 27 shared no
+// header past about 961,000 while the node was thousands of blocks further;
+// the other two, a home-built node, were at the tip. synced is the peer's
+// synced_headers (nil or -1 while unknown), tip the highest of any peer.
+func forkOf(services []string, kind string, synced *int64, tip int64) (string, string) {
+	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
+		return "", ""
+	}
+	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced <= forkTipSlack {
+		return "", ""
+	}
+	has := map[string]bool{}
+	for _, s := range services {
+		has[s] = true
+	}
+	switch {
+	case has[blake2bService]:
+		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is on a chain of its own, not yours"
+	case has[reducedDataService]:
+		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
+	}
+	return "", ""
 }
