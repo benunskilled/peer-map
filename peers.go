@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/netip"
+	"os"
 	"strings"
 	"time"
 
@@ -179,14 +180,9 @@ func group(p rawPeer) string {
 		return "outbound"
 	case "feeler", "addr-fetch":
 		return ""
-	case "":
-		// Core older than 0.21 has no connection_type; fall back to direction.
-		if p.Inbound {
-			return "inbound"
-		}
-		return "outbound"
 	default:
-		// A type a future Core adds: show it by direction rather than hide it.
+		// Core older than 0.21 has no connection_type, and a future Core may
+		// add a type: either way, show it by direction rather than hide it.
 		if p.Inbound {
 			return "inbound"
 		}
@@ -254,19 +250,30 @@ func operator(p rawPeer) (asn.Info, bool) {
 // peer's own address is gone. On the node this was written for: 9,935 inbound
 // sessions in four weeks, against not one outbound IPv6 connection (Core
 // knew 13,357 IPv6 addresses and had tried none successfully).
-const dockerGateway = "10.21.0.1"
+var dockerGateway = envOr("PEERMAP_DOCKER_GATEWAY", "10.21.0.1")
 
 // hiddenIPv6 is the network such a peer is shown under instead of "Private".
 const hiddenIPv6 = "ipv6_hidden"
 
 // Tor and I2P peers reach Core through the proxy containers in Umbrel's
-// network, which put their own address in place of the peer's.
+// network, which put their own address in place of the peer's. The Bitcoin
+// Node app exports both addresses (exports.sh); the defaults are its values.
+var (
+	torProxy = envOr("APP_BITCOIN_TOR_PROXY_IP", "10.21.22.10")  // bitcoin_tor_1
+	i2pProxy = envOr("APP_BITCOIN_I2P_DAEMON_IP", "10.21.22.11") // bitcoin_i2pd_daemon_1
+)
+
 const (
-	torProxy  = "10.21.22.10" // bitcoin_tor_1
-	i2pProxy  = "10.21.22.11" // bitcoin_i2pd_daemon_1
 	torHidden = "tor_hidden"
 	i2pHidden = "i2p_hidden"
 )
+
+func envOr(name, def string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return def
+}
 
 // isPrivate: an address inside a private network, such as the one umbrelOS
 // runs its apps in.
@@ -275,7 +282,10 @@ func isPrivate(addr string) bool {
 	return err == nil && a.Unmap().IsPrivate()
 }
 
-func convert(raw []rawPeer) []Peer {
+func convert(raw []rawPeer) []Peer { return convertAt(raw, time.Now()) }
+
+// convertAt is convert on a given clock, the one the source runs on.
+func convertAt(raw []rawPeer, now time.Time) []Peer {
 	out := make([]Peer, 0, len(raw))
 	// What the whole list says, for checks that need more than one peer:
 	// the highest header any peer shares (this node's tip, as far as its
@@ -295,9 +305,10 @@ func convert(raw []rawPeer) []Peer {
 		if g == "" {
 			continue
 		}
+		kind, relays := classify(r.Subver)
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
-			Subver: r.Subver, Kind: kindOf(r.Subver), About: aboutOf(r.Subver), NoRelay: !relaysBlocks(r.Subver),
+			Subver: r.Subver, Kind: kind, About: aboutOf(r.Subver), NoRelay: !relays,
 			ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
 		}
@@ -323,27 +334,39 @@ func convert(raw []rawPeer) []Peer {
 				claim, _, _ = strings.Cut(p.About, ",")
 				claim = "the wallet " + claim
 			}
-			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, time.Now())
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, now)
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case libreKind != "":
 			p.Kind, p.About = libreKind, libreAbout
 		case borrowedKind != "" &&
-			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()) == "":
+			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now) == "":
 			p.Kind, p.About = borrowedKind, borrowedAbout
 		default:
 			// What a peer does says more than what it lacks: a crawler asking
 			// for addresses again and again is named that, whatever else is off.
-			if why := behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, time.Now()); why != "" {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
-			} else if why := anachronism(r.Subver, r.ServicesNames); why != "" {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
-			} else if why := protocolMismatch(r.Subver, r.Version); why != "" {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
-			} else if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+skippedHandshakeAbout(r.BytesRecvPerMsg)
-			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
+			// The first check that answers wins.
+			for _, check := range []func() string{
+				func() string { return behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now) },
+				func() string { return anachronism(r.Subver, r.ServicesNames) },
+				func() string { return protocolMismatch(r.Subver, r.Version) },
+				func() string {
+					if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
+						return skippedHandshakeAbout(r.BytesRecvPerMsg)
+					}
+					return ""
+				},
+				func() string {
+					if offersNothingAsCore(r.Subver, r.ServicesNames) {
+						return offersNothingAbout
+					}
+					return ""
+				},
+			} {
+				if why := check(); why != "" {
+					p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
+					break
+				}
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
