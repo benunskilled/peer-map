@@ -587,42 +587,43 @@ func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
 	core := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 		Subver: "/Satoshi:28.0.0/", Transport: "v1", ConnTime: conn, ServicesNames: all,
 		BytesRecvPerMsg: map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24, "ping": 32 * 30}}
+	// Each case is judged next to this ordinary Core, which sent wtxidrelay.
 	if got := convert([]rawPeer{core})[0]; got.Kind != "Node (Core)" {
 		t.Errorf("Core sending wtxidrelay: got %q / %q", got.Kind, got.About)
 	}
 	r := core
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
-	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind ||
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind ||
 		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21" {
 		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
 	}
 	// With sendaddrv2 sent, only wtxidrelay is named.
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
-	if got := convert([]rawPeer{r})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21" {
+	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21" {
 		t.Errorf("only wtxidrelay missing: got %q", got.About)
 	}
 	// Knots is Core underneath and sends it too.
 	r.Subver = "/Satoshi:29.2.0/Knots:20251110/"
-	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind {
 		t.Errorf("Knots without wtxidrelay: got %q", got.Kind)
 	}
 	// Still in its handshake: nothing to judge yet.
 	r = core
 	r.BytesRecvPerMsg = map[string]int64{"version": 126}
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
 		t.Errorf("before verack: got %q", got.Kind)
 	}
 	// Core before 0.21 never sent it.
 	r = core
 	r.Subver, r.Version, r.ServicesNames = "/Satoshi:0.20.1/", 70015, []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24}
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
 		t.Errorf("Core 0.20: got %q / %q", got.Kind, got.About)
 	}
 	// No byte counts at all, as from an older Core: no judgement.
 	r = core
 	r.BytesRecvPerMsg = nil
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
 		t.Errorf("no counts: got %q", got.Kind)
 	}
 }
@@ -823,8 +824,50 @@ func TestForkBits(t *testing.T) {
 		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
 		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
 	} {
-		if got, why := forkOf(c.svc, c.kind); got != c.want || (got != "") != (why != "") {
+		if got, why := forkOf(c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
 			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
+		}
+	}
+	// Headers decide when they are known: at the tip it is this chain, stuck
+	// thousands of blocks back it is not, and -1 (not yet known) leaves the bit.
+	bip110 := []string{"NETWORK", "UNKNOWN[2^27]"}
+	for _, c := range []struct {
+		synced int64
+		want   string
+	}{{972597, ""}, {972591, ""}, {972590, "BIP110 fork"}, {961170, "BIP110 fork"}, {-1, "BIP110 fork"}} {
+		h := c.synced
+		if got, _ := forkOf(bip110, "Other", &h, 972597); got != c.want {
+			t.Errorf("synced %d at tip 972597: got %q, want %q", c.synced, got, c.want)
+		}
+	}
+}
+
+func TestWtxidrelayNeedsSomeoneToSendIt(t *testing.T) {
+	core := rawPeer{Addr: "198.51.100.8:8333", ConnectionType: "outbound-full-relay", Version: 70016,
+		Subver: "/Satoshi:28.1.0/", ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"},
+		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
+	// A node older than 0.21 asks no peer for it, so nobody sends it.
+	if got := convert([]rawPeer{core})[0]; got.Kind == fakeWalletKind {
+		t.Errorf("no peer sent wtxidrelay, still struck: %q", got.About)
+	}
+	other := core
+	other.Addr = "198.51.100.9:8333"
+	other.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "wtxidrelay": 24, "sendaddrv2": 24}
+	if got := convert([]rawPeer{core, other})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("another peer sent wtxidrelay, this one did not: got %q", got.Kind)
+	}
+}
+
+func TestLightningWalletReadsTheBareName(t *testing.T) {
+	// A word in an operator's brackets does not make Core a Lightning wallet,
+	// as with every kind in readsBareName; Bitcoin Lab reads it the same way.
+	for subver, want := range map[string]string{
+		"/Satoshi:28.0.0(neutrino)/": "Node (Core)",
+		"/Satoshi:29.0.0(lit:v1)/":   "Node (Core)",
+		"/neutrino:0.17.1/":          "Lightning wallet",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
 		}
 	}
 }

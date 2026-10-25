@@ -539,8 +539,11 @@ func protocolMismatch(subver string, version int) string {
 // for, on 24.10.2026: all 18 outbound Core and Knots peers and 74 inbound ones
 // sent it; of those that did not, 26 were Wasabi, two followed blocks for
 // hours offering nothing, and two passed for nodes.
-func skipsWtxidrelay(subver string, version int, recv map[string]int64) bool {
-	return recv != nil && recv["verack"] > 0 && recv["wtxidrelay"] == 0 &&
+// Core sends it only when both sides speak 70016, so on a node older than
+// 0.21 no peer sends it at all: anySent, whether any peer in the list sent
+// one, keeps such a node from striking every modern peer.
+func skipsWtxidrelay(subver string, version int, recv map[string]int64, anySent bool) bool {
+	return anySent && recv != nil && recv["verack"] > 0 && recv["wtxidrelay"] == 0 &&
 		version >= 70016 && coreAtLeast(subver, 0, 21)
 }
 
@@ -836,7 +839,7 @@ var bracketed = regexp.MustCompile(`\([^)]*\)`)
 
 // The kinds that read only the agent outside the brackets. Bitcoin Lab's
 // test reads this list, so both apps agree on it.
-var readsBareName = map[string]bool{"Research scanner": true, "Crawler": true, "Indexer": true, "Wallet": true, "Light client": true}
+var readsBareName = map[string]bool{"Research scanner": true, "Crawler": true, "Indexer": true, "Wallet": true, "Lightning wallet": true, "Light client": true}
 
 // emptyName is a user agent with nothing in it but slashes, or a version
 // without a name before it: "//" came 523 times in three days from two
@@ -880,15 +883,28 @@ func classify(subver string) (string, bool) {
 // slot for 40 to 65 seconds at the median, up to 22 minutes. Crawlers repeat
 // bits they saw elsewhere (/bitcoin-seeder:0.01/ sent both), so only nodes and
 // unknown software count.
+// forkTipSlack is how many blocks behind the tip a peer's headers may be and
+// still count as this chain: one block found while the answer was on its way,
+// with room to spare.
+const forkTipSlack = 6
+
 const (
 	reducedDataService = "UNKNOWN[2^27]"
 	blake2bService     = "UNKNOWN[2^28]"
 )
 
 // forkOf is the flag and its hover text for a peer offering one of those
-// bits, or "", "".
-func forkOf(services []string, kind string) (string, string) {
+// bits, or "", "". A peer whose headers reach this node's tip follows this
+// chain whatever it offers, and is not flagged: in Bitcoin Lab's record of the
+// node this was written for, 3,945 of 3,947 sessions with bit 27 shared no
+// header past about 961,000 while the node was thousands of blocks further;
+// the other two, a home-built node, were at the tip. synced is the peer's
+// synced_headers (nil or -1 while unknown), tip the highest of any peer.
+func forkOf(services []string, kind string, synced *int64, tip int64) (string, string) {
 	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
+		return "", ""
+	}
+	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced <= forkTipSlack {
 		return "", ""
 	}
 	has := map[string]bool{}
