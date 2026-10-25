@@ -807,3 +807,21 @@ func TestVirtusCrawlerBehindCore23(t *testing.T) {
 		t.Errorf("70016 is not the crawler: %q", got.About)
 	}
 }
+
+func TestForkBits(t *testing.T) {
+	for _, c := range []struct {
+		svc        []string
+		kind, want string
+	}{
+		{[]string{"NETWORK", "WITNESS", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Node (Core)", "BIP110"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Other", "BIP110"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
+		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
+	} {
+		if got, why := forkOf(c.svc, c.kind); got != c.want || (got != "") != (why != "") {
+			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
+		}
+	}
+}
