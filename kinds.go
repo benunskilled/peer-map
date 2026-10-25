@@ -860,3 +860,39 @@ func classify(subver string) (string, bool) {
 	}
 	return "Other", true
 }
+
+// Service bits Knots gives to rules other than Bitcoin's (src/protocol.h on
+// its 29.x-knots branch): bit 27 NODE_REDUCED_DATA, a node enforcing BIP110's
+// ReducedData rules, bit 28 NODE_BLAKE2B, a node enforcing a hard fork to
+// BLAKE2b proof of work (and ReducedData). Core lists them as UNKNOWN[2^n].
+// In peer-observer's record of the node this was written for, 21. to
+// 25.10.2026, with that node at height 973,026: 898 sessions offering bit 28
+// from 406 addresses reported start heights around 978,000, a chain of their
+// own; 2,719 offering bit 27 from 921 addresses reported around 961,000. The
+// node had also dialled 33 and 18 of them itself, each holding an outbound
+// slot for 40 to 65 seconds at the median, up to 22 minutes. Crawlers repeat
+// bits they saw elsewhere (/bitcoin-seeder:0.01/ sent both), so only nodes and
+// unknown software count.
+const (
+	reducedDataService = "UNKNOWN[2^27]"
+	blake2bService     = "UNKNOWN[2^28]"
+)
+
+// forkOf is the flag and its hover text for a peer offering one of those
+// bits, or "", "".
+func forkOf(services []string, kind string) (string, string) {
+	if kind != "Other" && !strings.HasPrefix(kind, "Node") {
+		return "", ""
+	}
+	has := map[string]bool{}
+	for _, s := range services {
+		has[s] = true
+	}
+	switch {
+	case has[blake2bService]:
+		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is on a chain of its own, not yours"
+	case has[reducedDataService]:
+		return "BIP110", "Offers Knots' ReducedData bit (service bit 27): it rejects blocks that break BIP110's rules, so it may no longer follow your chain"
+	}
+	return "", ""
+}

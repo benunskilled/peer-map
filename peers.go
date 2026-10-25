@@ -152,6 +152,8 @@ type Peer struct {
 	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
 	NoTxWhy      string   `json:"no_tx_why,omitempty"`     // why, where it can be told
 	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
+	Fork         string   `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
+	ForkWhy      string   `json:"fork_why,omitempty"`
 	PingMs       *float64 `json:"ping_ms"`
 	// The lowest round trip Core has ever measured to this peer. Closer to
 	// the line itself than the last ping, which also carries whatever was
@@ -355,6 +357,7 @@ func convert(raw []rawPeer) []Peer {
 		if p.NoTxRelay {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
+		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind)
 		if r.Inbound {
 			switch hostOf(r.Addr) {
 			case dockerGateway:

@@ -1406,6 +1406,7 @@
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
     if (p.chain_unknown) flags.push("chain unknown");
+    if (p.fork) flags.push(p.fork);
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
@@ -1587,7 +1588,7 @@
           n.textContent = never;
           pill.append(n);
         }
-        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p)].filter(Boolean).join("\n"));
+        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         td.appendChild(pill);
         // What Core saw stays grey; the name the peer sends is bright, it is
         // what tells one "Other" from the next. The user's own apps on this
@@ -1600,11 +1601,13 @@
           const parts = seen ? seen.split(", ") : [];
           parts.forEach((f, i) => {
             if (i) e.append(", ");
-            if (f === "no tx" && p.no_tx_why) {
+            // The same for other rules the peer says it enforces.
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
+            if (why) {
               const s = document.createElement("span");
-              s.className = "no-tx";
+              s.className = f === "no tx" ? "no-tx" : "no-tx fork";
               s.textContent = f;
-              s.title = p.no_tx_why;
+              s.title = why;
               e.append(s);
             } else e.append(f);
           });
