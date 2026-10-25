@@ -398,3 +398,74 @@ func TestHomeOfFallsBackToInboundAndOtherwiseNil(t *testing.T) {
 func geoLookup(ip string) (geo.Location, bool) {
 	return geo.Lookup(netip.MustParseAddr(ip))
 }
+
+func TestTorExitPeer(t *testing.T) {
+	list, err := os.ReadFile("torexit/exits.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exit, _, _ := strings.Cut(string(list), "\n")
+	got := convert([]rawPeer{
+		{Addr: exit + ":51234", Network: "ipv4", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:30.2.0/"},
+		{Addr: "192.0.2.1:51234", Network: "ipv4", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:30.2.0/"},
+	})
+	if !got[0].TorExit || got[1].TorExit {
+		t.Errorf("tor_exit = %v, %v; want true, false", got[0].TorExit, got[1].TorExit)
+	}
+}
+
+func TestRPCWithoutResultIsNotEmpty(t *testing.T) {
+	// A reply with no list used to read as "no peers" and replace the last good map.
+	for _, body := range []string{`{"result":null,"error":null}`, `{}`} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(body))
+		}))
+		c := &rpcClient{url: srv.URL + "/", http: srv.Client()}
+		if _, err := c.getPeerInfo(context.Background()); err == nil || !strings.Contains(err.Error(), "without a result") {
+			t.Errorf("%s: got %v", body, err)
+		}
+		srv.Close()
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"result":[],"error":null}`))
+	}))
+	defer srv.Close()
+	c := &rpcClient{url: srv.URL + "/", http: srv.Client()}
+	if peers, err := c.getPeerInfo(context.Background()); err != nil || len(peers) != 0 {
+		t.Errorf("an empty list is a real answer: got %v, %v", peers, err)
+	}
+}
+
+func TestNoTxWhy(t *testing.T) {
+	no := false
+	all := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	base := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:31.1.0/", Transport: "v2", ServicesNames: all, RelayTxes: &no,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "wtxidrelay": 13, "sendaddrv2": 13, "verack": 13}}
+	cases := []struct {
+		name string
+		edit func(r *rawPeer)
+		want string
+	}{
+		{"inbound block-relay-only", func(r *rawPeer) {}, "Its node opened this connection for blocks only"},
+		{"inbound blocksonly=1", func(r *rawPeer) { r.BytesRecvPerMsg = map[string]int64{"wtxidrelay": 13, "verack": 13, "getaddr": 33} },
+			"Its node runs with blocksonly=1: no transactions at all"},
+		{"our own block-relay-only", func(r *rawPeer) { r.Inbound, r.ConnectionType = false, "block-relay-only" },
+			"Your node opened this connection for blocks only"},
+		{"handshake not done", func(r *rawPeer) { r.BytesRecvPerMsg = map[string]int64{"version": 126} }, "Wants no transactions from your node"},
+		{"not Core", func(r *rawPeer) { r.Subver = "/btcwire:0.5.0/neutrino:0.12.0-beta/" }, "Wants no transactions from your node"},
+	}
+	for _, c := range cases {
+		r := base
+		c.edit(&r)
+		if got := convert([]rawPeer{r})[0].NoTxWhy; got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+	yes := true
+	r := base
+	r.RelayTxes = &yes
+	if got := convert([]rawPeer{r})[0].NoTxWhy; got != "" {
+		t.Errorf("relaying peer: got %q", got)
+	}
+}

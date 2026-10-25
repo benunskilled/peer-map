@@ -166,6 +166,11 @@ func (c *rpcClient) getPeerInfo(ctx context.Context) ([]rawPeer, error) {
 		// transport error it names nothing about where the node lives.
 		return nil, &shownError{line: fmt.Sprintf("RPC error %d: %s", out.Error.Code, out.Error.Message)}
 	}
+	// A reply without a list is not "no peers": taking it as one replaced the
+	// last good list with an empty map. An empty list decodes as [], not nil.
+	if out.Result == nil {
+		return nil, &shownError{line: "sent no peer list", err: fmt.Errorf("RPC reply without a result (HTTP %d)", resp.StatusCode)}
+	}
 	return out.Result, nil
 }
 
@@ -199,7 +204,6 @@ type source struct {
 	last    time.Time // when the last answer came in; the window runs from there
 	lastErr string    // the last failure logged, so a node that stays down logs once
 	snap    snapshot
-	calls   int // RPC calls made, for tests and the log
 }
 
 func (s *source) get(ctx context.Context) snapshot {
@@ -207,7 +211,6 @@ func (s *source) get(ctx context.Context) snapshot {
 	defer s.mu.Unlock()
 	now := s.now()
 	if s.last.IsZero() || now.Sub(s.last) >= interval {
-		s.calls++
 		// The call belongs to this app, not to the browser request that
 		// triggered it: a dashboard that navigates away mid-poll used to
 		// cancel the RPC, and the cancellation was then cached as Core's
@@ -234,7 +237,7 @@ func (s *source) get(ctx context.Context) snapshot {
 		default:
 			s.last = now
 			s.lastErr = ""
-			s.snap.Peers = convert(raw)
+			s.snap.Peers = convertAt(raw, now)
 			s.snap.Home = homeOf(raw)
 			s.snap.FetchedAt = now.Unix()
 			s.snap.Error = ""
@@ -264,12 +267,25 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 		io.WriteString(w, "ok\n")
 	})
 	mux.HandleFunc("GET /api/peers", func(w http.ResponseWriter, r *http.Request) {
-		snap := src.get(r.Context())
-		snap.Sibling = sib.installed(r.Context())
-		if snap.Sibling {
-			snap.SiblingPort = siblingLinkPort()
+		// The locks are held across Core's and Bitcoin Lab's answers, up to
+		// 24 seconds. A browser that gives up meanwhile stops waiting here;
+		// the work goes on in the background, so the next poller gets it.
+		ready := make(chan snapshot, 1)
+		go func() {
+			snap := src.get(r.Context())
+			snap.Sibling = sib.installed(r.Context())
+			if snap.Sibling {
+				snap.SiblingPort = siblingLinkPort()
+			}
+			snap.LastBlock = sib.latest(r.Context())
+			ready <- snap
+		}()
+		var snap snapshot
+		select {
+		case snap = <-ready:
+		case <-r.Context().Done():
+			return
 		}
-		snap.LastBlock = sib.latest(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		json.NewEncoder(w).Encode(snap)

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -143,6 +142,10 @@ func newSiblingCheck() *siblingCheck {
 	if url == "" {
 		url = siblingDefault
 	}
+	if url != "off" && !strings.HasSuffix(url, "/api/health") {
+		// The block card's address is built from this one.
+		log.Printf("PEERMAP_SIBLING_HEALTH_URL %q does not end in /api/health: the block card will ask %s", url, strings.TrimSuffix(url, "/api/health")+"/api/blocks/latest")
+	}
 	return &siblingCheck{
 		url:      url,
 		blockURL: strings.TrimSuffix(url, "/api/health") + "/api/blocks/latest",
@@ -155,7 +158,15 @@ func newSiblingCheck() *siblingCheck {
 	}
 }
 
-// present reports whether Bitcoin Lab answered recently. Never blocks longer
+// clock is s.now, or the wall clock for a check built without one.
+func (s *siblingCheck) clock() time.Time {
+	if s.now == nil {
+		return time.Now()
+	}
+	return s.now()
+}
+
+// installed reports whether Bitcoin Lab answered recently. Never blocks longer
 // than the client timeout, and only that rarely.
 func (s *siblingCheck) installed(ctx context.Context) bool {
 	if s.url == "off" {
@@ -163,7 +174,7 @@ func (s *siblingCheck) installed(ctx context.Context) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.checkedAt.IsZero() && time.Since(s.checkedAt) < s.every {
+	if !s.checkedAt.IsZero() && s.clock().Sub(s.checkedAt) < s.every {
 		return s.present
 	}
 	// The probe is this app's, not the browser's: tied to the incoming request
@@ -173,23 +184,18 @@ func (s *siblingCheck) installed(ctx context.Context) bool {
 	// call, so pollers arriving meanwhile still share this one probe.
 	req, err := http.NewRequestWithContext(context.WithoutCancel(ctx), http.MethodGet, s.url, nil)
 	if err != nil {
-		s.checkedAt, s.present = time.Now(), false
+		s.checkedAt, s.present = s.clock(), false
 		return false
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			// Nothing was learned about the neighbour, so nothing is
-			// remembered: the next poll probes again.
-			return false
-		}
 		// A neighbour that is not there is the normal case and is an answer:
 		// remembered, or a missing app costs a request per dashboard poll.
-		s.checkedAt, s.present = time.Now(), false
+		s.checkedAt, s.present = s.clock(), false
 		return false
 	}
 	defer resp.Body.Close()
-	s.checkedAt, s.present = time.Now(), resp.StatusCode == http.StatusOK
+	s.checkedAt, s.present = s.clock(), resp.StatusCode == http.StatusOK
 	return s.present
 }
 
@@ -223,9 +229,6 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	}
 	resp, err := s.client.Do(req)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil // nothing learned; the next poll asks again
-		}
 		return miss()
 	}
 	defer resp.Body.Close()
@@ -354,9 +357,4 @@ func (s *siblingCheck) withAge(b *lastBlock, now time.Time) *lastBlock {
 		out.AgeMs = 0
 	}
 	return &out
-}
-
-// offSibling is the check a test wants: no neighbour, no request, no timeout.
-func offSibling() *siblingCheck {
-	return &siblingCheck{url: "off", now: time.Now}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ func TestKindOf(t *testing.T) {
 		"/Satoshi:29.3.0/Knots:20260507/":          "Node (Knots)",
 		"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/":    "Wallet",
 		"/breadwallet:1.3.5/":                      "Wallet",
-		"/btcwire:0.5.0/neutrino:0.17.1/":          "Light client",
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "Lightning wallet",
 		"/Rust BIP-157:0.6.0/rust-bitcoin:0.32.8/": "Light client",
 		// Seen on a real node, all of them "Other" before.
 		"/bitcoin-seeder:0.01/":          "Crawler",
@@ -53,12 +52,18 @@ func TestKindOf(t *testing.T) {
 		"/mempool:3.0.0/electrs:0.10.0/": "Indexer",
 		// "mempool" in the brackets is a node's label, not a pool (seen on a real node)
 		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
-		"/mempool/":                     "Indexer",
-		"/mempool.space:1.0/":           "Indexer",
-		"/Bitcoin ABC:0.14.5(EB8.0)/":   "Other chain",
-		"/Floresta:0.9.1/":              "Node (Floresta)",
-		"/btcwire:0.5.0/hemi-soak:1.0/": "Other",
-		"":                              noAgentKind,
+		"/mempool/":                   "Indexer",
+		"/mempool.space:1.0/":         "Indexer",
+		"/Bitcoin ABC:0.14.5(EB8.0)/": "Other chain",
+		// A word in the brackets is the operator's label, not what the peer is:
+		// these are Core nodes, not crawlers, scanners or indexers.
+		"/Satoshi:29.0.0(my-monitor)/":       "Node (Core)",
+		"/Satoshi:28.1.0(watchtower)/":       "Node (Core)",
+		"/Satoshi:27.0.0(uni-mainz)/":        "Node (Core)",
+		"/Satoshi:29.0.0(electrum-backend)/": "Node (Core)",
+		"/Floresta:0.9.1/":                   "Node (Floresta)",
+		"/btcwire:0.5.0/hemi-soak:1.0/":      "Other",
+		"":                                   noAgentKind,
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%q: got %q want %q", subver, got, want)
@@ -88,8 +93,11 @@ func TestObservedFlags(t *testing.T) {
 			ServicesNames: []string{"NETWORK", "WITNESS"}, RelayTxes: &yes, SyncedHeaders: &height,
 		}, false, false, false},
 		{"offers nothing, wants nothing, chain unknown", rawPeer{
-			ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne,
+			Version: 70016, ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne,
 		}, true, true, true},
+		// Still in its handshake: no version yet, so no services listed either.
+		// That is not the peer offering nothing.
+		{"handshake not done", rawPeer{ServicesNames: []string{}, RelayTxes: &no, SyncedHeaders: &minusOne}, false, false, false},
 	}
 	for _, c := range cases {
 		c.raw.Addr = "1.0.0.1:8333"
@@ -134,24 +142,6 @@ func TestRelaysBlocks(t *testing.T) {
 	}
 }
 
-// The page explains each kind in a sentence (KIND_WHY in web/app.js). A kind
-// added here without a line there would show its filter with no reason given.
-func TestEveryKindIsExplainedOnThePage(t *testing.T) {
-	js, err := os.ReadFile("web/app.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	names := []string{"Other", noAgentKind, fakeWalletKind}
-	for _, r := range kindRules {
-		names = append(names, r.name)
-	}
-	for _, n := range names {
-		if !strings.Contains(string(js), `"`+n+`": `) {
-			t.Errorf("KIND_WHY in web/app.js has no line for %q", n)
-		}
-	}
-}
-
 // A 2016 wallet name on something offering blocks and v2 is not that wallet.
 // The real Bitcoin Wallet, offering nothing, stays a wallet and says what it is.
 func TestFakeWallet(t *testing.T) {
@@ -166,8 +156,10 @@ func TestFakeWallet(t *testing.T) {
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", []string{}, "Wallet", "Schildbach"},
 		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", nil, "Wallet", "Schildbach"},
 		// Core's name misspelt: what it claims, and a guess from what it offers.
-		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: a crawler"},
-		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: a scanner or node that hides"},
+		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it writes Sat0shi with a zero and offers no services"},
+		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /Satoshi2:"},
+		{"/SatoshiX:0.18.0/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /SatoshiX:"},
+		{"Satoshi:22.0.0", []string{"NETWORK"}, fakeWalletKind, "Claims: Bitcoin Core 22.0.0\nProbably: not Bitcoin Core - Core writes its name between slashes: /Satoshi:22.0.0/"},
 		// Only a wallet name can be fake: a node offering blocks is a node.
 		{"/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Node (Core)", ""},
 	}
@@ -204,11 +196,11 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
 		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks the pruned-node service"},
+		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
 		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks the pruned-node service"},
-		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks the pruned-node service"},
+		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
+		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks a service every Core since 0.16 offers"},
 		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
 		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
 	}
@@ -275,7 +267,7 @@ func TestLinkingLion(t *testing.T) {
 func TestCoreOfferingNothing(t *testing.T) {
 	no := []string{}
 	got := convert([]rawPeer{{Addr: "198.51.100.7:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: no}})
-	if len(got) != 1 || got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, offersNothingAbout) {
+	if len(got) != 1 || got[0].Kind != fakeWalletKind || got[0].About != "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED" {
 		t.Fatalf("Core offering nothing: %+v", got)
 	}
 	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS", "NETWORK_LIMITED"}, {"NETWORK_LIMITED", "WITNESS"}} {
@@ -347,7 +339,7 @@ func TestProtocolMismatch(t *testing.T) {
 		kind    string
 		says    string
 	}{
-		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: unknown software - it speaks protocol 70015, older than any Core since 0.21"},
+		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it speaks protocol 70015, older than any Core since 0.21"},
 		{"/Satoshi:0.21.0/", 70015, "Disguised", "protocol 70015"},
 		{"/Satoshi:0.13.2/", 70016, "Disguised", "which Core 0.13 never did"},
 		{"/Satoshi:25.1.0/Knots:20231115/", 70015, "Disguised", "Claims: Bitcoin Knots"},
@@ -393,7 +385,7 @@ func TestBitcoinjTooNew(t *testing.T) {
 		// A version Core did not report says nothing either way.
 		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
 		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
-		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Light client", "Neutrino"},
+		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "Neutrino"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -509,6 +501,8 @@ func TestBehaviourAbout(t *testing.T) {
 		{"bitcoinj under its own name pings as it likes", "/bitcoinj:0.17/", "v1", map[string]int64{"ping": 32 * 1800}, hour, ""},
 		{"a transport not settled yet counts nothing", "/Satoshi:31.1.0/", "detecting", map[string]int64{"ping": 32 * 1800, "getaddr": 24 * 9}, hour, ""},
 		{"no bytes reported", "/Satoshi:31.1.0/", "v1", nil, hour, ""},
+		{"a node on Core before 26 reports no transport: that is v1", "/Satoshi:31.1.0/", "", map[string]int64{"ping": 32 * 1800}, hour,
+			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
 	}
 	for _, c := range cases {
 		if got := behaviourAbout(c.subver, c.transport, c.recv, c.connTime, now); got != c.want {
@@ -531,5 +525,349 @@ func TestBehaviourMakesCoreDisguised(t *testing.T) {
 		BytesRecvPerMsg: map[string]int64{"ping": 32 * 31, "getaddr": 24}}})[0]
 	if got.Kind != "Node (Core)" {
 		t.Errorf("an honest Core became %q: %q", got.Kind, got.About)
+	}
+	// Behaviour comes before a missing service: the crawler is named as one.
+	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:0.19.0.1/",
+		Transport: "v1", ConnTime: conn, ServicesNames: []string{"WITNESS"},
+		BytesRecvPerMsg: map[string]int64{"getaddr": 24 * 58}}})[0]
+	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once" {
+		t.Errorf("got %q / %q", got.Kind, got.About)
+	}
+}
+
+func TestWasabiIsAWallet(t *testing.T) {
+	conn := time.Now().Unix() - 3600
+	yes, no := true, false
+	wasabi := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:29.3.0/", Transport: "v1", ConnTime: conn, ServicesNames: []string{}, RelayTxes: &yes,
+		BytesRecvPerMsg: map[string]int64{"ping": 32 * 30, "getheaders": 1053 * 15, "getdata": 300000}}
+	got := convert([]rawPeer{wasabi})[0]
+	if got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 29.3.0\nProbably: Wasabi Wallet or a fork - one of its 13 borrowed Core names, offers nothing, wants transactions" || !got.NoRelay {
+		t.Errorf("Wasabi: got %q / %q / norelay %v", got.Kind, got.About, got.NoRelay)
+	}
+	// Without transaction relay it is no wallet.
+	r := wasabi
+	r.RelayTxes = &no
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("no tx relay: got %q", got.Kind)
+	}
+	// A name outside Wasabi's list stays Disguised.
+	r = wasabi
+	r.Subver = "/Satoshi:31.0.0/"
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("31.0.0: got %q", got.Kind)
+	}
+	// Offering services, it is a node.
+	r = wasabi
+	r.ServicesNames = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("with services: got %q", got.Kind)
+	}
+	// Ginger's older list, and the one name on both.
+	r = wasabi
+	r.Subver = "/Satoshi:0.21.0/"
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 0.21.0\nProbably: Ginger Wallet (or an old Wasabi) - one of its 31 borrowed Core names, offers nothing, wants transactions" {
+		t.Errorf("Ginger: got %q / %q", got.Kind, got.About)
+	}
+	r.Subver = "/Satoshi:26.0.0/"
+	if got := convert([]rawPeer{r})[0]; got.About != "Claims: Bitcoin Core 26.0.0\nProbably: Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions" {
+		t.Errorf("26.0.0: got %q", got.About)
+	}
+	// Asking for addresses again and again is a crawler, whatever the name.
+	r = wasabi
+	r.BytesRecvPerMsg = map[string]int64{"getaddr": 24 * 20}
+	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("getaddr crawler: got %q", got.Kind)
+	}
+}
+
+func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
+	conn := time.Now().Unix() - 3600
+	all := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+	core := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:28.0.0/", Transport: "v1", ConnTime: conn, ServicesNames: all,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24, "ping": 32 * 30}}
+	// Each case is judged next to this ordinary Core, which sent wtxidrelay.
+	if got := convert([]rawPeer{core})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("Core sending wtxidrelay: got %q / %q", got.Kind, got.About)
+	}
+	r := core
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind ||
+		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21" {
+		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
+	}
+	// With sendaddrv2 sent, only wtxidrelay is named.
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
+	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21" {
+		t.Errorf("only wtxidrelay missing: got %q", got.About)
+	}
+	// Knots is Core underneath and sends it too.
+	r.Subver = "/Satoshi:29.2.0/Knots:20251110/"
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("Knots without wtxidrelay: got %q", got.Kind)
+	}
+	// Still in its handshake: nothing to judge yet.
+	r = core
+	r.BytesRecvPerMsg = map[string]int64{"version": 126}
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("before verack: got %q", got.Kind)
+	}
+	// Core before 0.21 never sent it.
+	r = core
+	r.Subver, r.Version, r.ServicesNames = "/Satoshi:0.20.1/", 70015, []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24}
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("Core 0.20: got %q / %q", got.Kind, got.About)
+	}
+	// No byte counts at all, as from an older Core: no judgement.
+	r = core
+	r.BytesRecvPerMsg = nil
+	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("no counts: got %q", got.Kind)
+	}
+}
+
+func TestWasabiPeerSearch(t *testing.T) {
+	no, yes := false, true
+	search := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:27.0.0/", Transport: "v1", ConnTime: time.Now().Unix() - 5, ServicesNames: []string{}, RelayTxes: &no,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24, "getaddr": 24}}
+	got := convert([]rawPeer{search})[0]
+	if got.Kind != "Crawler" || got.About != "Claims: Bitcoin Core 27.0.0\nProbably: Wasabi Wallet's peer search - one of its 13 borrowed Core names, offers nothing, asks only for addresses" {
+		t.Errorf("peer search: got %q / %q", got.Kind, got.About)
+	}
+	for name, change := range map[string]func(r *rawPeer){
+		"sendcmpct instead of sendaddrv2": func(r *rawPeer) {
+			r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendcmpct": 33, "verack": 24, "getaddr": 24}
+		},
+		"Ginger's name only": func(r *rawPeer) { r.Subver = "/Satoshi:0.21.0/" },
+		"protocol 70015":     func(r *rawPeer) { r.Version = 70015 },
+	} {
+		r := search
+		change(&r)
+		if got := convert([]rawPeer{r})[0]; got.Kind == "Crawler" || strings.Contains(got.About, "Wasabi") {
+			t.Errorf("%s: got %q / %q", name, got.Kind, got.About)
+		}
+	}
+	// A wallet that sends wtxidrelay is not on NBitcoin.
+	r := search
+	r.RelayTxes = &yes
+	r.BytesRecvPerMsg = map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24}
+	if got := convert([]rawPeer{r})[0]; got.Kind == "Wallet" {
+		t.Errorf("wtxidrelay wallet: got %q / %q", got.Kind, got.About)
+	}
+}
+
+func TestLibreRelayAndGarbageman(t *testing.T) {
+	bit := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2", "UNKNOWN[2^29]"}
+	for _, c := range []struct{ subver, kind, about string }{
+		{"/Satoshi:30.2.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
+		{"/Satoshi:31.1.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
+		{"/Satoshi:29.3.0/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
+		{"/Satoshi:29.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
+		{"/Satoshi:28.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
+		{"/Satoshi:29.1.0/Knots:20250903/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
+	} {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+			Subver: c.subver, Transport: "v2", ServicesNames: bit}})[0]
+		if got.Kind != c.kind || got.About != c.about {
+			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
+		}
+	}
+	// Without the bit it is plain Core.
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+		Subver: "/Satoshi:30.2.0/", Transport: "v2", ServicesNames: bit[:4]}})[0]
+	if got.Kind != "Node (Core)" {
+		t.Errorf("no bit: got %q", got.Kind)
+	}
+}
+
+func TestNamesSeenOnce(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/dnsseedrs:0.2.0/":      "Crawler",
+		"/ckh-netsurvey:1.0/":    "Crawler",
+		"/bread:2.1/":            "Wallet",
+		"//":                     noAgentKind,
+		"/:1.1.0-dev+c1771608d/": noAgentKind,
+		"/Satoshi:31.1.0/":       "Node (Core)",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016, Subver: "//", ServicesNames: []string{}}})[0]
+	if !strings.HasPrefix(got.About, "Introduced itself but left its name empty") {
+		t.Errorf("// about: %q", got.About)
+	}
+}
+
+func TestP2aburnAbout(t *testing.T) {
+	if got := aboutOf("/p2aburn:1.0/"); !strings.HasPrefix(got, "p2aburn, a bot that sweeps P2A anchors") || kindOf("/p2aburn:1.0/") != "Other" {
+		t.Errorf("got %q / %q", kindOf("/p2aburn:1.0/"), got)
+	}
+}
+
+func TestOtherSaysWhatItDoes(t *testing.T) {
+	no, yes := false, true
+	for _, c := range []struct {
+		svc   []string
+		relay *bool
+		recv  map[string]int64
+		sent  map[string]int64
+		want  string
+	}{
+		{[]string{"NETWORK", "WITNESS"}, &yes, nil, nil, "Probably a full node under a name its operator chose"},
+		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Unknown software that pushes transactions without announcing them"},
+		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, nil, "Software with a name we don't recognise"},
+		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
+		{[]string{}, &no, map[string]int64{"getaddr": 24}, nil, "Unknown software that collects addresses"},
+		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, map[string]int64{"inv": 17521264, "tx": 5292757}, "Unknown software that listens to transactions: fetches every one it hears of, announces none"},
+		// A VerifiedX validator before it had a name here: asks for blocks,
+		// is sent blocks, no transactions.
+		{[]string{}, &yes, map[string]int64{"getdata": 1647, "getheaders": 354039}, map[string]int64{"block": 21269099, "inv": 565744}, "Software with a name we don't recognise"},
+		{[]string{}, &no, nil, nil, "Software with a name we don't recognise"},
+	} {
+		if got := otherAbout(c.svc, c.relay, c.recv, c.sent); got != c.want {
+			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
+		}
+	}
+}
+
+func TestClientsFoundOn24October(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/P2Pool:17.0/":    "Pool node",
+		"/pydroid-pool:3/": "Pool node",
+		"/Satoshi:29.4.2(mempool.guide)/Knots:20260508rc2/": "Node (Knots)",
+		"/Ghost:1.11.42/":                        "Node (Ghost)",
+		"/CamlCoin:0.1.0/":                       "Node (other)",
+		"/rustoshi:0.1.0/":                       "Node (other)",
+		"/tbcd:2.1.0-dev/":                       "Node (other)",
+		"/blueberry:2026.08.17/":                 "Wallet",
+		"/BitcoinKit:0.1.0/":                     "Wallet",
+		"Yuki / 0.0.1":                           "Light client",
+		"/VerifiedX:9.0.1/":                      "Light client",
+		"/WalletKit:0.1.0/":                      "Wallet",
+		"/btcwire:0.4.1/Satoshi:0.19/":           "Research scanner",
+		"/p2p-observer:0.1.0/":                   "Crawler",
+		"/bip324-probe:0.1.0/":                   "Crawler",
+		"/crawlrs:0.2.0/":                        "Crawler",
+		"/symphony:0.0.1/":                       "Indexer",
+		"/your-fork:0.1/":                        "Crawler",
+		"VDS 0.9.9.1":                            "Other chain",
+		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Light client",
+		"/btcwire:0.5.0/utreexod:0.5.0/":         "Node (other)",
+		"NBXplorer-4096":                         "Indexer",
+		"/bitcoin-s:1.9.12/":                     "Light client",
+		"Stacks/2.1":                             "Light client",
+		"/btcwire:0.4.1/lit:v0.1/":               "Lightning wallet",
+		"/nakamoto:0.3.0/":                       "Light client",
+		"/btcwire:0.5.0/spvwallet:0.1.0/":        "Wallet",
+		"/bread:2.1/":                            "Wallet",
+		"/bitcoinj:0.16.3/Elastum:0.1z/":         "Wallet",
+		"/LionSeed:0.1.0/":                       "Crawler",
+		"/gnoban:1.3.1/":                         "Crawler",
+		"/Aurum:0.12.4/":                         "Other chain",
+		"/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/": "Wallet",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+	if got := aboutOf("/bitcoinj:0.15.10.bisq.16/Bisq:1.10.9/"); !strings.HasPrefix(got, "Bisq") {
+		t.Errorf("Bisq about: %q", got)
+	}
+	for subver, want := range map[string]string{
+		"/WalletKit:0.1.0/":              "Unstoppable Wallet on iPhone",
+		"/btcwire:0.4.1/Satoshi:0.19/":   "Pool Detective",
+		"/Denovo:0.7.0/":                 "Denovo",
+		"/programmingbitcoin:0.1/":       "Code from Jimmy Song",
+		"/programmingblockchain:0.1/":    "Code from Jimmy Song",
+		"/bip324-ts:0.0.1/":              "bip324-ts",
+		"/bread:2.1/":                    "BRD's wallet core",
+		"/breadwallet:0.6.7/":            "BRD (breadwallet)",
+		"/bitcoinj:0.16.3/Elastum:0.1z/": "Names Elastum",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
+			t.Errorf("%s about: %q", subver, got)
+		}
+	}
+	if got := aboutOf("libbtc 0.1"); !strings.HasPrefix(got, "libbtc") {
+		t.Errorf("libbtc about: %q", got)
+	}
+}
+
+func TestVirtusCrawlerBehindCore23(t *testing.T) {
+	no := false
+	r := rawPeer{Addr: "198.51.100.7:50000", ConnectionType: "inbound", Inbound: true, Version: 70015,
+		Subver: "/Satoshi:23.0.0/", ServicesNames: []string{}, RelayTxes: &no,
+		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
+	got := convert([]rawPeer{r})[0]
+	if got.Kind != "Crawler" || !strings.Contains(got.About, "p2p-crawler") {
+		t.Errorf("virtu's crawler: got %q / %q", got.Kind, got.About)
+	}
+	r.Version = 70016
+	if got := convert([]rawPeer{r})[0]; strings.Contains(got.About, "p2p-crawler") {
+		t.Errorf("70016 is not the crawler: %q", got.About)
+	}
+}
+
+func TestForkBits(t *testing.T) {
+	for _, c := range []struct {
+		svc        []string
+		kind, want string
+	}{
+		{[]string{"NETWORK", "WITNESS", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Node (Core)", "BIP110 fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Other", "BIP110 fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
+		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
+	} {
+		if got, why := forkOf(c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
+			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
+		}
+	}
+	// Headers decide when they are known: at the tip it is this chain, stuck
+	// thousands of blocks back it is not, and -1 (not yet known) leaves the bit.
+	bip110 := []string{"NETWORK", "UNKNOWN[2^27]"}
+	for _, c := range []struct {
+		synced int64
+		want   string
+	}{{972597, ""}, {972591, ""}, {972590, "BIP110 fork"}, {961170, "BIP110 fork"}, {-1, "BIP110 fork"}} {
+		h := c.synced
+		if got, _ := forkOf(bip110, "Other", &h, 972597); got != c.want {
+			t.Errorf("synced %d at tip 972597: got %q, want %q", c.synced, got, c.want)
+		}
+	}
+}
+
+func TestWtxidrelayNeedsSomeoneToSendIt(t *testing.T) {
+	core := rawPeer{Addr: "198.51.100.8:8333", ConnectionType: "outbound-full-relay", Version: 70016,
+		Subver: "/Satoshi:28.1.0/", ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"},
+		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
+	// A node older than 0.21 asks no peer for it, so nobody sends it.
+	if got := convert([]rawPeer{core})[0]; got.Kind == fakeWalletKind {
+		t.Errorf("no peer sent wtxidrelay, still struck: %q", got.About)
+	}
+	other := core
+	other.Addr = "198.51.100.9:8333"
+	other.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "wtxidrelay": 24, "sendaddrv2": 24}
+	if got := convert([]rawPeer{core, other})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("another peer sent wtxidrelay, this one did not: got %q", got.Kind)
+	}
+}
+
+func TestLightningWalletReadsTheBareName(t *testing.T) {
+	// A word in an operator's brackets does not make Core a Lightning wallet,
+	// as with every kind in readsBareName; Bitcoin Lab reads it the same way.
+	for subver, want := range map[string]string{
+		"/Satoshi:28.0.0(neutrino)/": "Node (Core)",
+		"/Satoshi:29.0.0(lit:v1)/":   "Node (Core)",
+		"/neutrino:0.17.1/":          "Lightning wallet",
+	} {
+		if got := kindOf(subver); got != want {
+			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
 	}
 }

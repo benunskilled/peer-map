@@ -96,6 +96,7 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		"/btcwire:0.5.0/neutrino:0.17.1/", "/electrs:0.11.1/", "/Metrika-Bitnodes:0.1/",
 		"/dsn.tm.kit.edu/bitcoin:0.9.99/", "/ckp2p:2.0/", "/Floresta:0.9.1/",
 		fakeWallet, "/Sat0shi:31.0.0/", "/bitcoin-seeder:0.01/", "/Satoshi:0.14.2/", "",
+		"/Satoshi:29.3.0/Knots:20260508/", "/Satoshi:29.4.2/Knots:20260508/",
 	}
 
 	nodeClients := []string{}
@@ -137,12 +138,24 @@ func mockPeers(ctx context.Context) ([]rawPeer, error) {
 		// full node does both. The rare last case is the interesting one -
 		// something calling itself Core that behaves like neither.
 		services, relay, headers := nodeServices, true, int64(967000+r.Intn(400))
+		// A block-relay-only connection carries no transactions, by design.
+		if typ == "block-relay-only" {
+			relay = false
+		}
 		switch kindOf(subver) {
-		case "Wallet", "Light client", "Crawler", "Research scanner", "Indexer":
+		case "Wallet", "Lightning wallet", "Light client", "Crawler", "Research scanner", "Indexer":
 			services, headers = []string{}, -1
 			relay = r.Intn(3) > 0
 			if subver == fakeWallet {
 				services = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
+			}
+		case "Node (Knots)":
+			// Knots builds that offer the bits of other rules (forkOf).
+			switch subver {
+			case "/Satoshi:29.3.0/Knots:20260508/":
+				services = append(append([]string{}, nodeServices...), reducedDataService)
+			case "/Satoshi:29.4.2/Knots:20260508/":
+				services = append(append([]string{}, nodeServices...), reducedDataService, blake2bService)
 			}
 		case "Node (Core)":
 			if r.Intn(20) == 0 {

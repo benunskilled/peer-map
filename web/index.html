@@ -15,7 +15,7 @@
   <header class="topbar">
     <h1>Peer Map</h1>
     <a id="sibling-link" class="sibling-link" hidden target="bitcoin-lab">Bitcoin Lab &#8599;</a>
-    <span class="status-pill" id="status" aria-live="polite">Loading peers…</span>
+    <span class="status-pill" id="status">Loading peers…</span>
   </header>
 
   <main>
@@ -38,7 +38,6 @@
            location filter and works with it: both at once means both. -->
       <span class="place-filter" id="kindFilter" hidden>
         Only <b id="kindFilterName"></b>
-        <span class="why" id="kindFilterWhy"></span>
         <button class="linkish" id="kindFilterClear" aria-label="Clear kind filter">×</button>
       </span>
     </div>
@@ -62,7 +61,7 @@
 
     <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
-        <svg id="map" role="img" aria-label="World map of connected peers">
+        <svg id="map" role="group" aria-label="World map of connected peers">
           <defs>
             <!-- One soft glow per group: the markers are a light on the map, not a chart. -->
             <radialGradient id="glow-manual"><stop offset="0" stop-color="#3987e5" stop-opacity=".9"/><stop offset=".45" stop-color="#3987e5" stop-opacity=".3"/><stop offset="1" stop-color="#3987e5" stop-opacity="0"/></radialGradient>
