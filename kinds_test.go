@@ -815,8 +815,8 @@ func TestForkBits(t *testing.T) {
 	}{
 		{[]string{"NETWORK", "WITNESS", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
 		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Node (Core)", "BIP110"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Other", "BIP110"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Node (Core)", "BIP110 fork"},
+		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Other", "BIP110 fork"},
 		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
 		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
 	} {

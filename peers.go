@@ -358,6 +358,7 @@ func convert(raw []rawPeer) []Peer {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
 		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind)
+		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {
 			switch hostOf(r.Addr) {
 			case dockerGateway:
