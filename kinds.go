@@ -294,26 +294,34 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
 	// illuminodes/mantle: the node says "/mantle:0.1.0/", its replay tool,
 	// which fetches mainnet blocks from peers to validate them, says
-	// "/mantle-replay-iouring:0.1.0/" (crates/fetcher/src/lib.rs).
+	// "/mantle-replay-iouring:0.1.0/" (crates/fetcher/src/lib.rs); beside it
+	// "/mantle-discover:0.1.0/" collects addresses with getaddr
+	// (replay/src/discover_peers.rs) and "/mantle-rank-peers:0.1.0/" times
+	// how fast a node answers its version (replay/src/rank_peers.rs).
 	{regexp.MustCompile(`(?i)^/mantle:`), "Mantle, a Bitcoin full node written from scratch in Rust (illuminodes)"},
 	{regexp.MustCompile(`(?i)^/mantle-replay`), "Mantle's replay tool: fetches blocks from nodes to check them with Mantle, a Bitcoin node written from scratch in Rust"},
+	{regexp.MustCompile(`(?i)^/mantle-discover`), "Mantle's peer finder: asks nodes for addresses of other nodes"},
+	{regexp.MustCompile(`(?i)^/mantle-rank-peers`), "Mantle's speed test: times how fast a node answers"},
 	// btcd's wire package sends "/btcwire:0.5.0/" when a program sets no name
 	// of its own (wire/msgversion.go), and its peer package's example sets
 	// "peer" 1.0.0 (peer/example_test.go). On the node this was written for,
 	// 21. to 25.10.2026, the bare name asked for addresses and headers and
 	// wanted no transactions.
 	{regexp.MustCompile(`^/btcwire:[^/]*/$`), "A program on btcd's Go library that set no name of its own"},
-	{regexp.MustCompile(`^/btcwire:[^/]*/peer:1\.0\.0/$`), "A program built from the example in btcd's Go library, under the example's name"},
+	{regexp.MustCompile(`^/btcwire:[^/]*/peer:1\.0\.0/$`), "Probably a program built from the example code in btcd's Go library, keeping its name"},
 	// RESET (Trac-Systems/reset) is a coin clocked by Bitcoin's blocks; a
 	// share of its reward goes to whoever brings in a new block first. Its
-	// agents fetch from mempool.space unless told otherwise, so these P2P
-	// names are a guess from the name and the behaviour: on the node this was
-	// written for, 13.9. to 25.10.2026, about a hundred sessions under seven
-	// reset-* names asked only for headers, most wanting no transactions.
-	{regexp.MustCompile(`(?i)^/reset-`), "Probably a header client for RESET, a coin clocked by Bitcoin's blocks that rewards whoever brings in a new block first"},
-	// JWRD Computing (jwrd.net) maintains its own bitcoind; 0.9.99.99 is how
-	// the old bitcoind writes version 99999.
-	{regexp.MustCompile(`^/jwrd\.net:`), "A node run on JWRD Computing's own bitcoind"},
+	// agents fetch from mempool.space unless told otherwise and its code has
+	// no P2P client, so these names are a guess from the name, the behaviour
+	// and the timing: its repository was created on 15.10.2026, and Bitcoin
+	// Lab's record of the node this was written for, from 13.9., shows the
+	// first reset-* name on 20.10.; by 25.10. there were seven, asking only
+	// for headers, most wanting no transactions.
+	{regexp.MustCompile(`(?i)^/reset-`), "Probably a header client for RESET, a coin clocked by Bitcoin's blocks that pays a small reward to whoever brings in a new block first"},
+	// JWRD Computing (jwrd.net) maintains its own bitcoind of the old 0.5
+	// line, which writes version 99999 as 0.9.99.99; nothing public says it
+	// sends this name.
+	{regexp.MustCompile(`^/jwrd\.net:`), "Probably a node on JWRD Computing's own bitcoind, a fork of an early version"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
@@ -806,7 +814,7 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64)
 	// What it did, where Core counted it: a name nobody knows still says
 	// little, its messages say more. Seen on the node this was written for,
 	// 21. to 24.10.2026: /pwsh-pusher/ and /p2aburn/ pushing transactions
-	// nobody asked for, a family of /reset-header-.../ names and others
+	// nobody asked for, others
 	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
 	// /relay-geo:0.1/ fetching every transaction and announcing none.
 	switch {

@@ -415,9 +415,12 @@ func TestOtherAbouts(t *testing.T) {
 		{"/reset-header-agent:1.0/", 70016, "Probably a header client for RESET"},
 		{"/RESET-Headers:1.0/", 70016, "Probably a header client for RESET"},
 		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
-		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "A program built from the example in btcd's Go library"},
+		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "Probably a program built from the example code in btcd's Go library"},
 		{"/mantle-replay-iouring:0.1.0/", 70016, "Mantle's replay tool"},
-		{"/jwrd.net:0.9.99.99/", 70016, "A node run on JWRD Computing's own bitcoind"},
+		{"/mantle-discover:0.1.0/", 70016, "Mantle's peer finder"},
+		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
+		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
+		{"/jwrd.net:0.9.99.99/", 70016, "Probably a node on JWRD Computing's own bitcoind"},
 		{"/curl:8.5.0/", 70015, "Software with a name we don't recognise"},
 	}
 	for _, c := range cases {
