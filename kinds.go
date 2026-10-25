@@ -71,7 +71,7 @@ var kindRules = []struct {
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
 	// Irium and VDS are forks and altcoins of their own.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds_|^/Aurum:`), false},
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	// Pool Detective, MIT's Digital Currency Initiative watching what mining
@@ -83,7 +83,7 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -121,7 +121,7 @@ var kindRules = []struct {
 	// day, all inbound, from 12 addresses at six hosting companies.
 	// nakamoto, cloudhead's light client on compact block filters, says
 	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/`), false},
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -298,6 +298,11 @@ var aboutRules = []struct {
 	// node connects to itself when told to (addnode).
 	// src/sync/stages/pull/peer.rs in maestro-org/maestro-symphony;
 	// src/crawl.rs in achow101/dnsseedrs; Satscraft/bip324-probe.
+	// Bitcoin Lab's record of the node this was written for, 13.9. to
+	// 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
+	// transactions, gone after 18 seconds at the median; the same handshake
+	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr).
+	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler, asks for addresses"},
 	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
 	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
 	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
