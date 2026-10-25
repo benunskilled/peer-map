@@ -412,7 +412,13 @@ func TestOtherAbouts(t *testing.T) {
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
 		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
 		{"/GlobalNodeMap:2.1/", 70016, "Probably a node map or counter"},
-		{"/reset-header-agent:1.0/", 70016, "Software with a name we don't recognise"},
+		{"/reset-header-agent:1.0/", 70016, "Probably a header client for RESET"},
+		{"/RESET-Headers:1.0/", 70016, "Probably a header client for RESET"},
+		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
+		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "A program built from the example in btcd's Go library"},
+		{"/mantle-replay-iouring:0.1.0/", 70016, "Mantle's replay tool"},
+		{"/jwrd.net:0.9.99.99/", 70016, "A node run on JWRD Computing's own bitcoind"},
+		{"/curl:8.5.0/", 70015, "Software with a name we don't recognise"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -743,6 +749,8 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/CamlCoin:0.1.0/":                       "Node (other)",
 		"/rustoshi:0.1.0/":                       "Node (other)",
 		"/tbcd:2.1.0-dev/":                       "Node (other)",
+		"/mantle:0.1.0/":                         "Node (other)",
+		"/mantle-replay-iouring:0.1.0/":          "Other",
 		"/blueberry:2026.08.17/":                 "Wallet",
 		"/BitcoinKit:0.1.0/":                     "Wallet",
 		"Yuki / 0.0.1":                           "Light client",
