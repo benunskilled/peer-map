@@ -584,6 +584,7 @@
       } else {
         const known = new Map((state.data.peers || []).map((p) => [p.addr, p]));
         const t = document.createElement("table");
+        t.className = "firsts";
         for (const addr of b.first_peers) {
           const peer = known.get(addr);
           const tr = document.createElement("tr");
