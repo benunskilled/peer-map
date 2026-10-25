@@ -137,9 +137,10 @@ var kindRules = []struct {
 	// Full nodes written from scratch, each sending its own name (checked in
 	// its source): the hashhog fleet of ten languages (github.com/hashhog),
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
-	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, and tbcd, the
-	// Hemi network's Bitcoin daemon (hemilabs/heminetwork).
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd):|/utreexod:`), true},
+	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
+	// Hemi network's Bitcoin daemon (hemilabs/heminetwork), and
+	// illuminodes/mantle.
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd|mantle):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -291,6 +292,28 @@ var aboutRules = []struct {
 	// Seen from one netcup address, offering nothing and gone after a second;
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
+	// illuminodes/mantle: the node says "/mantle:0.1.0/", its replay tool,
+	// which fetches mainnet blocks from peers to validate them, says
+	// "/mantle-replay-iouring:0.1.0/" (crates/fetcher/src/lib.rs).
+	{regexp.MustCompile(`(?i)^/mantle:`), "Mantle, a Bitcoin full node written from scratch in Rust (illuminodes)"},
+	{regexp.MustCompile(`(?i)^/mantle-replay`), "Mantle's replay tool: fetches blocks from nodes to check them with Mantle, a Bitcoin node written from scratch in Rust"},
+	// btcd's wire package sends "/btcwire:0.5.0/" when a program sets no name
+	// of its own (wire/msgversion.go), and its peer package's example sets
+	// "peer" 1.0.0 (peer/example_test.go). On the node this was written for,
+	// 21. to 25.10.2026, the bare name asked for addresses and headers and
+	// wanted no transactions.
+	{regexp.MustCompile(`^/btcwire:[^/]*/$`), "A program on btcd's Go library that set no name of its own"},
+	{regexp.MustCompile(`^/btcwire:[^/]*/peer:1\.0\.0/$`), "A program built from the example in btcd's Go library, under the example's name"},
+	// RESET (Trac-Systems/reset) is a coin clocked by Bitcoin's blocks; a
+	// share of its reward goes to whoever brings in a new block first. Its
+	// agents fetch from mempool.space unless told otherwise, so these P2P
+	// names are a guess from the name and the behaviour: on the node this was
+	// written for, 13.9. to 25.10.2026, about a hundred sessions under seven
+	// reset-* names asked only for headers, most wanting no transactions.
+	{regexp.MustCompile(`(?i)^/reset-`), "Probably a header client for RESET, a coin clocked by Bitcoin's blocks that rewards whoever brings in a new block first"},
+	// JWRD Computing (jwrd.net) maintains its own bitcoind; 0.9.99.99 is how
+	// the old bitcoind writes version 99999.
+	{regexp.MustCompile(`^/jwrd\.net:`), "A node run on JWRD Computing's own bitcoind"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
