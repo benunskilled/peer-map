@@ -868,7 +868,9 @@ func classify(subver string) (string, bool) {
 // In peer-observer's record of the node this was written for, 21. to
 // 25.10.2026, with that node at height 973,026: 898 sessions offering bit 28
 // from 406 addresses reported start heights around 978,000, a chain of their
-// own; 2,719 offering bit 27 from 921 addresses reported around 961,000. The
+// own; 2,719 offering bit 27 from 921 addresses reported around 961,000, the
+// BIP110 chain, which went its own way. Neither can deliver a block of this
+// node's chain, so both count as never first. The
 // node had also dialled 33 and 18 of them itself, each holding an outbound
 // slot for 40 to 65 seconds at the median, up to 22 minutes. Crawlers repeat
 // bits they saw elsewhere (/bitcoin-seeder:0.01/ sent both), so only nodes and
@@ -892,7 +894,7 @@ func forkOf(services []string, kind string) (string, string) {
 	case has[blake2bService]:
 		return "BLAKE2b fork", "Offers Knots' BLAKE2b bit (service bit 28): it follows a hard fork to another proof of work, so it is on a chain of its own, not yours"
 	case has[reducedDataService]:
-		return "BIP110", "Offers Knots' ReducedData bit (service bit 27): it rejects blocks that break BIP110's rules, so it may no longer follow your chain"
+		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
 	}
 	return "", ""
 }
