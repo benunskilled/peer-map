@@ -277,6 +277,19 @@ func isPrivate(addr string) bool {
 
 func convert(raw []rawPeer) []Peer {
 	out := make([]Peer, 0, len(raw))
+	// What the whole list says, for checks that need more than one peer:
+	// the highest header any peer shares (this node's tip, as far as its
+	// peers know) and whether any peer sent wtxidrelay.
+	var tip int64
+	anyWtxid := false
+	for _, r := range raw {
+		if r.SyncedHeaders != nil && *r.SyncedHeaders > tip {
+			tip = *r.SyncedHeaders
+		}
+		if r.BytesRecvPerMsg["wtxidrelay"] > 0 {
+			anyWtxid = true
+		}
+	}
 	for _, r := range raw {
 		g := group(r)
 		if g == "" {
@@ -327,7 +340,7 @@ func convert(raw []rawPeer) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
 			} else if why := protocolMismatch(r.Subver, r.Version); why != "" {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
-			} else if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg) {
+			} else if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+skippedHandshakeAbout(r.BytesRecvPerMsg)
 			} else if offersNothingAsCore(r.Subver, r.ServicesNames) {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+offersNothingAbout
@@ -357,7 +370,7 @@ func convert(raw []rawPeer) []Peer {
 		if p.NoTxRelay {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
-		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind)
+		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind, r.SyncedHeaders, tip)
 		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {
 			switch hostOf(r.Addr) {

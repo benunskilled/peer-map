@@ -145,7 +145,7 @@
         // Two minutes are up between two polls, and a paused dashboard never
         // polls again at all - so the star and the row colour take themselves
         // off rather than waiting for the next answer.
-        if (state.liveShown && !liveBlock()) render();
+        if (state.liveShown && !liveBlock()) renderWhenFree();
       }, 1000);
     }
   }
