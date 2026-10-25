@@ -83,13 +83,13 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
 	// NBXplorer, BTCPay Server's indexer, names itself "NBXplorer-" and a
 	// random number (Backend/Indexer.cs in dgarage/NBXplorer).
-	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool|^NBXplorer-`), false},
+	{"Indexer", regexp.MustCompile(`(?i)electrs|electrum|esplora|/mempool|^NBXplorer-|^/symphony:`), false},
 	// SPV and mobile wallets. bitcoinj is the Android wallet's library. Most
 	// of them ask a node for their transactions through a bloom filter
 	// (BIP37), which Core leaves off by default: at such a node they leave
@@ -296,6 +296,11 @@ var aboutRules = []struct {
 	// observer/src/protocol.rs in 0xB10C/p2p-observer, work in progress in
 	// October 2026; extractors/p2p in peer-observer/peer-observer, which a
 	// node connects to itself when told to (addnode).
+	// src/sync/stages/pull/peer.rs in maestro-org/maestro-symphony;
+	// src/crawl.rs in achow101/dnsseedrs; Satscraft/bip324-probe.
+	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
+	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
+	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
 	{regexp.MustCompile(`^/p2p-observer:`), "p2p-observer, 0xB10C's tool that connects to nodes to watch the network"},
 	{regexp.MustCompile(`^/p2p-extractor:`), "peer-observer's p2p extractor: your node was told to connect to it, and it records what your node sends"},
 	{regexp.MustCompile(`^/AgenticBitcoin:`), "AgenticBitcoin, Bitcoin rewritten in Rust by AI agents"},
