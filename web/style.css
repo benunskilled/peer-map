@@ -551,7 +551,9 @@ a.addr-txt:hover { color: var(--accent); }
 .pd-chip { padding: 1px 8px; border-radius: 6px; background: #1a2430; color: var(--muted); font-size: 11.5px; letter-spacing: .02em; }
 .pd-chip.none { color: var(--faint); font-style: italic; }
 .pd-where { margin: 6px 0 0; color: var(--muted); }
+.pd.pd-two { grid-template-columns: 1fr 1fr; }
 @media (max-width: 900px) { .pd { grid-template-columns: 1fr 1fr; } .pd-block:first-child { grid-column: 1 / -1; } }
+@media (max-width: 900px) { .pd.pd-two .pd-block:first-child { grid-column: auto; } }
 @media (max-width: 600px) { .pd { grid-template-columns: 1fr; } }
 /* A phone card: the detail is a block under the card's grid, not a cell in it. */
 .cards.cards table tr.detail-row { display: block; border-top: 0; padding: 0; }
