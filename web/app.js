@@ -1538,6 +1538,12 @@
       cell: (td, p) => {
         const who = document.createElement("div");
         who.className = "who";
+        // A small arrow at the left: the row opens on a tap or a click.
+        const chev = document.createElement("span");
+        chev.className = "chev";
+        chev.setAttribute("aria-hidden", "true");
+        chev.textContent = "\u203a";
+        who.appendChild(chev);
         const f = document.createElement("span");
         f.className = "flag";
         f.textContent = HIDDEN_FLAG[p.network] || flagOf(p.cc);
@@ -1827,6 +1833,12 @@
     else svc.appendChild(el("span", "pd-chip none", p.no_services ? "no services" : "services unknown"));
     who.appendChild(svc);
     if (p.version) who.appendChild(el("p", "pd-small", "Protocol " + p.version));
+    if (state.data && state.data.sibling) {
+      const lab = el("a", "pd-lab", "Open this peer in Bitcoin Lab \u2197");
+      lab.href = siblingURL(p.addr);
+      lab.target = LAB_TARGET;
+      who.appendChild(lab);
+    }
     const where = [p.region, p.cc].filter(Boolean).join(", ");
     if (where || p.operator) who.appendChild(el("p", "pd-where", [where, p.operator ? p.operator + (p.asn ? " (AS" + p.asn + ")" : "") : ""].filter(Boolean).join(" \u00b7 ")));
     return panel;
@@ -2007,7 +2019,13 @@
         if (reopen) tr.classList.add("open");
         tr.addEventListener("click", (ev) => {
           // Links and buttons keep doing their own thing; so does selecting text.
-          if (ev.target.closest("a, button, input, select, textarea") || String(window.getSelection()).length > 0) return;
+          // On a touch screen the address is too small a target for a finger: a tap
+          // on it opens the peer like a tap anywhere else, and the way over to
+          // Bitcoin Lab is a button in the panel.
+          const onAddress = ev.target.closest("a.peer-jump") && window.matchMedia("(pointer: coarse)").matches;
+          if (onAddress) ev.preventDefault();
+          else if (ev.target.closest("a, button, input, select, textarea")) return;
+          if (String(window.getSelection()).length > 0) return;
           toggleDetail(tr, p, rowKey);
         });
         tbody.appendChild(tr);

@@ -559,3 +559,12 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr.detail-row { display: block; border-top: 0; padding: 0; }
 .cards.cards table tr.detail-row td { display: block; padding: 0 12px 14px; }
 .cards.cards table tr.detail-row td::before { content: none; }
+/* The arrow that says a peer opens; it turns down while it is open. */
+.who { position: relative; }
+.chev { position: absolute; left: -15px; top: 50%; margin-top: -9px; width: 12px; text-align: center; font-size: 17px; line-height: 18px; color: var(--faint); transition: transform .15s ease; pointer-events: none; }
+.peers tr:hover .chev, .peers tr.open .chev { color: var(--muted); }
+.peers tr.open .chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
+/* The way over to Bitcoin Lab from an opened peer: a button a finger can hit. */
+.pd-lab { display: inline-block; margin-top: 10px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: #161d26; color: var(--text); font-size: 13px; text-decoration: none; }
+.pd-lab:hover { border-color: var(--accent); }
