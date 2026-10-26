@@ -505,10 +505,17 @@ a.addr-txt:hover { color: var(--accent); }
 /* The pill lies over the place line only: country and address below it keep
    the whole width, and the place name gives way to the pill. */
 .cards.cards table tr td.k-peer { grid-column: 1 / -1; }
-.cards.cards table tr td.k-peer .who b { padding-right: 150px; }
+.cards.cards table tr td.k-peer .who b { padding-right: 132px; max-width: none; }
 .cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
 .cards.cards .kind .never-txt { display: none; }
 .cards.cards .never-sub, .cards.cards .tor-sub { display: inline; }
 .cards.cards table tr { --card-indent: 39px; }
 .cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }
+
+/* A node catching up from this one: the arrow turns slowly, like the block
+   wave it is quiet, and stands still when motion is reduced. */
+.syncing { color: #7fe3d6; cursor: help; }
+.sync-ico { display: inline-block; animation: sync-spin 2s linear infinite; }
+@keyframes sync-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sync-ico { animation: none; } }

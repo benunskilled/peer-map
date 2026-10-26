@@ -1408,6 +1408,7 @@
     if (p.no_tx_relay) flags.push("no tx");
     if (p.chain_unknown) flags.push("chain unknown");
     if (p.fork) flags.push(p.fork);
+    if (p.sync_mb) flags.push("syncing");
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
@@ -1604,8 +1605,18 @@
           parts.forEach((f, i) => {
             if (i) e.append(", ");
             // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
-            if (why) {
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "syncing" ? `Still syncing: it has taken ${p.sync_mb} MB of blocks from this node and has not caught up` : "";
+            if (f === "syncing") {
+              const s = document.createElement("span");
+              s.className = "syncing";
+              s.title = why;
+              const ico = document.createElement("span");
+              ico.className = "sync-ico";
+              ico.setAttribute("aria-hidden", "true");
+              ico.textContent = "\u21bb";
+              s.append(ico, " ", f + " " + (p.sync_mb >= 1000 ? (p.sync_mb / 1000).toFixed(1) + " GB" : p.sync_mb + " MB"));
+              e.append(s);
+            } else if (why) {
               const s = document.createElement("span");
               s.className = f === "no tx" ? "no-tx" : "no-tx fork";
               s.textContent = f;

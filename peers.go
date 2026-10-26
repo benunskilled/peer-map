@@ -36,6 +36,8 @@ type rawPeer struct {
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
 	SyncedHeaders *int64 `json:"synced_headers"`
+	// The last block this node and the peer share; below zero while unknown.
+	SyncedBlocks *int64 `json:"synced_blocks"`
 	// Bytes received per message type. Read only to count pings and address
 	// requests (see behaviourAbout); nil when Core did not report it.
 	BytesRecvPerMsg map[string]int64 `json:"bytesrecv_per_msg"`
@@ -155,6 +157,7 @@ type Peer struct {
 	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
 	Fork         string   `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
 	ForkWhy      string   `json:"fork_why,omitempty"`
+	SyncMB       int64    `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
 	PingMs       *float64 `json:"ping_ms"`
 	// The lowest round trip Core has ever measured to this peer. Closer to
 	// the line itself than the last ping, which also carries whatever was
@@ -334,7 +337,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				claim, _, _ = strings.Cut(p.About, ",")
 				claim = "the wallet " + claim
 			}
-			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, now)
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+bitcoinjWhy(r, now)
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case libreKind != "":
@@ -351,17 +354,18 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				func() string { return anachronism(r.Subver, r.ServicesNames) },
 				func() string { return protocolMismatch(r.Subver, r.Version) },
 				func() string {
-					if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
-						return skippedHandshakeAbout(r.BytesRecvPerMsg)
-					}
-					return ""
-				},
-				func() string {
 					if offersNothingAsCore(r.Subver, r.ServicesNames) {
 						return offersNothingAbout
 					}
 					return ""
 				},
+				func() string {
+					if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
+						return skippedHandshakeAbout(r.BytesRecvPerMsg)
+					}
+					return ""
+				},
+				func() string { return quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.ConnTime, now) },
 			} {
 				if why := check(); why != "" {
 					p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why
@@ -370,7 +374,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			}
 		}
 		if p.Kind == "Other" && p.About == "" {
-			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg)
+			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
@@ -384,16 +388,21 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// who it probably is.
 		if isLinkingLion(r.Addr) || r.mockLinkingLion {
 			p.LinkingLion = true
+			lion := linkingLionAbout
+			if quietAfterHandshake(r.BytesRecvPerMsg, r.ConnTime, now) {
+				lion += linkingLionQuiet
+			}
 			if r.Subver == "" {
-				p.About = "Probably: " + linkingLionAbout
+				p.About = "Probably: " + lion
 			} else {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
 			}
 		}
 		if p.NoTxRelay {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
 		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind, r.SyncedHeaders, tip)
+		p.SyncMB = syncingFrom(r.Inbound, r.BytesSentPerMsg, r.SyncedBlocks, tip, r.ConnTime, now)
 		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {
 			switch hostOf(r.Addr) {

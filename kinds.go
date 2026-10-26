@@ -208,6 +208,33 @@ func stayedLong(connTime int64, now time.Time) string {
 	return fmt.Sprintf(", and has stayed connected for %d days", days)
 }
 
+// askedNothing says what a "wallet" never did: a real one asks for headers,
+// blocks or transactions within seconds of connecting, and sets a bloom filter
+// to hear about its own. Only said once the peer has been connected for a
+// while, since one that has just arrived has not had the time. recv is
+// getpeerinfo's bytesrecv_per_msg; nil means the node did not report it.
+func askedNothing(recv map[string]int64, connTime int64, now time.Time) string {
+	if recv == nil || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+		return ""
+	}
+	for _, m := range []string{"getheaders", "getblocks", "getdata", "filterload", "tx", "mempool"} {
+		if recv[m] > 0 {
+			return ""
+		}
+	}
+	return ", and never asked for a header or a transaction"
+}
+
+// bitcoinjWhy is the second reason given next to the protocol: that the peer
+// asked for nothing, which says more than how long it stayed, or - when it did
+// ask for something - how long it stayed.
+func bitcoinjWhy(r rawPeer, now time.Time) string {
+	if why := askedNothing(r.BytesRecvPerMsg, r.ConnTime, now); why != "" {
+		return why
+	}
+	return stayedLong(r.ConnTime, now)
+}
+
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already
 // covers the rest.
@@ -466,6 +493,10 @@ func isLinkingLion(addr string) bool {
 // explanation above the list carry it (LION_CREDIT in web/app.js).
 const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
 
+// linkingLionQuiet is added once the peer has been connected for a while and
+// has still only done the handshake: it listens and asks for nothing.
+const linkingLionQuiet = "; it only listens"
+
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
 // What Bitcoin Core started to offer, and in which version. A peer calling
@@ -484,6 +515,9 @@ var serviceSince = []struct {
 }
 
 var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
+
+// The Bitcore library by name: /bitcore:1.1.0/, nothing after it.
+var bitcoreLibrary = regexp.MustCompile(`^/bitcore:[0-9][0-9.]*/$`)
 
 // Software with no version that ever spoke the v2 transport.
 var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin)`)
@@ -513,7 +547,23 @@ func anachronism(subver string, services []string) string {
 	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
 	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
 	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
-		return "not Bitcoin Core - it lacks a service every Core since 0.16 offers"
+		return "not Bitcoin Core - it lacks NETWORK_LIMITED, which every Core since 0.16 offers"
+	}
+	// The Bitcore library announces NETWORK and nothing else (bitcore-p2p's
+	// version message defaults to services 1). Seen 21. to 26.10.2026: 921
+	// sessions from 510 addresses named /bitcore:1.1.0/, 858 of them offering
+	// WITNESS, NETWORK_LIMITED and P2P_V2 at today's chain height, most gone in
+	// under five seconds; the rest announced NETWORK, like the library.
+	if bitcoreLibrary.MatchString(subver) {
+		var extra []string
+		for _, sv := range services {
+			if sv != "NETWORK" {
+				extra = append(extra, sv)
+			}
+		}
+		if len(extra) > 0 {
+			return "a scanner - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
+		}
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
@@ -766,6 +816,45 @@ func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 
 	return 0
 }
 
+// handshakeOnly are the messages a peer sends to introduce itself and to answer
+// our pings. A peer that has sent nothing else for ten minutes has asked for no
+// header, address or transaction: not what any node, wallet or relay does.
+var handshakeOnly = map[string]bool{
+	"version": true, "verack": true, "feefilter": true, "ping": true, "pong": true,
+	"sendheaders": true, "sendcmpct": true, "sendaddrv2": true, "wtxidrelay": true, "sendtxrcncl": true,
+}
+
+// quietAfterHandshake is true once a peer has been connected long enough to
+// have asked for something and has sent only the handshake. recv is
+// getpeerinfo's bytesrecv_per_msg; nil means the node did not report it. On one
+// node, in 4,500 sessions of Core and Knots of ten minutes or more, none did.
+func quietAfterHandshake(recv map[string]int64, connTime int64, now time.Time) bool {
+	if recv == nil || recv["verack"] == 0 || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+		return false
+	}
+	for m, n := range recv {
+		if n > 0 && !handshakeOnly[m] {
+			return false
+		}
+	}
+	return true
+}
+
+// quietCoreAbout is the last reason a peer naming Core is not Core: after the
+// handshake it asked for nothing, not even for addresses. Only for full-relay
+// peers - one that wants no transactions may be a block-relay-only connection,
+// which has little to ask for - and it comes after every harder reason (a
+// service Core always offers, a protocol it cannot speak). Observed, 21. to
+// 26.10.2026 and in two older sets: of 4,500 sessions of Core and Knots of ten
+// minutes or more, none stayed quiet.
+func quietCoreAbout(subver string, relayTxes *bool, recv map[string]int64, connTime int64, now time.Time) string {
+	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes ||
+		!quietAfterHandshake(recv, connTime, now) {
+		return ""
+	}
+	return "not Bitcoin Core - it asked for nothing after the handshake, not even for addresses"
+}
+
 // behaviourAbout is why a peer naming Core is not Core, judged by what it has
 // sent, or "" when its behaviour fits. recv is getpeerinfo's bytesrecv_per_msg.
 func behaviourAbout(subver, transport string, recv map[string]int64, connTime int64, now time.Time) string {
@@ -805,7 +894,17 @@ func claimOf(subver string) string {
 
 // otherAbout is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64) string {
+func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+	// A peer that has been connected for a while and asked for nothing is no
+	// full node, whatever services it lists. Seen 21. to 26.10.2026: /your-fork:0.1/
+	// and /alt-bitnodes:0.1/ staying for hours, hearing of transactions
+	// and never fetching one, /pydroid-pool:3/ wanting neither.
+	if quietAfterHandshake(recv, connTime, now) {
+		if relayTxes != nil && *relayTxes {
+			return "Unknown software that only listens: hears new transactions, fetches none"
+		}
+		return "Unknown software that only listens: wants no transactions, asks for nothing"
+	}
 	for _, s := range services {
 		if s == "NETWORK" {
 			return "Probably a full node under a name its operator chose"
@@ -818,10 +917,16 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64)
 	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
 	// /relay-geo:0.1/ fetching every transaction and announcing none.
 	switch {
+	// BIP 35: "send me your whole mempool". Seen 22. to 26.10.2026 as /curl:8.5.0/,
+	// twenty times from one address, each right after the handshake.
+	case recv["mempool"] > 0:
+		return "Unknown software that asks for our mempool"
 	case recv["tx"] > 0 && recv["inv"] == 0:
 		return "Unknown software that pushes transactions without announcing them"
-	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0:
 		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
+	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0:
+		return "Unknown software that follows new blocks: wants headers announced, no transactions"
 	// Asking for data alone is no sign of listening: a peer that fetches
 	// blocks asks the same way. Only transactions sent to it count.
 	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
@@ -950,4 +1055,37 @@ func forkOf(services []string, kind string, synced *int64, tip int64) (string, s
 		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
 	}
 	return "", ""
+}
+
+// Syncing: a peer that takes whole blocks from this node faster than the chain
+// grows, and has not caught up, is a node still syncing - one just set up, or
+// one started again. A block every ten minutes is 0.16 MB a minute. On one
+// node, 21. to 26.10.2026, 418 inbound peers took 20 MB or more; 365 of them at
+// 1 MB a minute or faster over their whole stay (median 5). The average over
+// the whole stay is all a single look at getpeerinfo gives, so a peer that has
+// reached the tip is left out by what Core says it has: the last block it
+// shares with this node is within syncBehind blocks of the tip.
+const (
+	syncMinBytes  = 20_000_000
+	syncMinPerMin = 1_000_000.0
+	syncBehind    = 6
+)
+
+// syncingFrom is how many megabytes of blocks an inbound peer has taken from
+// this node while it syncs, or 0. sent is bytessent_per_msg, synced is
+// synced_blocks (nil or below zero: Core does not know), tip the highest
+// header any peer shares.
+func syncingFrom(inbound bool, sent map[string]int64, synced *int64, tip, connTime int64, now time.Time) int64 {
+	b := sent["block"]
+	if !inbound || b < syncMinBytes || connTime <= 0 {
+		return 0
+	}
+	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced < syncBehind {
+		return 0
+	}
+	secs := now.Unix() - connTime
+	if secs < 1 || float64(b)/(float64(secs)/60) < syncMinPerMin {
+		return 0
+	}
+	return b / 1_000_000
 }
