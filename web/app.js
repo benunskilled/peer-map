@@ -1456,7 +1456,8 @@
     if (p.sync_mb) flags.push("syncing");
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
-    if (p.chain_unknown) flags.push("chain unknown");
+    // A node that is syncing has sent no headers yet: nothing odd, "syncing" says it.
+    if (p.chain_unknown && !p.sync_mb) flags.push("chain unknown");
     if (p.fork) flags.push(p.fork);
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
