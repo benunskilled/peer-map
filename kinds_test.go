@@ -1115,3 +1115,12 @@ func TestNoAgentAbout(t *testing.T) {
 		}
 	}
 }
+
+// The detail that opens on a tap needs what the peer announced.
+func TestPeerCarriesServicesAndVersion(t *testing.T) {
+	p := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/", Version: 70016,
+		ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}}})[0]
+	if p.Version != 70016 || strings.Join(p.Services, ",") != "NETWORK,WITNESS,NETWORK_LIMITED" {
+		t.Errorf("got version %d, services %v", p.Version, p.Services)
+	}
+}
