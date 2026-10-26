@@ -151,14 +151,17 @@ type Peer struct {
 	LinkingLion bool `json:"linking_lion,omitempty"`
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
-	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
-	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
-	NoTxWhy      string   `json:"no_tx_why,omitempty"`     // why, where it can be told
-	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
-	Fork         string   `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
-	ForkWhy      string   `json:"fork_why,omitempty"`
-	SyncMB       int64    `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
-	PingMs       *float64 `json:"ping_ms"`
+	NoServices   bool   `json:"no_services,omitempty"`   // advertises NODE_NONE
+	NoTxRelay    bool   `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
+	NoTxWhy      string `json:"no_tx_why,omitempty"`     // why, where it can be told
+	ChainUnknown bool   `json:"chain_unknown,omitempty"` // Core has never seen a header from it
+	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
+	ForkWhy      string `json:"fork_why,omitempty"`
+	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
+	// What the peer announced, for the detail that opens on a tap.
+	Services []string `json:"services,omitempty"`
+	Version  int      `json:"version,omitempty"` // protocol version of its version message
+	PingMs   *float64 `json:"ping_ms"`
 	// The lowest round trip Core has ever measured to this peer. Closer to
 	// the line itself than the last ping, which also carries whatever was
 	// queued on either side at that moment - so it is the one a block's last
@@ -314,6 +317,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			Subver: r.Subver, Kind: kind, About: aboutOf(r.Subver), NoRelay: !relays,
 			ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
+			Services: r.ServicesNames, Version: r.Version,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
 		// is Core saying nothing. Only the first is worth showing.

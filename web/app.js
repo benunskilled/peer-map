@@ -31,6 +31,7 @@
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
     kind: null,           // kind filter from clicking an entry in a group's kind line
+    openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
     paused: false,
@@ -1729,6 +1730,66 @@
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
   ];
 
+  // What is known of a peer, in full: the sentences behind the words in its
+  // row, what it announced, the connection, the traffic and where it sits.
+  // Opens under the row on a tap or a click (a phone has no hover), and stays
+  // open across a refresh.
+  const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
+  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
+  function peerDetail(p) {
+    const box = document.createElement("div");
+    box.className = "peer-detail";
+    const add = (label, text) => {
+      if (!text) return;
+      const row = document.createElement("div");
+      row.className = "pd-row";
+      const l = document.createElement("span");
+      l.className = "pd-label";
+      l.textContent = label;
+      const v = document.createElement("span");
+      v.className = "pd-text";
+      v.textContent = text;
+      row.append(l, v);
+      box.appendChild(row);
+    };
+    // With a kind filter on, the description already stands under the kind.
+    if (p.about && !state.kind) add("What it is", p.about.replace(/\n/g, " \u00b7 "));
+    if (p.sync_mb) add("syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node and has not caught up`);
+    if (p.no_relay) add("never first", neverNote(p));
+    if (p.no_services) add("no services", NO_SERVICES_WHY);
+    if (p.no_tx_relay) add("no tx", p.no_tx_why || "Wants no transactions from your node");
+    if (p.chain_unknown && !p.sync_mb) add("no headers", NO_HEADERS_WHY);
+    if (p.fork) add(p.fork, p.fork_why);
+    if (p.tor_exit) add("Tor exit", TOR_EXIT_TITLE);
+    if (p.app) add("Umbrel app", p.app);
+    add("Software", p.subver || "no name sent");
+    add("Protocol", p.version ? String(p.version) : "");
+    add("Services", (p.services && p.services.length) ? p.services.join(", ") : (p.no_services ? "none" : ""));
+    add("Connection", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type), netLabel(p.network) + (p.transport ? " " + p.transport : "")].filter(Boolean).join(" \u00b7 "));
+    if (p.conntime) add("Connected", `${ago(Date.now() / 1000 - p.conntime)} (since ${new Date(p.conntime * 1000).toLocaleString()})`);
+    if (p.ping_ms != null) add("Ping", fmtPing(p.ping_ms) + (p.min_ping_ms != null ? ` (lowest ${fmtPing(p.min_ping_ms)})` : ""));
+    add("Traffic", `sent ${bytesText(p.bytes_sent)}, received ${bytesText(p.bytes_recv)}`);
+    add("Place", [p.region, p.cc].filter(Boolean).join(", "));
+    add("Operator", p.operator ? p.operator + (p.asn ? " (AS" + p.asn + ")" : "") : "");
+    return box;
+  }
+  // The detail goes into the kind cell: it is the wide one on a table, and on a
+  // phone card it spans the whole card.
+  function toggleDetail(tr, p, key) {
+    const cell = tr.querySelector("td.k-kind");
+    if (!cell) return;
+    const open = cell.querySelector(".peer-detail");
+    if (open) {
+      open.remove();
+      state.openRows.delete(key);
+      tr.classList.remove("open");
+    } else {
+      cell.appendChild(peerDetail(p));
+      state.openRows.add(key);
+      tr.classList.add("open");
+    }
+  }
+
   function renderTables() {
     const root = $("tables");
     root.textContent = "";
@@ -1871,6 +1932,13 @@
           }
           tr.appendChild(td);
         }
+        const rowKey = g + " " + p.addr;
+        if (state.openRows.has(rowKey)) { tr.classList.add("open"); tr.querySelector("td.k-kind")?.appendChild(peerDetail(p)); }
+        tr.addEventListener("click", (ev) => {
+          // Links and buttons keep doing their own thing; so does selecting text.
+          if (ev.target.closest("a, button, input, select, textarea") || String(window.getSelection()).length > 0) return;
+          toggleDetail(tr, p, rowKey);
+        });
         tbody.appendChild(tr);
       }
       table.appendChild(tbody);

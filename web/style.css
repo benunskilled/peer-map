@@ -507,7 +507,7 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-peer { grid-column: 1 / -1; }
 .cards.cards table tr td.k-peer .who b { padding-right: 132px; max-width: none; }
 .cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
-.cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
+.cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about, .cards.cards table tr td.k-kind > .peer-detail { grid-column: 1 / -1; padding-left: var(--card-indent); }
 .cards.cards .kind .never-txt { display: none; }
 .cards.cards .never-sub, .cards.cards .tor-sub { display: inline; }
 .cards.cards table tr { --card-indent: 39px; }
@@ -521,3 +521,12 @@ a.addr-txt:hover { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .sync-ico { animation: none; } }
 .chip.count.syncing, .kinds .chip.syncing { color: #7fe3d6; cursor: help; }
 .chip.syncing .sync-ico { color: #7fe3d6; }
+
+/* A peer opens with everything known of it on a tap or a click. The detail is
+   0 wide and at least as wide as its cell, so it never widens a column. */
+.peers tbody tr { cursor: pointer; }
+.peers tr.open td { background: rgba(255,255,255,.03); }
+.peer-detail { white-space: normal; width: 0; min-width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); font-size: 12px; line-height: 1.45; cursor: default; }
+.pd-row { display: flex; gap: 10px; padding: 2px 0; }
+.pd-label { flex: 0 0 82px; color: var(--faint); }
+.pd-text { flex: 1 1 auto; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
