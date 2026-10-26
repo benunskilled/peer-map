@@ -1704,7 +1704,11 @@
         if (state.kind && p.about) {
           const about = document.createElement("div");
           about.className = "about";
-          about.textContent = p.about;
+          // The list says why in one or two lines; the claim is the name beside it,
+          // and everything is in the panel that opens on a tap.
+          const probably = p.about.split("\n").find((l) => l.startsWith("Probably:"));
+          about.textContent = probably || p.about;
+          about.classList.add(probably ? "short" : "clip");
           td.appendChild(about);
         }
       },
