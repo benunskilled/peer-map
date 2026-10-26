@@ -1445,7 +1445,7 @@
   function syncSpan(p) {
     const s = document.createElement("span");
     s.className = "syncing";
-    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node and has not caught up`;
+    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`;
     const ico = document.createElement("span");
     ico.className = "sync-ico";
     ico.setAttribute("aria-hidden", "true");
@@ -1737,57 +1737,113 @@
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
   const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
   function peerDetail(p) {
-    const box = document.createElement("div");
-    box.className = "peer-detail";
-    const add = (label, text) => {
-      if (!text) return;
-      const row = document.createElement("div");
-      row.className = "pd-row";
-      const l = document.createElement("span");
-      l.className = "pd-label";
-      l.textContent = label;
-      const v = document.createElement("span");
-      v.className = "pd-text";
-      v.textContent = text;
-      row.append(l, v);
-      box.appendChild(row);
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
     };
+    const panel = el("div", "pd");
+    const block = (title) => {
+      const b = el("section", "pd-block");
+      b.appendChild(el("h4", "", title));
+      panel.appendChild(b);
+      return b;
+    };
+    const stat = (label, big, small) => {
+      const s = el("div", "pd-stat");
+      s.append(el("span", "pd-label", label), el("span", "pd-big", big));
+      if (small) s.appendChild(el("span", "pd-small", small));
+      return s;
+    };
+
+    // What it is, and why each word in the row is there.
+    const what = block("What it is");
     // With a kind filter on, the description already stands under the kind.
-    if (p.about && !state.kind) add("What it is", p.about.replace(/\n/g, " \u00b7 "));
-    if (p.sync_mb) add("syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node and has not caught up`);
-    if (p.no_relay) add("never first", neverNote(p));
-    if (p.no_services) add("no services", NO_SERVICES_WHY);
-    if (p.no_tx_relay) add("no tx", p.no_tx_why || "Wants no transactions from your node");
-    if (p.chain_unknown && !p.sync_mb) add("no headers", NO_HEADERS_WHY);
-    if (p.fork) add(p.fork, p.fork_why);
-    if (p.tor_exit) add("Tor exit", TOR_EXIT_TITLE);
-    if (p.app) add("Umbrel app", p.app);
-    add("Software", p.subver || "no name sent");
-    add("Protocol", p.version ? String(p.version) : "");
-    add("Services", (p.services && p.services.length) ? p.services.join(", ") : (p.no_services ? "none" : ""));
-    add("Connection", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type), netLabel(p.network) + (p.transport ? " " + p.transport : "")].filter(Boolean).join(" \u00b7 "));
-    if (p.conntime) add("Connected", `${ago(Date.now() / 1000 - p.conntime)} (since ${new Date(p.conntime * 1000).toLocaleString()})`);
-    if (p.ping_ms != null) add("Ping", fmtPing(p.ping_ms) + (p.min_ping_ms != null ? ` (lowest ${fmtPing(p.min_ping_ms)})` : ""));
-    add("Traffic", `sent ${bytesText(p.bytes_sent)}, received ${bytesText(p.bytes_recv)}`);
-    add("Place", [p.region, p.cc].filter(Boolean).join(", "));
-    add("Operator", p.operator ? p.operator + (p.asn ? " (AS" + p.asn + ")" : "") : "");
-    return box;
-  }
-  // The detail goes into the kind cell: it is the wide one on a table, and on a
-  // phone card it spans the whole card.
-  function toggleDetail(tr, p, key) {
-    const cell = tr.querySelector("td.k-kind");
-    if (!cell) return;
-    const open = cell.querySelector(".peer-detail");
-    if (open) {
-      open.remove();
-      state.openRows.delete(key);
-      tr.classList.remove("open");
-    } else {
-      cell.appendChild(peerDetail(p));
-      state.openRows.add(key);
-      tr.classList.add("open");
+    if (p.about && !state.kind) {
+      for (const line of p.about.split("\n")) {
+        const m = /^(Claims|Probably):\s*(.*)$/.exec(line);
+        const row = el("p", "pd-about");
+        if (m) row.append(el("span", "pd-tag " + m[1].toLowerCase(), m[1]), " " + m[2]);
+        else row.textContent = line;
+        what.appendChild(row);
+      }
     }
+    const flags = [];
+    if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
+    if (p.no_relay) flags.push(["never first", neverNote(p)]);
+    if (p.no_services) flags.push(["no services", NO_SERVICES_WHY]);
+    if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
+    if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
+    if (p.fork) flags.push([p.fork, p.fork_why]);
+    if (p.tor_exit) flags.push(["Tor exit", TOR_EXIT_TITLE]);
+    if (p.app) flags.push(["Umbrel app", p.app]);
+    for (const [word, why, cls] of flags) {
+      const row = el("p", "pd-flag-row");
+      row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
+      what.appendChild(row);
+    }
+    if (!what.querySelector("p")) what.appendChild(el("p", "pd-about", "Nothing out of the ordinary: a peer that says what it is and does what that software does."));
+
+    // The line: how it is connected, how fast, how long, how much each way.
+    const line = block("Connection");
+    const tiles = el("div", "pd-tiles");
+    if (p.ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.ping_ms), p.min_ping_ms != null ? "lowest " + fmtPing(p.min_ping_ms) : ""));
+    if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
+    tiles.appendChild(stat("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type)].filter(Boolean).join(" \u00b7 "),
+      netLabel(p.network) + (p.transport ? " \u00b7 " + p.transport : "")));
+    line.appendChild(tiles);
+    const total = Math.max(1, p.bytes_sent + p.bytes_recv);
+    const traffic = el("div", "pd-traffic");
+    const bar = el("div", "pd-bar");
+    const sent = el("span", "pd-sent"), got = el("span", "pd-got");
+    sent.style.flexGrow = String(Math.max(p.bytes_sent / total, 0.02));
+    got.style.flexGrow = String(Math.max(p.bytes_recv / total, 0.02));
+    bar.append(sent, got);
+    const ratio = p.bytes_recv > 0 ? p.bytes_sent / p.bytes_recv : 0;
+    traffic.append(el("span", "pd-label", "Traffic"), bar,
+      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it` + (ratio >= 10 ? ` \u00b7 ${Math.round(ratio)}\u00d7 more out than in` : "")));
+    line.appendChild(traffic);
+
+    // What it announced and where it sits.
+    const who = block("Announced");
+    who.appendChild(el("p", "pd-ua", p.subver || "no name sent"));
+    const svc = el("div", "pd-svc");
+    if (p.services && p.services.length) for (const s of p.services) svc.appendChild(el("span", "pd-chip", s));
+    else svc.appendChild(el("span", "pd-chip none", p.no_services ? "no services" : "services unknown"));
+    who.appendChild(svc);
+    if (p.version) who.appendChild(el("p", "pd-small", "Protocol " + p.version));
+    const where = [p.region, p.cc].filter(Boolean).join(", ");
+    if (where || p.operator) who.appendChild(el("p", "pd-where", [where, p.operator ? p.operator + (p.asn ? " (AS" + p.asn + ")" : "") : ""].filter(Boolean).join(" \u00b7 ")));
+    return panel;
+  }
+  // The detail is a row of its own under the peer, as wide as the table. It
+  // adds no width to any column: its content is 0 wide and as wide as the cell.
+  function detailRow(tr, p) {
+    const row = document.createElement("tr");
+    row.className = "detail-row";
+    const td = document.createElement("td");
+    td.colSpan = tr.cells.length;
+    td.appendChild(peerDetail(p));
+    row.appendChild(td);
+    return row;
+  }
+  // One at a time: opening a peer closes the one that was open, so the list does
+  // not grow without end. What the reader tapped stays where it was on the
+  // screen, although a detail above it has just gone.
+  function toggleDetail(tr, p, key) {
+    const top = tr.getBoundingClientRect().top;
+    const open = tr.nextElementSibling?.classList.contains("detail-row");
+    for (const row of document.querySelectorAll("#tables tr.detail-row")) row.remove();
+    for (const row of document.querySelectorAll("#tables tr.open")) row.classList.remove("open");
+    state.openRows.clear();
+    if (!open) {
+      tr.after(detailRow(tr, p));
+      tr.classList.add("open");
+      state.openRows.add(key);
+    }
+    const d = tr.getBoundingClientRect().top - top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
   }
 
   function renderTables() {
@@ -1933,13 +1989,15 @@
           tr.appendChild(td);
         }
         const rowKey = g + " " + p.addr;
-        if (state.openRows.has(rowKey)) { tr.classList.add("open"); tr.querySelector("td.k-kind")?.appendChild(peerDetail(p)); }
+        const reopen = state.openRows.has(rowKey);
+        if (reopen) tr.classList.add("open");
         tr.addEventListener("click", (ev) => {
           // Links and buttons keep doing their own thing; so does selecting text.
           if (ev.target.closest("a, button, input, select, textarea") || String(window.getSelection()).length > 0) return;
           toggleDetail(tr, p, rowKey);
         });
         tbody.appendChild(tr);
+        if (reopen) tbody.appendChild(detailRow(tr, p));
       }
       table.appendChild(tbody);
       wrap.appendChild(table);
