@@ -690,6 +690,35 @@
   document.addEventListener("focusout", freed);
   window.addEventListener("blur", () => { pressedAt = 0; freed(); });
 
+  // A reload puts the reader back where they were. The browser tries it before
+  // the peers have arrived, finds a short page and settles near the top (Ben
+  // 26.10.: the Map always at the top). So the position is kept here, set again once the
+  // tables are in, and let go when the reader moves the page, when the page has
+  // grown to it, or after six seconds.
+  let reloadY = null;
+  try {
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const nav = performance.getEntriesByType("navigation")[0];
+    const key = "scrollY:" + location.pathname;
+    if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
+      const v = Number(sessionStorage.getItem(key));
+      if (v > 0) reloadY = v;
+    }
+    const save = () => { try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* private window */ } };
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+    const let_go = () => { reloadY = null; };
+    for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) window.addEventListener(ev, let_go, { passive: true });
+    setTimeout(let_go, 6000);
+  } catch { /* no storage: the browser's own restore has to do */ }
+  function restoreReloadY() {
+    if (reloadY === null) return;
+    if (state.focus) { reloadY = null; return; }
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo(0, Math.min(reloadY, max));
+    if (max >= reloadY) reloadY = null;
+  }
+
   // What the reader is looking at stays where it is on a refresh. Keeping
   // the scroll position alone is not that: when anything above grows or
   // shrinks - a kind chip wrapping to another line, the block card, the list
@@ -738,6 +767,7 @@
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     holdAnchor(anchor);
+    restoreReloadY();
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
