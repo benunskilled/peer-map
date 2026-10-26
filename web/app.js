@@ -1734,6 +1734,7 @@
   // row, what it announced, the connection, the traffic and where it sits.
   // Opens under the row on a tap or a click (a phone has no hover), and stays
   // open across a refresh.
+  const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
   const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
   function peerDetail(p) {
@@ -1784,8 +1785,18 @@
       what.appendChild(row);
     }
     if (!what.querySelector("p")) {
-      // Nothing to explain: say so, as plainly as for an honest node.
-      what.appendChild(el("p", "pd-about", p.kind.startsWith("Node") ? "An ordinary node: it says what it is and does what that software does." : "Nothing odd: it says what it is and does what that software does."));
+      if (p.kind.startsWith("Node")) {
+        // A node with nothing to explain: say what is good about it, from what it did.
+        const good = ["says what it is"];
+        if (p.services && p.services.length) good.push("offers " + andList(p.services));
+        if (!p.no_tx_relay) good.push("relays transactions");
+        if (!p.chain_unknown) good.push("shares its block headers");
+        what.appendChild(el("p", "pd-about", "An honest node: it " + andList(good) + "."));
+      } else {
+        // Nothing to say about the others either: no block rather than a made-up one.
+        what.remove();
+        panel.classList.add("pd-two");
+      }
     }
 
     // The line: how it is connected, how fast, how long, how much each way.
