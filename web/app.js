@@ -646,7 +646,9 @@
   }
 
   // ---------- render ----------
-  const matchesKind = (p) => !state.kind || p.kind === state.kind;
+  // "syncing" is not a kind but is picked like one: the chip beside the count.
+  const SYNCING = "syncing";
+  const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb : p.kind === state.kind);
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
@@ -1728,9 +1730,12 @@
       // How many are catching up from this node right now, and what they took.
       const syncing = kindPool.filter((p) => p.sync_mb);
       if (syncing.length) {
-        const sc = document.createElement("span");
-        sc.className = "chip count syncing";
-        sc.title = `${syncing.length} syncing from this node, ${mbText(syncing.reduce((t, p) => t + p.sync_mb, 0))} of blocks taken so far`;
+        const sc = document.createElement("button");
+        sc.type = "button";
+        sc.className = "chip kind-pick syncing" + (state.kind === SYNCING ? " on" : "");
+        const taken = `${syncing.length} syncing from this node, ${mbText(syncing.reduce((t, p) => t + p.sync_mb, 0))} of blocks taken so far`;
+        sc.title = state.kind === SYNCING ? "Show every kind again" : taken + " - click to show only these";
+        sc.setAttribute("aria-pressed", String(state.kind === SYNCING));
         const si = document.createElement("i");
         si.textContent = syncing.length;
         const ico = document.createElement("span");
@@ -1738,6 +1743,7 @@
         ico.setAttribute("aria-hidden", "true");
         ico.textContent = "\u21bb";
         sc.append(ico, si, " syncing");
+        sc.addEventListener("click", () => setKind(SYNCING));
         mix.appendChild(sc);
       }
       if (kindPool.length) renderKindMix(mix, kindPool);

@@ -1064,11 +1064,14 @@ func forkOf(services []string, kind string, synced *int64, tip int64) (string, s
 // 1 MB a minute or faster over their whole stay (median 5). The average over
 // the whole stay is all a single look at getpeerinfo gives, so a peer that has
 // reached the tip is left out by what Core says it has: the last block it
-// shares with this node is within syncBehind blocks of the tip.
+// shares with this node is within syncBehind blocks (a day) of the tip. Seen
+// 26.10.2026: one peer 6 blocks behind that had taken 11.9 GB in 2.5 days at
+// 3 MB a minute, another 27 behind with 3.8 GB - nodes at the tip that fetch
+// blocks all the time - and three genuine ones with no common block yet.
 const (
 	syncMinBytes  = 20_000_000
 	syncMinPerMin = 1_000_000.0
-	syncBehind    = 6
+	syncBehind    = 144
 )
 
 // syncingFrom is how many megabytes of blocks an inbound peer has taken from
