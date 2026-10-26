@@ -1092,3 +1092,20 @@ func syncingFrom(inbound bool, sent map[string]int64, synced *int64, tip, connTi
 	}
 	return b / 1_000_000
 }
+
+// noAgentAbout is what a peer that sent its version but left its name empty
+// did next, in a few words. Seen 21. to 26.10.2026, 429 such sessions: 113
+// asked for headers and addresses like a full node, 43 asked for addresses
+// and nothing else, the rest said nothing or only answered pings.
+func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {
+	const lead = "Introduced itself but left its name empty: "
+	switch {
+	case recv["getheaders"] > 0 && (recv["getaddr"] > 0 || recv["sendcmpct"] > 0):
+		return lead + "it asks for headers like a full node does"
+	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
+		return lead + "it asks for addresses and nothing else"
+	case quietAfterHandshake(recv, connTime, now):
+		return lead + "after the handshake it asked for nothing"
+	}
+	return lead + "software that keeps quiet about what it is"
+}
