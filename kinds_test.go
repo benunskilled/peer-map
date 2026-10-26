@@ -1087,3 +1087,31 @@ func TestSyncingFrom(t *testing.T) {
 		t.Errorf("a Core node syncing: %q, %d MB", p.Kind, p.SyncMB)
 	}
 }
+
+// A peer with a version but no name says what it did next.
+func TestNoAgentAbout(t *testing.T) {
+	now := time.Now()
+	hour := now.Unix() - 3600
+	cases := []struct {
+		name string
+		recv map[string]int64
+		conn int64
+		want string
+	}{
+		{"a full node without a name", map[string]int64{"version": 126, "verack": 24, "getheaders": 1061, "getaddr": 24, "sendcmpct": 33}, hour,
+			"Introduced itself but left its name empty: it asks for headers like a full node does"},
+		{"addresses only", map[string]int64{"version": 126, "verack": 24, "getaddr": 24, "pong": 32}, hour,
+			"Introduced itself but left its name empty: it asks for addresses and nothing else"},
+		{"quiet for an hour", map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30}, hour,
+			"Introduced itself but left its name empty: after the handshake it asked for nothing"},
+		{"just arrived", map[string]int64{"version": 126, "verack": 24}, now.Unix() - 5,
+			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+		{"no counters", nil, hour,
+			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+	}
+	for _, c := range cases {
+		if got := noAgentAbout(c.recv, c.conn, now); got != c.want {
+			t.Errorf("%s: got %q", c.name, got)
+		}
+	}
+}

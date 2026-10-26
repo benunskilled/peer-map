@@ -379,7 +379,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
 		if p.Kind == noAgentKind && r.Version > 0 {
-			p.About = "Introduced itself but left its name empty: software that keeps quiet about what it is"
+			p.About = noAgentAbout(r.BytesRecvPerMsg, r.ConnTime, now)
 		} else if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
