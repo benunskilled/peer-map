@@ -1783,7 +1783,10 @@
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
       what.appendChild(row);
     }
-    if (!what.querySelector("p")) what.appendChild(el("p", "pd-about", "Nothing out of the ordinary: a peer that says what it is and does what that software does."));
+    if (!what.querySelector("p")) {
+      // Nothing to explain: say so, as plainly as for an honest node.
+      what.appendChild(el("p", "pd-about", p.kind.startsWith("Node") ? "An ordinary node: it says what it is and does what that software does." : "Nothing odd: it says what it is and does what that software does."));
+    }
 
     // The line: how it is connected, how fast, how long, how much each way.
     const line = block("Connection");
