@@ -1402,13 +1402,30 @@
   // They are shown in one cell on purpose: a peer claiming to be Bitcoin Core
   // while offering nothing and having no known chain is only obvious when the
   // claim and the observation sit next to each other.
+  // A node catching up from this one: a turning arrow, the word and what it
+  // has taken. Always first in the grey line under the place.
+  function mbText(mb) {
+    return mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB";
+  }
+  function syncSpan(p) {
+    const s = document.createElement("span");
+    s.className = "syncing";
+    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node and has not caught up`;
+    const ico = document.createElement("span");
+    ico.className = "sync-ico";
+    ico.setAttribute("aria-hidden", "true");
+    ico.textContent = "\u21bb";
+    s.append(ico, " syncing " + mbText(p.sync_mb));
+    return s;
+  }
+
   function kindLabel(p) {
     const flags = [];
+    if (p.sync_mb) flags.push("syncing");
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
     if (p.chain_unknown) flags.push("chain unknown");
     if (p.fork) flags.push(p.fork);
-    if (p.sync_mb) flags.push("syncing");
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
@@ -1601,22 +1618,12 @@
         if (under || never || p.tor_exit) {
           const e = line("sub ua", "");
           // "no tx" says on hover why, where Core's messages tell it.
-          const parts = seen ? seen.split(", ") : [];
+          const parts = (seen ? seen.split(", ") : []).filter((f) => f !== "syncing");
           parts.forEach((f, i) => {
             if (i) e.append(", ");
             // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "syncing" ? `Still syncing: it has taken ${p.sync_mb} MB of blocks from this node and has not caught up` : "";
-            if (f === "syncing") {
-              const s = document.createElement("span");
-              s.className = "syncing";
-              s.title = why;
-              const ico = document.createElement("span");
-              ico.className = "sync-ico";
-              ico.setAttribute("aria-hidden", "true");
-              ico.textContent = "\u21bb";
-              s.append(ico, " ", f + " " + (p.sync_mb >= 1000 ? (p.sync_mb / 1000).toFixed(1) + " GB" : p.sync_mb + " MB"));
-              e.append(s);
-            } else if (why) {
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
+            if (why) {
               const s = document.createElement("span");
               s.className = f === "no tx" ? "no-tx" : "no-tx fork";
               s.textContent = f;
@@ -1624,7 +1631,7 @@
               e.append(s);
             } else e.append(f);
           });
-          if (seen && p.subver) e.append(" \u00b7 ");
+          if (parts.length && p.subver) e.append(" \u00b7 ");
           if (never) {
             const n = document.createElement("span");
             n.className = "never-sub";
@@ -1646,6 +1653,8 @@
             name.textContent = p.subver;
             e.append(name);
           }
+          // Always first in the line.
+          if (seen.includes("syncing")) e.prepend(syncSpan(p), e.firstChild ? " \u00b7 " : "");
           td.appendChild(fit(e, under));
         }
         // With a kind filter on, the question is why these peers are in it:
@@ -1716,6 +1725,21 @@
       ni.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
       n.append(ni, " peers");
       mix.appendChild(n);
+      // How many are catching up from this node right now, and what they took.
+      const syncing = kindPool.filter((p) => p.sync_mb);
+      if (syncing.length) {
+        const sc = document.createElement("span");
+        sc.className = "chip count syncing";
+        sc.title = `${syncing.length} syncing from this node, ${mbText(syncing.reduce((t, p) => t + p.sync_mb, 0))} of blocks taken so far`;
+        const si = document.createElement("i");
+        si.textContent = syncing.length;
+        const ico = document.createElement("span");
+        ico.className = "sync-ico";
+        ico.setAttribute("aria-hidden", "true");
+        ico.textContent = "\u21bb";
+        sc.append(ico, si, " syncing");
+        mix.appendChild(sc);
+      }
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);

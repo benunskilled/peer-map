@@ -519,3 +519,5 @@ a.addr-txt:hover { color: var(--accent); }
 .sync-ico { display: inline-block; animation: sync-spin 2s linear infinite; }
 @keyframes sync-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .sync-ico { animation: none; } }
+.chip.count.syncing, .kinds .chip.syncing { color: #7fe3d6; cursor: help; }
+.chip.syncing .sync-ico { color: #7fe3d6; }
