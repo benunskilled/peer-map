@@ -1787,21 +1787,22 @@
     if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
     if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
     if (p.fork) flags.push([p.fork, p.fork_why]);
-    if (p.tor_exit) flags.push(["Tor exit", TOR_EXIT_TITLE]);
     if (p.app) flags.push(["Umbrel app", p.app]);
     for (const [word, why, cls] of flags) {
       const row = el("p", "pd-flag-row");
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
       what.appendChild(row);
     }
-    if (!what.querySelector("p")) {
+    // The Umbrel app only adds context; it does not take the honest line away.
+    const onlyContext = !what.querySelector(".pd-about") && !flags.some(f => f[0] !== "Umbrel app");
+    if (!what.querySelector("p") || onlyContext) {
       if (p.kind.startsWith("Node")) {
         // A node with nothing to explain: say what is good about it, from what it did.
         const good = ["says what it is"];
         if (p.services && p.services.length) good.push("offers " + andList(p.services));
         if (!p.no_tx_relay) good.push("relays transactions");
         if (!p.chain_unknown) good.push("shares its block headers");
-        what.appendChild(el("p", "pd-about", "An honest node: it " + andList(good) + "."));
+        what.insertBefore(el("p", "pd-about", "An honest node: it " + andList(good) + "."), what.querySelector("p"));
       } else {
         // Nothing to say about the others either: no block rather than a made-up one.
         what.remove();
@@ -1817,6 +1818,11 @@
     tiles.appendChild(stat("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type)].filter(Boolean).join(" \u00b7 "),
       netLabel(p.network) + (p.transport ? " \u00b7 " + p.transport : "")));
     line.appendChild(tiles);
+    if (p.tor_exit) {
+      const tor = el("p", "pd-flag-row");
+      tor.append(el("span", "pd-flag", "Tor exit"), " " + TOR_EXIT_TITLE.replace(/^Tor exit: /, "Reached through a Tor exit: "));
+      line.appendChild(tor);
+    }
     const total = Math.max(1, p.bytes_sent + p.bytes_recv);
     const traffic = el("div", "pd-traffic");
     const bar = el("div", "pd-bar");
