@@ -1436,6 +1436,8 @@
   // claim and the observation sit next to each other.
   // A node catching up from this one: a turning arrow, the word and what it
   // has taken. Always first in the grey line under the place.
+  // What "no headers" means, on hover: Core never got a block header from the peer.
+  const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
   function mbText(mb) {
     return mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB";
   }
@@ -1457,7 +1459,7 @@
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
     // A node that is syncing has sent no headers yet: nothing odd, "syncing" says it.
-    if (p.chain_unknown && !p.sync_mb) flags.push("chain unknown");
+    if (p.chain_unknown && !p.sync_mb) flags.push("no headers");
     if (p.fork) flags.push(p.fork);
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
@@ -1621,7 +1623,7 @@
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // The pill says the kind and nothing else, for every peer: what Core
-        // saw (no services, no tx, chain unknown) goes to the line under it.
+        // saw (no services, no tx, no headers) goes to the line under it.
         // One layout in every row, and the pill is never cut.
         const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
         const never = p.no_relay ? " \u00b7 never first" : "";
@@ -1655,10 +1657,10 @@
           parts.forEach((f, i) => {
             if (i) e.append(", ");
             // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "no headers" ? NO_HEADERS_WHY : "";
             if (why) {
               const s = document.createElement("span");
-              s.className = f === "no tx" ? "no-tx" : "no-tx fork";
+              s.className = f === "no tx" || f === "no headers" ? "no-tx" : "no-tx fork";
               s.textContent = f;
               s.title = why;
               e.append(s);
