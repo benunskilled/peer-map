@@ -692,7 +692,7 @@
   // shrinks - a kind chip wrapping to another line, the block card, the list
   // of peers not on the map - everything below moves. Chrome makes up for it
   // itself (scroll anchoring); Safari does not, and the page jumped up and
-  // down there on its own (Ben 24.10.). The anchor is the topmost table row
+  // down there on its own. The anchor is the topmost table row
   // on screen, else the topmost card.
   function readAnchor() {
     if (window.scrollY < 1) return null;
@@ -1836,7 +1836,7 @@
   //
   // Before that, a tight table gives up what matters least, a step at a time
   // (see [data-drops] in style.css): Connected, then Ping, then Net, and
-  // Operator last (Ben 24.10.: Ping and Connected matter less than anything
+  // Operator last (Ping and Connected matter less than anything
   // else). The first three steps are also taken when the tables would fit
   // but the kind's text would be cut. The address always stays: it is the
   // link into Bitcoin Lab.
