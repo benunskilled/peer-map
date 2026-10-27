@@ -31,6 +31,7 @@
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
     kind: null,           // kind filter from clicking an entry in a group's kind line
+    pool: null,           // under "Pool node": one pool, or UNKNOWN_POOL
     openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
@@ -649,7 +650,12 @@
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
   const SYNCING = "syncing";
-  const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb : p.kind === state.kind);
+  // Under "Pool node" the pools are picked the same way, one level down.
+  const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool";
+  const poolName = (p) => p.pool || UNKNOWN_POOL;
+  const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb
+    : p.kind === state.kind && (state.kind !== POOL_KIND || !state.pool || poolName(p) === state.pool));
+
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
@@ -1187,7 +1193,7 @@
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
-    $("kindFilterName").textContent = state.kind || "";
+    $("kindFilterName").textContent = (state.kind || "") + (state.kind === POOL_KIND && state.pool ? " \u00b7 " + state.pool : "");
   }
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1202,6 +1208,11 @@
 
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
+    state.pool = null;
+    applyFilters();
+  }
+  function setPool(pool) {
+    state.pool = state.pool === pool ? null : pool;
     applyFilters();
   }
 
@@ -1211,6 +1222,7 @@
   });
   $("kindFilterClear").addEventListener("click", () => {
     state.kind = null;
+    state.pool = null;
     applyFilters();
   });
 
@@ -1494,6 +1506,31 @@
     });
   }
 
+  // With "Pool node" picked, which pools those are: one chip per pool, the
+  // ones not known by name last.
+  function renderPoolMix(card, peers) {
+    if (!peers.length) return;
+    const n = new Map();
+    for (const p of peers) n.set(poolName(p), (n.get(poolName(p)) || 0) + 1);
+    const entries = [...n].sort((a, b) => (a[0] === UNKNOWN_POOL) - (b[0] === UNKNOWN_POOL) || b[1] - a[1] || a[0].localeCompare(b[0]));
+    const el = document.createElement("div");
+    el.className = "kinds chips pool-picks";
+    for (const [pool, count] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip kind-pick" + (state.pool === pool ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + pool);
+      b.title = state.pool === pool ? "Show every pool again"
+        : pool === UNKNOWN_POOL ? "Pool nodes whose pool is not known" : `Show only ${pool}`;
+      b.setAttribute("aria-pressed", String(state.pool === pool));
+      b.addEventListener("click", () => setPool(pool));
+      el.appendChild(b);
+    }
+    card.appendChild(el);
+  }
+
   // How spread out a group is: distinct operators and countries. Operators by
   // the name in the Operator column, not by ASN: a large company runs several
   // ASNs (Amazon has AS16509 and AS14618) and should still count once. Peers
@@ -1668,7 +1705,7 @@
         // Umbrel need no flags: nothing about them is a surprise.
         // Syncing is the one thing that stays: the count above the list includes them.
         const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
-        const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
+        const under = [seen, p.pool, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under || never || p.tor_exit) {
           const e = line("sub ua", "");
           // "no tx" says on hover why, where Core's messages tell it.
@@ -1685,7 +1722,14 @@
               e.append(s);
             } else e.append(f);
           });
-          if (parts.length && p.subver) e.append(" \u00b7 ");
+          if (parts.length && (p.subver || p.pool)) e.append(" \u00b7 ");
+          // Whose pool it is, where an address proved it or the agent names it.
+          if (p.pool) {
+            const pool = document.createElement("span");
+            pool.className = "pool-name";
+            pool.textContent = p.pool;
+            e.append(pool, p.subver ? " \u00b7 " : "");
+          }
           if (never) {
             const n = document.createElement("span");
             n.className = "never-sub";
@@ -1956,6 +2000,7 @@
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
+      if (state.kind === POOL_KIND) renderPoolMix(card, kindPool.filter((p) => p.kind === POOL_KIND));
 
       if (peers.length) {
         const spread = document.createElement("p");
