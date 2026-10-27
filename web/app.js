@@ -1515,6 +1515,10 @@
     const entries = [...n].sort((a, b) => (a[0] === UNKNOWN_POOL) - (b[0] === UNKNOWN_POOL) || b[1] - a[1] || a[0].localeCompare(b[0]));
     const el = document.createElement("div");
     el.className = "kinds chips pool-picks";
+    const label = document.createElement("span");
+    label.className = "picks-label";
+    label.textContent = "Pools:";
+    el.appendChild(label);
     for (const [pool, count] of entries) {
       const b = document.createElement("button");
       b.type = "button";
@@ -1836,6 +1840,7 @@
         what.appendChild(row);
       }
     }
+    if (p.pool_proof) what.appendChild(el("p", "pd-about", p.pool_proof));
     const flags = [];
     if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
     if (p.no_relay) flags.push(["never first", neverNote(p)]);

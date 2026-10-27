@@ -439,7 +439,10 @@ table.peers.aligned { table-layout: fixed; }
 .kinds.chips .kind-pick:hover { color: var(--text); border-color: #33475b; }
 .kinds.chips .kind-pick.on { color: var(--text); border-color: var(--accent); }
 /* The pools under "Pool node": a second line of chips, one step in. */
-.kinds.chips.pool-picks { margin: 8px 20px 0; }
+/* One level under the kinds: named, and lighter than the kind chips above. */
+.kinds.chips.pool-picks { margin: 8px 20px 0; align-items: center; }
+.pool-picks .picks-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.kinds.chips.pool-picks .kind-pick { background: transparent; font-size: 11.5px; padding: 1px 8px; }
 .ua .pool-name { color: var(--text); }
 
 /* Rows: two lines each. */

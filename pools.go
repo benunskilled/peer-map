@@ -27,13 +27,13 @@ var poolNodes = map[netip.Addr]poolNode{
 	netip.MustParseAddr("32.189.241.52"): {"AtlasPool", "hands out AtlasPool's mining jobs (AtlasPool/PDX)"},
 	// ckpool tagged /pool.mutatrum.com/ on 3333, Public-Pool on 3334.
 	netip.MustParseAddr("95.168.173.100"): {"mutatrum", "hands out mutatrum's mining jobs (/pool.mutatrum.com/)"},
-	netip.MustParseAddr("66.85.130.202"):  {"Kano pool", "is stratum.kano.is, and hands out KanoPool's mining jobs"},
+	netip.MustParseAddr("66.85.130.202"):  {"KanoPool", "is stratum.kano.is, and hands out KanoPool's mining jobs"},
 	netip.MustParseAddr("62.2.188.226"):   {"Blitzpool", "is blitzpool.yourdevice.ch, and hands out Blitzpool's mining jobs"},
 	netip.MustParseAddr("179.27.118.130"): {"PyBLOCK", "is pool.pyblock.xyz"},
 	netip.MustParseAddr("144.202.96.186"): {"MintSolo", "hands out MintSolo's mining jobs (MintSolo GSS)"},
 	netip.MustParseAddr("149.28.149.108"): {"MintSolo", "hands out MintSolo's mining jobs (MintSolo GSS)"},
 	// Says (xbtpool.io); xbtpool is ctrlpool now, and its jobs on 4334 are tagged CTRL.
-	netip.MustParseAddr("161.97.128.46"): {"CTRL", "hands out ctrlpool's mining jobs (CTRL), formerly xbtpool"},
+	netip.MustParseAddr("161.97.128.46"): {"ctrlpool", "hands out ctrlpool's mining jobs (CTRL), formerly xbtpool"},
 }
 
 // A pool the user agent names itself, where no address says more.
@@ -42,7 +42,7 @@ var poolLabels = []struct {
 	pool string
 }{
 	{regexp.MustCompile(`(?i)\(PyBLOCK-POOL\)`), "PyBLOCK"},
-	{regexp.MustCompile(`(?i)\(xbtpool\.io\)`), "CTRL"},
+	{regexp.MustCompile(`(?i)\(xbtpool\.io\)`), "ctrlpool"},
 	{regexp.MustCompile(`(?i)^/pydroid-pool:`), "pydroid"},
 }
 

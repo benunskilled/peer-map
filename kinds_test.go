@@ -1160,12 +1160,12 @@ func TestQuietCoreNeedsSomethingOffered(t *testing.T) {
 // neutrino's version tells the lnd generation; any other stays general.
 func TestNeutrinoVersion(t *testing.T) {
 	for subver, want := range map[string]string{
-		"/btcwire:0.5.0/neutrino:0.17.1/":          "lnd 0.21 or newer, such as current Zeus",
-		"/btcwire:0.5.0/neutrino:0.12.0-beta/":     "lnd 0.13 to 0.20, such as Blixt",
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "lnd 0.21 or newer, without a node of its own",
+		"/btcwire:0.5.0/neutrino:0.12.0-beta/":     "Older lnd, without a node of its own",
 		"/btcwire:0.5.0/neutrino:0.11.0-beta/":     "Neutrino: Lightning wallets on lnd",
 		"/btcwire:0.5.0/neutrino:0.12.0-beta-zap/": "Neutrino: Lightning wallets on lnd",
 	} {
-		if got := aboutOf(subver); !strings.HasPrefix(got, "Lightning wallet on "+want) && !strings.HasPrefix(got, want) {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: %q, want %q", subver, got, want)
 		}
 	}
