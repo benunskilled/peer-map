@@ -692,31 +692,38 @@
   window.addEventListener("blur", () => { pressedAt = 0; freed(); });
 
   // A reload puts the reader back where they were. The browser tries it before
-  // the peers have arrived, finds a short page and settles near the top (Ben
-  // 26.10.: the Map always at the top). So the position is kept here, set again once the
+  // the peers have arrived, finds a short page and settles near the top. So the position is kept here, set again once the
   // tables are in, and let go when the reader moves the page, when the page has
   // grown to it, or after six seconds.
   let reloadY = null;
+  let restoredY = null;  // where this code last put the page
   try {
-    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     const nav = performance.getEntriesByType("navigation")[0];
     const key = "scrollY:" + location.pathname;
     if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
       const v = Number(sessionStorage.getItem(key));
-      if (v > 0) reloadY = v;
+      if (v > 0) {
+        reloadY = v;
+        // Only with a position to restore; otherwise the browser's own restore stays on.
+        if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+      }
     }
-    const save = () => { try { sessionStorage.setItem(key, String(Math.round(window.scrollY))); } catch { /* private window */ } };
+    // Still waiting to be restored, the page is short: keep the position that waits.
+    const save = () => { try { sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY))); } catch { /* private window */ } };
     window.addEventListener("pagehide", save);
     document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
-    const let_go = () => { reloadY = null; };
-    for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) window.addEventListener(ev, let_go, { passive: true });
-    setTimeout(let_go, 6000);
+    const letGo = () => { reloadY = null; };
+    for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) window.addEventListener(ev, letGo, { passive: true });
+    // A drag on the scrollbar or a fling is the reader's, not ours.
+    window.addEventListener("scroll", () => { if (reloadY !== null && restoredY !== null && Math.abs(window.scrollY - restoredY) > 40) letGo(); }, { passive: true });
+    setTimeout(letGo, 6000);
   } catch { /* no storage: the browser's own restore has to do */ }
   function restoreReloadY() {
     if (reloadY === null) return;
     if (state.focus) { reloadY = null; return; }
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo(0, Math.min(reloadY, max));
+    restoredY = window.scrollY;
     if (max >= reloadY) reloadY = null;
   }
 
@@ -725,7 +732,7 @@
   // shrinks - a kind chip wrapping to another line, the block card, the list
   // of peers not on the map - everything below moves. Chrome makes up for it
   // itself (scroll anchoring); Safari does not, and the page jumped up and
-  // down there on its own (Ben 24.10.). The anchor is the topmost table row
+  // down there on its own. The anchor is the topmost table row
   // on screen, else the topmost card.
   function readAnchor() {
     if (window.scrollY < 1) return null;
@@ -1806,7 +1813,9 @@
         if (p.services && p.services.length) good.push("offers " + andList(p.services));
         if (!p.no_tx_relay) good.push("relays transactions");
         if (!p.chain_unknown) good.push("shares its block headers");
-        what.insertBefore(el("p", "pd-about", "An honest node: it " + andList(good) + "."), what.querySelector("p"));
+        // Ten minutes is what the behaviour rules need before they speak: sooner, only "so far".
+        const settled = p.conntime && Date.now() / 1000 - p.conntime >= 600;
+        what.insertBefore(el("p", "pd-about", (settled ? "An honest node: it " : "Nothing odd so far: it ") + andList(good) + "."), what.querySelector("p"));
       } else {
         // Nothing to say about the others either: no block rather than a made-up one.
         what.remove();
@@ -1891,6 +1900,9 @@
   }
 
   function renderTables() {
+    // A panel left open for a peer that is gone must not pop open when its address comes back.
+    const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
+    for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
     const root = $("tables");
     root.textContent = "";
     for (const g of GROUPS) {
@@ -2090,7 +2102,7 @@
   //
   // Before that, a tight table gives up what matters least, a step at a time
   // (see [data-drops] in style.css): Connected, then Ping, then Net, and
-  // Operator last (Ben 24.10.: Ping and Connected matter less than anything
+  // Operator last (Ping and Connected matter less than anything
   // else). The first three steps are also taken when the tables would fit
   // but the kind's text would be cut. The address always stays: it is the
   // link into Bitcoin Lab.

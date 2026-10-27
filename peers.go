@@ -369,7 +369,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 					}
 					return ""
 				},
-				func() string { return quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.ConnTime, now) },
+				func() string {
+					return quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
+				},
 			} {
 				if why := check(); why != "" {
 					p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+why

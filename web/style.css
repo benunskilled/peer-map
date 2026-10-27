@@ -521,6 +521,7 @@ a.addr-txt:hover { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .sync-ico { animation: none; } }
 .chip.count.syncing, .kinds .chip.syncing { color: #7fe3d6; cursor: help; }
 .chip.syncing .sync-ico { color: #7fe3d6; }
+button.chip.syncing { cursor: pointer; }
 
 /* A peer opens with everything known of it on a tap or a click: a row of its
    own under the peer, as wide as the table. Its content is 0 wide and as wide as

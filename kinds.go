@@ -854,9 +854,11 @@ func quietAfterHandshake(recv map[string]int64, connTime int64, now time.Time) b
 // service Core always offers, a protocol it cannot speak). Observed, 21. to
 // 26.10.2026 and in two older sets: of 4,500 sessions of Core and Knots of ten
 // minutes or more, none stayed quiet.
-func quietCoreAbout(subver string, relayTxes *bool, recv map[string]int64, connTime int64, now time.Time) string {
+func quietCoreAbout(subver string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+	// Something must have been offered to it: on a node that relays nothing (blocksonly)
+	// even a real Core has nothing to ask about.
 	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes ||
-		!quietAfterHandshake(recv, connTime, now) {
+		(sent["inv"] == 0 && sent["tx"] == 0) || !quietAfterHandshake(recv, connTime, now) {
 		return ""
 	}
 	return "not Bitcoin Core - it asked for nothing after the handshake, not even for addresses"
@@ -908,7 +910,11 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 	// and never fetching one, /pydroid-pool:3/ wanting neither.
 	if quietAfterHandshake(recv, connTime, now) {
 		if relayTxes != nil && *relayTxes {
-			return "Unknown software that only listens: hears new transactions, fetches none"
+			// "Hears" only if we announced something to it.
+			if sent["inv"] > 0 {
+				return "Unknown software that only listens: hears new transactions, fetches none"
+			}
+			return "Unknown software that only listens: asks for nothing"
 		}
 		return "Unknown software that only listens: wants no transactions, asks for nothing"
 	}
