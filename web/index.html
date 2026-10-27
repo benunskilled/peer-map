@@ -61,7 +61,10 @@
 
     <section class="card map-card" id="mapCard">
       <div class="map-wrap" id="mapWrap">
-        <svg id="map" role="group" aria-label="World map of connected peers">
+        <!-- The viewBox is world.json's size (TestMapSizeInHTML), here so the map
+             takes its height before world.json arrives: arriving later, it made
+             the page 400px taller after a reload had put the reader back. -->
+        <svg id="map" viewBox="0 0 1000 438" role="group" aria-label="World map of connected peers">
           <defs>
             <!-- One soft glow per group: the markers are a light on the map, not a chart. -->
             <radialGradient id="glow-manual"><stop offset="0" stop-color="#3987e5" stop-opacity=".9"/><stop offset=".45" stop-color="#3987e5" stop-opacity=".3"/><stop offset="1" stop-color="#3987e5" stop-opacity="0"/></radialGradient>
