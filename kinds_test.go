@@ -196,11 +196,11 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
 		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
+		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks NETWORK_LIMITED"},
 		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks a service every Core since 0.16 offers"},
-		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks a service every Core since 0.16 offers"},
+		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks NETWORK_LIMITED"},
+		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks NETWORK_LIMITED"},
 		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
 		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
 	}
@@ -385,7 +385,7 @@ func TestBitcoinjTooNew(t *testing.T) {
 		// A version Core did not report says nothing either way.
 		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
 		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
-		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "Neutrino"},
+		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "lnd 0.21"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -412,7 +412,16 @@ func TestOtherAbouts(t *testing.T) {
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
 		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
 		{"/GlobalNodeMap:2.1/", 70016, "Probably a node map or counter"},
-		{"/reset-header-agent:1.0/", 70016, "Software with a name we don't recognise"},
+		{"/reset-header-agent:1.0/", 70016, "Probably a header client for RESET"},
+		{"/RESET-Headers:1.0/", 70016, "Probably a header client for RESET"},
+		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
+		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "Probably a program built from the example code in btcd's Go library"},
+		{"/mantle-replay-iouring:0.1.0/", 70016, "Mantle's replay tool"},
+		{"/mantle-discover:0.1.0/", 70016, "Mantle's peer finder"},
+		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
+		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
+		{"/jwrd.net:0.9.99.99/", 70016, "Probably a node on JWRD Computing's own bitcoind"},
+		{"/curl:8.5.0/", 70015, "Software with a name we don't recognise"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -728,7 +737,7 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		{[]string{}, &yes, map[string]int64{"getdata": 1647, "getheaders": 354039}, map[string]int64{"block": 21269099, "inv": 565744}, "Software with a name we don't recognise"},
 		{[]string{}, &no, nil, nil, "Software with a name we don't recognise"},
 	} {
-		if got := otherAbout(c.svc, c.relay, c.recv, c.sent); got != c.want {
+		if got := otherAbout(c.svc, c.relay, c.recv, c.sent, 0, time.Now()); got != c.want {
 			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
 		}
 	}
@@ -742,7 +751,10 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/Ghost:1.11.42/":                        "Node (Ghost)",
 		"/CamlCoin:0.1.0/":                       "Node (other)",
 		"/rustoshi:0.1.0/":                       "Node (other)",
+		"/bitcoin-rs:0.1.0/":                     "Node (other)",
 		"/tbcd:2.1.0-dev/":                       "Node (other)",
+		"/mantle:0.1.0/":                         "Node (other)",
+		"/mantle-replay-iouring:0.1.0/":          "Other",
 		"/blueberry:2026.08.17/":                 "Wallet",
 		"/BitcoinKit:0.1.0/":                     "Wallet",
 		"Yuki / 0.0.1":                           "Light client",
@@ -868,6 +880,293 @@ func TestLightningWalletReadsTheBareName(t *testing.T) {
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%s: got %q, want %q", subver, got, want)
+		}
+	}
+}
+
+// The second reason next to the protocol is what the peer never asked for -
+// but only once it has been connected long enough for a real wallet to have.
+func TestBitcoinjAskedNothing(t *testing.T) {
+	now := time.Now()
+	wallet := func(connAgo int64, recv map[string]int64) string {
+		return convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: "/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", Version: 70017, ServicesNames: []string{},
+			ConnTime: now.Unix() - connAgo, BytesRecvPerMsg: recv}})[0].About
+	}
+	quiet := map[string]int64{"version": 124, "verack": 24, "ping": 32, "pong": 32, "getaddr": 24}
+	if got := wallet(3*86400, quiet); !strings.HasSuffix(got, "never asked for a header or a transaction") {
+		t.Errorf("quiet for 3 days: %q", got)
+	}
+	// Just connected: a real wallet has not had the time to ask either way.
+	if got := wallet(30, quiet); strings.Contains(got, "never asked") {
+		t.Errorf("30 seconds: %q", got)
+	}
+	// It asked for headers: the clause is not true, the duration is said instead.
+	asked := map[string]int64{"version": 124, "getheaders": 1061}
+	if got := wallet(3*86400, asked); strings.Contains(got, "never asked") || !strings.Contains(got, "3 days") {
+		t.Errorf("asked for headers: %q", got)
+	}
+	// A node that did not report the counters says nothing about it.
+	if got := wallet(3*86400, nil); strings.Contains(got, "never asked") {
+		t.Errorf("no counters: %q", got)
+	}
+}
+
+// A peer naming Core that wants transactions, did the handshake and then
+// asked for nothing for ten minutes is not Core - but only after every harder
+// reason, and not one that may be a block-relay-only connection.
+func TestQuietAfterHandshake(t *testing.T) {
+	now := time.Now()
+	yes, no := true, false
+	quiet := map[string]int64{"version": 126, "verack": 24, "feefilter": 32, "pong": 32 * 30}
+	asks := map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30, "getheaders": 1061}
+	core := func(recv map[string]int64, ago int64) rawPeer {
+		return rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
+			Subver: "/Satoshi:31.1.0/", Transport: "v1", ConnTime: now.Unix() - ago, RelayTxes: &yes,
+			ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, BytesRecvPerMsg: recv,
+			BytesSentPerMsg: map[string]int64{"inv": 70}}
+	}
+	if got := convert([]rawPeer{core(quiet, 3600)})[0]; got.Kind != fakeWalletKind ||
+		!strings.Contains(got.About, "it asked for nothing after the handshake, not even for addresses") {
+		t.Errorf("quiet for an hour: %q / %q", got.Kind, got.About)
+	}
+	if got := convert([]rawPeer{core(quiet, 120)})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("only two minutes: %q", got.Kind)
+	}
+	if got := convert([]rawPeer{core(asks, 3600)})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("asked for headers: %q", got.Kind)
+	}
+	// A peer that wants no transactions may be a block-relay-only connection,
+	// from a node still catching up: nothing to ask for, nothing to say.
+	r := core(quiet, 3600)
+	r.RelayTxes = &no
+	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
+		t.Errorf("block-relay-only: %q", got.Kind)
+	}
+	// Knots runs Core's code and is judged the same.
+	k := core(quiet, 3600)
+	k.Subver = "/Satoshi:29.3.0/Knots:20260507/"
+	if got := convert([]rawPeer{k})[0]; got.Kind != fakeWalletKind {
+		t.Errorf("Knots quiet: %q", got.Kind)
+	}
+	// A harder reason wins: no NETWORK_LIMITED is said, not the quiet.
+	h := core(quiet, 3600)
+	h.ServicesNames = []string{"NETWORK", "WITNESS"}
+	if got := convert([]rawPeer{h})[0]; !strings.Contains(got.About, "lacks NETWORK_LIMITED") {
+		t.Errorf("harder reason: %q", got.About)
+	}
+	// Wasabi on a borrowed Core name stays Wasabi, quiet or not.
+	w := core(quiet, 3600)
+	w.Subver, w.ServicesNames = "/Satoshi:26.0.0/", []string{}
+	if got := convert([]rawPeer{w})[0]; got.Kind == fakeWalletKind && strings.Contains(got.About, "asked for nothing") {
+		t.Errorf("quiet Wasabi: %q / %q", got.Kind, got.About)
+	}
+	// LinkingLion: the line says what it does only once it has been seen doing it.
+	lion := core(quiet, 3600)
+	lion.Subver, lion.mockLinkingLion = "", true
+	if got := convert([]rawPeer{lion})[0]; !strings.HasSuffix(got.About, "; it only listens") {
+		t.Errorf("quiet lion: %q", got.About)
+	}
+	lion = core(quiet, 60)
+	lion.Subver, lion.mockLinkingLion = "", true
+	if got := convert([]rawPeer{lion})[0]; strings.Contains(got.About, "only listens") {
+		t.Errorf("young lion: %q", got.About)
+	}
+}
+
+// An unknown name that stays and asks for nothing is said to only listen,
+// ahead of whatever its services suggest.
+func TestOtherAboutOnlyListens(t *testing.T) {
+	now := time.Now()
+	yes, no := true, false
+	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40, "sendaddrv2": 24}
+	hour := now.Unix() - 3600
+	if got := otherAbout(nil, &yes, quiet, map[string]int64{"inv": 120}, hour, now); got != "Unknown software that only listens: hears new transactions, fetches none" {
+		t.Errorf("wants transactions: %q", got)
+	}
+	// Nothing was announced to it, so it cannot be said to hear anything.
+	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Unknown software that only listens: asks for nothing" {
+		t.Errorf("nothing announced: %q", got)
+	}
+	if got := otherAbout(nil, &no, quiet, nil, hour, now); got != "Unknown software that only listens: wants no transactions, asks for nothing" {
+		t.Errorf("wants none: %q", got)
+	}
+	// Listing NETWORK does not make a silent peer a full node.
+	if got := otherAbout([]string{"NETWORK"}, &yes, quiet, nil, hour, now); !strings.Contains(got, "only listens") {
+		t.Errorf("NETWORK but silent: %q", got)
+	}
+	// Not long enough yet, or it did ask: the older lines stand.
+	if got := otherAbout(nil, &yes, quiet, nil, now.Unix()-60, now); strings.Contains(got, "only listens") {
+		t.Errorf("one minute: %q", got)
+	}
+	asks := map[string]int64{"version": 126, "verack": 24, "getaddr": 24}
+	if got := otherAbout(nil, &yes, asks, nil, hour, now); got != "Unknown software that collects addresses" {
+		t.Errorf("collects addresses: %q", got)
+	}
+}
+
+// What unknown software did, said plainly: asking for the mempool, downloading
+// blocks, wanting headers announced.
+func TestOtherAboutWhatItDid(t *testing.T) {
+	now := time.Now()
+	yes, no := true, false
+	cases := []struct {
+		name  string
+		relay *bool
+		recv  map[string]int64
+		sent  map[string]int64
+		want  string
+	}{
+		{"mempool", &yes, map[string]int64{"version": 126, "verack": 24, "mempool": 24}, nil,
+			"Unknown software that asks for our mempool"},
+		{"asks for headers", &no, map[string]int64{"version": 126, "getheaders": 1061}, nil,
+			"Unknown software that follows new blocks: asks for headers, wants no transactions"},
+		{"only wants them announced", &no, map[string]int64{"version": 126, "sendheaders": 24}, nil,
+			"Unknown software that follows new blocks: wants headers announced, no transactions"},
+	}
+	for _, c := range cases {
+		if got := otherAbout(nil, c.relay, c.recv, c.sent, 0, now); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+// The Bitcore library announces NETWORK only: any more under its name is not it.
+func TestBitcoreLibraryOffersOnlyNetwork(t *testing.T) {
+	cases := []struct {
+		subver   string
+		services []string
+		kind     string
+		says     string
+	}{
+		{"/bitcore:1.1.0/", []string{"NETWORK"}, "Other", ""},
+		{"/bitcore:1.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Disguised", "it offers WITNESS, NETWORK_LIMITED, P2P_V2, which the Bitcore library never does"},
+		{"/bitcore:1.1.0/", []string{"NETWORK", "BLOOM", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "it offers BLOOM, WITNESS, NETWORK_LIMITED"},
+		{"/bitcore:8.25.12/", []string{"NETWORK"}, "Other", ""},
+	}
+	for _, c := range cases {
+		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
+			Subver: c.subver, ServicesNames: c.services}})[0]
+		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
+			t.Errorf("%s %v: got %q / %q", c.subver, c.services, got.Kind, got.About)
+		}
+	}
+}
+
+// A node catching up takes blocks fast and has not reached the tip; a peer that
+// has, or that was handed the same amount over days, is not catching up.
+func TestSyncingFrom(t *testing.T) {
+	now := time.Now()
+	ago := func(min int64) int64 { return now.Unix() - min*60 }
+	blocks := func(mb int64) map[string]int64 { return map[string]int64{"block": mb * 1_000_000} }
+	at := func(h int64) *int64 { return &h }
+	const tip = 973_000
+	cases := []struct {
+		name    string
+		inbound bool
+		sent    map[string]int64
+		synced  *int64
+		conn    int64
+		want    int64
+	}{
+		{"463 MB in twelve minutes, height unknown", true, blocks(463), at(-1), ago(12), 463},
+		{"the same, no field at all", true, blocks(463), nil, ago(12), 463},
+		{"far behind the tip", true, blocks(463), at(400_000), ago(12), 463},
+		{"600 GB taken, now at the tip", true, blocks(600_000), at(tip - 1), ago(15 * 60), 0},
+		{"11.9 GB over 2.5 days, 6 blocks behind", true, blocks(11_893), at(tip - 6), ago(3649), 0},
+		{"3.8 GB over 2 days, 27 blocks behind", true, blocks(3_831), at(tip - 27), ago(3127), 0},
+		{"a day behind and fast", true, blocks(463), at(tip - 150), ago(12), 463},
+		{"the same over two days", true, blocks(463), at(-1), ago(2 * 24 * 60), 0},
+		{"a few blocks", true, blocks(4), at(-1), ago(5), 0},
+		{"we are the one catching up", false, blocks(463), at(-1), ago(12), 0},
+		{"no counters", true, nil, at(-1), ago(12), 0},
+		{"connection time unknown", true, blocks(463), at(-1), 0, 0},
+	}
+	for _, c := range cases {
+		if got := syncingFrom(c.inbound, c.sent, c.synced, tip, c.conn, now); got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
+		}
+	}
+	p := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
+		ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, ConnTime: ago(12), BytesSentPerMsg: blocks(463)}})[0]
+	if p.Kind != "Node (Core)" || p.SyncMB != 463 {
+		t.Errorf("a Core node syncing: %q, %d MB", p.Kind, p.SyncMB)
+	}
+}
+
+// A peer with a version but no name says what it did next.
+func TestNoAgentAbout(t *testing.T) {
+	now := time.Now()
+	hour := now.Unix() - 3600
+	cases := []struct {
+		name string
+		recv map[string]int64
+		conn int64
+		want string
+	}{
+		{"a full node without a name", map[string]int64{"version": 126, "verack": 24, "getheaders": 1061, "getaddr": 24, "sendcmpct": 33}, hour,
+			"Introduced itself but left its name empty: it asks for headers like a full node does"},
+		{"addresses only", map[string]int64{"version": 126, "verack": 24, "getaddr": 24, "pong": 32}, hour,
+			"Introduced itself but left its name empty: it asks for addresses and nothing else"},
+		{"quiet for an hour", map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30}, hour,
+			"Introduced itself but left its name empty: after the handshake it asked for nothing"},
+		{"just arrived", map[string]int64{"version": 126, "verack": 24}, now.Unix() - 5,
+			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+		{"no counters", nil, hour,
+			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+	}
+	for _, c := range cases {
+		if got := noAgentAbout(c.recv, c.conn, now); got != c.want {
+			t.Errorf("%s: got %q", c.name, got)
+		}
+	}
+}
+
+// The detail that opens on a tap needs what the peer announced.
+func TestPeerCarriesServicesAndVersion(t *testing.T) {
+	p := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/", Version: 70016,
+		ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}}})[0]
+	if p.Version != 70016 || strings.Join(p.Services, ",") != "NETWORK,WITNESS,NETWORK_LIMITED" {
+		t.Errorf("got version %d, services %v", p.Version, p.Services)
+	}
+}
+
+func TestClientsFoundOn27October(t *testing.T) {
+	if got := aboutOf("/bitcoin-rs:0.1.0/"); got == "" {
+		t.Error("bitcoin-rs has no description")
+	}
+	if got, _ := classify("BTC RPC Proxy v0.8.1"); got != "Other" {
+		t.Errorf("BTC RPC Proxy: kind %q, want Other", got)
+	}
+	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Probably not a node") {
+		t.Errorf("BTC RPC Proxy: about %q", got)
+	}
+}
+
+// A Core connection on a node that announces nothing is no proof of a fake.
+func TestQuietCoreNeedsSomethingOffered(t *testing.T) {
+	now := time.Now()
+	yes := true
+	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40}
+	hour := now.Unix() - 3600
+	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, nil, hour, now); got != "" {
+		t.Errorf("nothing offered: %q", got)
+	}
+	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, map[string]int64{"inv": 70}, hour, now); got == "" {
+		t.Error("offered and still silent: want the reason")
+	}
+}
+
+// neutrino's version tells the lnd generation; any other stays general.
+func TestNeutrinoVersion(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "lnd 0.21 or newer, without a node of its own",
+		"/btcwire:0.5.0/neutrino:0.12.0-beta/":     "Older lnd, without a node of its own",
+		"/btcwire:0.5.0/neutrino:0.11.0-beta/":     "Neutrino: Lightning wallets on lnd",
+		"/btcwire:0.5.0/neutrino:0.12.0-beta-zap/": "Neutrino: Lightning wallets on lnd",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: %q, want %q", subver, got, want)
 		}
 	}
 }

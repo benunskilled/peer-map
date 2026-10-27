@@ -137,9 +137,10 @@ var kindRules = []struct {
 	// Full nodes written from scratch, each sending its own name (checked in
 	// its source): the hashhog fleet of ten languages (github.com/hashhog),
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
-	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, and tbcd, the
-	// Hemi network's Bitcoin daemon (hemilabs/heminetwork).
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd):|/utreexod:`), true},
+	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
+	// Hemi network's Bitcoin daemon (hemilabs/heminetwork),
+	// illuminodes/mantle, and gosuda/bitcoin-rs.
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd|mantle|bitcoin-rs):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -207,6 +208,33 @@ func stayedLong(connTime int64, now time.Time) string {
 	return fmt.Sprintf(", and has stayed connected for %d days", days)
 }
 
+// askedNothing says what a "wallet" never did: a real one asks for headers,
+// blocks or transactions within seconds of connecting, and sets a bloom filter
+// to hear about its own. Only said once the peer has been connected for a
+// while, since one that has just arrived has not had the time. recv is
+// getpeerinfo's bytesrecv_per_msg; nil means the node did not report it.
+func askedNothing(recv map[string]int64, connTime int64, now time.Time) string {
+	if recv == nil || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+		return ""
+	}
+	for _, m := range []string{"getheaders", "getblocks", "getdata", "filterload", "tx", "mempool"} {
+		if recv[m] > 0 {
+			return ""
+		}
+	}
+	return ", and never asked for a header or a transaction"
+}
+
+// bitcoinjWhy is the second reason given next to the protocol: that the peer
+// asked for nothing, which says more than how long it stayed, or - when it did
+// ask for something - how long it stayed.
+func bitcoinjWhy(r rawPeer, now time.Time) string {
+	if why := askedNothing(r.BytesRecvPerMsg, r.ConnTime, now); why != "" {
+		return why
+	}
+	return stayedLong(r.ConnTime, now)
+}
+
 // What a piece of software is, in a sentence, for the peers somebody is
 // likely to ask about. Only software that says who it is: the kind already
 // covers the rest.
@@ -219,6 +247,11 @@ var aboutRules = []struct {
 	// One address, 142 sessions in four days, each gone after its version
 	// message. Elastum was an exchange; elastum.io no longer resolves.
 	{regexp.MustCompile(`(?i)/Elastum:`), "Names Elastum, a former exchange; talks to nodes through bitcoinj"},
+	// 26-27.10.2026: one address, five sessions in 40 minutes under protocol
+	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
+	// the version message; three took 7 to 16 MB of blocks each. Not found
+	// anywhere, so only what it did.
+	{regexp.MustCompile(`^BTC RPC Proxy `), "Probably not a node: seen taking blocks under the oldest protocol, with no services and 127.0.0.1:8332 as our address"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
@@ -266,6 +299,13 @@ var aboutRules = []struct {
 	// The library alone, without a wallet app's name after it. After the
 	// wallet rules above, which also start with bitcoinj.
 	{regexp.MustCompile(`(?i)^/bitcoinj:`), "bitcoinj, a Java library that wallets and other tools use to talk to nodes"},
+	// neutrino sends a version fixed in its own code, not lnd's: 0.12.0-beta
+	// from neutrino 0.12 to 0.16 (lnd 0.13 to 0.20), 0.17.1 since neutrino
+	// 0.17.1 (lnd 0.21, June 2026; useragent.go in lightninglabs/neutrino).
+	// Zeus 13.2 ships lnd 0.21.4, Blixt 0.9 lnd 0.20, and neither changes the
+	// name; lnd on a server in neutrino mode says the same, so an app is only an example.
+	{regexp.MustCompile(`(?i)/neutrino:0\.17\.`), "lnd 0.21 or newer, without a node of its own (neutrino), e.g. Zeus"},
+	{regexp.MustCompile(`(?i)/neutrino:0\.12\.0-beta/`), "Older lnd, without a node of its own (neutrino), e.g. Blixt or an older Zeus"},
 	{regexp.MustCompile(`(?i)neutrino`), "Neutrino: Lightning wallets on lnd, such as Blixt or Zeus"},
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},
@@ -291,6 +331,36 @@ var aboutRules = []struct {
 	// Seen from one netcup address, offering nothing and gone after a second;
 	// the name fits a node map, but nothing public says whose.
 	{regexp.MustCompile(`(?i)GlobalNodeMap`), "Probably a node map or counter"},
+	// illuminodes/mantle: the node says "/mantle:0.1.0/", its replay tool,
+	// which fetches mainnet blocks from peers to validate them, says
+	// "/mantle-replay-iouring:0.1.0/" (crates/fetcher/src/lib.rs); beside it
+	// "/mantle-discover:0.1.0/" collects addresses with getaddr
+	// (replay/src/discover_peers.rs) and "/mantle-rank-peers:0.1.0/" times
+	// how fast a node answers its version (replay/src/rank_peers.rs).
+	{regexp.MustCompile(`(?i)^/mantle:`), "Mantle, a Bitcoin full node written from scratch in Rust (illuminodes)"},
+	{regexp.MustCompile(`(?i)^/mantle-replay`), "Mantle's replay tool: fetches blocks from nodes to check them with Mantle, a Bitcoin node written from scratch in Rust"},
+	{regexp.MustCompile(`(?i)^/mantle-discover`), "Mantle's peer finder: asks nodes for addresses of other nodes"},
+	{regexp.MustCompile(`(?i)^/mantle-rank-peers`), "Mantle's speed test: times how fast a node answers"},
+	// btcd's wire package sends "/btcwire:0.5.0/" when a program sets no name
+	// of its own (wire/msgversion.go), and its peer package's example sets
+	// "peer" 1.0.0 (peer/example_test.go). On the node this was written for,
+	// 21. to 25.10.2026, the bare name asked for addresses and headers and
+	// wanted no transactions.
+	{regexp.MustCompile(`^/btcwire:[^/]*/$`), "A program on btcd's Go library that set no name of its own"},
+	{regexp.MustCompile(`^/btcwire:[^/]*/peer:1\.0\.0/$`), "Probably a program built from the example code in btcd's Go library, keeping its name"},
+	// RESET (Trac-Systems/reset) is a coin clocked by Bitcoin's blocks; a
+	// share of its reward goes to whoever brings in a new block first. Its
+	// agents fetch from mempool.space unless told otherwise and its code has
+	// no P2P client, so these names are a guess from the name, the behaviour
+	// and the timing: its repository was created on 15.10.2026, and Bitcoin
+	// Lab's record of the node this was written for, from 13.9., shows the
+	// first reset-* name on 20.10.; by 25.10. there were seven, asking only
+	// for headers, most wanting no transactions.
+	{regexp.MustCompile(`(?i)^/reset-`), "Probably a header client for RESET, a coin clocked by Bitcoin's blocks that pays a small reward to whoever brings in a new block first"},
+	// JWRD Computing (jwrd.net) maintains its own bitcoind of the old 0.5
+	// line, which writes version 99999 as 0.9.99.99; nothing public says it
+	// sends this name.
+	{regexp.MustCompile(`^/jwrd\.net:`), "Probably a node on JWRD Computing's own bitcoind, a fork of an early version"},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed"},
@@ -332,6 +402,8 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)libbitcoin`), "libbitcoin, a full node written in C++, independent of Core"},
 	{regexp.MustCompile(`(?i)/bcoin:`), "bcoin, a full node written in JavaScript"},
 	{regexp.MustCompile(`(?i)gocoin`), "Gocoin, a full node and wallet written in Go"},
+	// gosuda/bitcoin-rs, crates/primitives/src/version.rs: "/bitcoin-rs:<version>/".
+	{regexp.MustCompile(`^/bitcoin-rs:`), "bitcoin-rs, a full node written in Rust, independent of Core"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 
@@ -435,6 +507,10 @@ func isLinkingLion(addr string) bool {
 // explanation above the list carry it (LION_CREDIT in web/app.js).
 const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
 
+// linkingLionQuiet is added once the peer has been connected for a while and
+// has still only done the handshake: it listens and asks for nothing.
+const linkingLionQuiet = "; it only listens"
+
 var coreVersion = regexp.MustCompile(`[Ss]at[o0]shi[0-9X]*:([0-9.]+)`)
 
 // What Bitcoin Core started to offer, and in which version. A peer calling
@@ -453,6 +529,9 @@ var serviceSince = []struct {
 }
 
 var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
+
+// The Bitcore library by name: /bitcore:1.1.0/, nothing after it.
+var bitcoreLibrary = regexp.MustCompile(`^/bitcore:[0-9][0-9.]*/$`)
 
 // Software with no version that ever spoke the v2 transport.
 var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin)`)
@@ -482,7 +561,23 @@ func anachronism(subver string, services []string) string {
 	// node as a "/Satoshi:31.0.0/" fleet offering NETWORK and WITNESS only,
 	// and as "/Satoshi:0.19.0.1/" offering WITNESS alone.
 	if len(services) > 0 && !has["NETWORK_LIMITED"] && coreAtLeast(subver, 0, 16) {
-		return "not Bitcoin Core - it lacks a service every Core since 0.16 offers"
+		return "not Bitcoin Core - it lacks NETWORK_LIMITED, which every Core since 0.16 offers"
+	}
+	// The Bitcore library announces NETWORK and nothing else (bitcore-p2p's
+	// version message defaults to services 1). Seen 21. to 26.10.2026: 921
+	// sessions from 510 addresses named /bitcore:1.1.0/, 858 of them offering
+	// WITNESS, NETWORK_LIMITED and P2P_V2 at today's chain height, most gone in
+	// under five seconds; the rest announced NETWORK, like the library.
+	if bitcoreLibrary.MatchString(subver) {
+		var extra []string
+		for _, sv := range services {
+			if sv != "NETWORK" {
+				extra = append(extra, sv)
+			}
+		}
+		if len(extra) > 0 {
+			return "a scanner - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
+		}
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
 		return "a scanner - it offers encrypted v2 connections, which that software never had"
@@ -735,6 +830,47 @@ func msgCount(bytes int64, payload int64, transport string, shortID bool) int64 
 	return 0
 }
 
+// handshakeOnly are the messages a peer sends to introduce itself and to answer
+// our pings. A peer that has sent nothing else for ten minutes has asked for no
+// header, address or transaction: not what any node, wallet or relay does.
+var handshakeOnly = map[string]bool{
+	"version": true, "verack": true, "feefilter": true, "ping": true, "pong": true,
+	"sendheaders": true, "sendcmpct": true, "sendaddrv2": true, "wtxidrelay": true, "sendtxrcncl": true,
+}
+
+// quietAfterHandshake is true once a peer has been connected long enough to
+// have asked for something and has sent only the handshake. recv is
+// getpeerinfo's bytesrecv_per_msg; nil means the node did not report it. On one
+// node, in 4,500 sessions of Core and Knots of ten minutes or more, none did.
+func quietAfterHandshake(recv map[string]int64, connTime int64, now time.Time) bool {
+	if recv == nil || recv["verack"] == 0 || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+		return false
+	}
+	for m, n := range recv {
+		if n > 0 && !handshakeOnly[m] {
+			return false
+		}
+	}
+	return true
+}
+
+// quietCoreAbout is the last reason a peer naming Core is not Core: after the
+// handshake it asked for nothing, not even for addresses. Only for full-relay
+// peers - one that wants no transactions may be a block-relay-only connection,
+// which has little to ask for - and it comes after every harder reason (a
+// service Core always offers, a protocol it cannot speak). Observed, 21. to
+// 26.10.2026 and in two older sets: of 4,500 sessions of Core and Knots of ten
+// minutes or more, none stayed quiet.
+func quietCoreAbout(subver string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+	// Something must have been offered to it: on a node that relays nothing (blocksonly)
+	// even a real Core has nothing to ask about.
+	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes ||
+		(sent["inv"] == 0 && sent["tx"] == 0) || !quietAfterHandshake(recv, connTime, now) {
+		return ""
+	}
+	return "not Bitcoin Core - it asked for nothing after the handshake, not even for addresses"
+}
+
 // behaviourAbout is why a peer naming Core is not Core, judged by what it has
 // sent, or "" when its behaviour fits. recv is getpeerinfo's bytesrecv_per_msg.
 func behaviourAbout(subver, transport string, recv map[string]int64, connTime int64, now time.Time) string {
@@ -774,7 +910,21 @@ func claimOf(subver string) string {
 
 // otherAbout is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64) string {
+func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+	// A peer that has been connected for a while and asked for nothing is no
+	// full node, whatever services it lists. Seen 21. to 26.10.2026: /your-fork:0.1/
+	// and /alt-bitnodes:0.1/ staying for hours, hearing of transactions
+	// and never fetching one, /pydroid-pool:3/ wanting neither.
+	if quietAfterHandshake(recv, connTime, now) {
+		if relayTxes != nil && *relayTxes {
+			// "Hears" only if we announced something to it.
+			if sent["inv"] > 0 {
+				return "Unknown software that only listens: hears new transactions, fetches none"
+			}
+			return "Unknown software that only listens: asks for nothing"
+		}
+		return "Unknown software that only listens: wants no transactions, asks for nothing"
+	}
 	for _, s := range services {
 		if s == "NETWORK" {
 			return "Probably a full node under a name its operator chose"
@@ -783,14 +933,20 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64)
 	// What it did, where Core counted it: a name nobody knows still says
 	// little, its messages say more. Seen on the node this was written for,
 	// 21. to 24.10.2026: /pwsh-pusher/ and /p2aburn/ pushing transactions
-	// nobody asked for, a family of /reset-header-.../ names and others
+	// nobody asked for, others
 	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
 	// /relay-geo:0.1/ fetching every transaction and announcing none.
 	switch {
+	// BIP 35: "send me your whole mempool". Seen 22. to 26.10.2026 as /curl:8.5.0/,
+	// twenty times from one address, each right after the handshake.
+	case recv["mempool"] > 0:
+		return "Unknown software that asks for our mempool"
 	case recv["tx"] > 0 && recv["inv"] == 0:
 		return "Unknown software that pushes transactions without announcing them"
-	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0:
 		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
+	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0:
+		return "Unknown software that follows new blocks: wants headers announced, no transactions"
 	// Asking for data alone is no sign of listening: a peer that fetches
 	// blocks asks the same way. Only transactions sent to it count.
 	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
@@ -919,4 +1075,57 @@ func forkOf(services []string, kind string, synced *int64, tip int64) (string, s
 		return "BIP110 fork", "Offers Knots' ReducedData bit (service bit 27): it enforces BIP110's rules, which put it on a chain of its own, not yours"
 	}
 	return "", ""
+}
+
+// Syncing: a peer that takes whole blocks from this node faster than the chain
+// grows, and has not caught up, is a node still syncing - one just set up, or
+// one started again. A block every ten minutes is 0.16 MB a minute. On one
+// node, 21. to 26.10.2026, 418 inbound peers took 20 MB or more; 365 of them at
+// 1 MB a minute or faster over their whole stay (median 5). The average over
+// the whole stay is all a single look at getpeerinfo gives, so a peer that has
+// reached the tip is left out by what Core says it has: the last block it
+// shares with this node is within syncBehind blocks (a day) of the tip. Seen
+// 26.10.2026: one peer 6 blocks behind that had taken 11.9 GB in 2.5 days at
+// 3 MB a minute, another 27 behind with 3.8 GB - nodes at the tip that fetch
+// blocks all the time - and three genuine ones with no common block yet.
+const (
+	syncMinBytes  = 20_000_000
+	syncMinPerMin = 1_000_000.0
+	syncBehind    = 144
+)
+
+// syncingFrom is how many megabytes of blocks an inbound peer has taken from
+// this node while it syncs, or 0. sent is bytessent_per_msg, synced is
+// synced_blocks (nil or below zero: Core does not know), tip the highest
+// header any peer shares.
+func syncingFrom(inbound bool, sent map[string]int64, synced *int64, tip, connTime int64, now time.Time) int64 {
+	b := sent["block"]
+	if !inbound || b < syncMinBytes || connTime <= 0 {
+		return 0
+	}
+	if synced != nil && *synced >= 0 && tip > 0 && tip-*synced < syncBehind {
+		return 0
+	}
+	secs := now.Unix() - connTime
+	if secs < 1 || float64(b)/(float64(secs)/60) < syncMinPerMin {
+		return 0
+	}
+	return b / 1_000_000
+}
+
+// noAgentAbout is what a peer that sent its version but left its name empty
+// did next, in a few words. Seen 21. to 26.10.2026, 429 such sessions: 113
+// asked for headers and addresses like a full node, 43 asked for addresses
+// and nothing else, the rest said nothing or only answered pings.
+func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {
+	const lead = "Introduced itself but left its name empty: "
+	switch {
+	case recv["getheaders"] > 0 && (recv["getaddr"] > 0 || recv["sendcmpct"] > 0):
+		return lead + "it asks for headers like a full node does"
+	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
+		return lead + "it asks for addresses and nothing else"
+	case quietAfterHandshake(recv, connTime, now):
+		return lead + "after the handshake it asked for nothing"
+	}
+	return lead + "software that keeps quiet about what it is"
 }

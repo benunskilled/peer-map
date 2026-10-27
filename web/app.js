@@ -31,6 +31,8 @@
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
     kind: null,           // kind filter from clicking an entry in a group's kind line
+    pool: null,           // under "Pool node": one pool, or UNKNOWN_POOL
+    openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
     paused: false,
@@ -584,6 +586,7 @@
       } else {
         const known = new Map((state.data.peers || []).map((p) => [p.addr, p]));
         const t = document.createElement("table");
+        t.className = "firsts";
         for (const addr of b.first_peers) {
           const peer = known.get(addr);
           const tr = document.createElement("tr");
@@ -645,7 +648,14 @@
   }
 
   // ---------- render ----------
-  const matchesKind = (p) => !state.kind || p.kind === state.kind;
+  // "syncing" is not a kind but is picked like one: the chip beside the count.
+  const SYNCING = "syncing";
+  // Under "Pool node" the pools are picked the same way, one level down.
+  const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool";
+  const poolName = (p) => p.pool || UNKNOWN_POOL;
+  const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb
+    : p.kind === state.kind && (state.kind !== POOL_KIND || !state.pool || poolName(p) === state.pool));
+
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
   const regionMode = () => state.view.k >= REGION_ZOOM;
@@ -686,6 +696,43 @@
   document.addEventListener("selectionchange", freed);
   document.addEventListener("focusout", freed);
   window.addEventListener("blur", () => { pressedAt = 0; freed(); });
+
+  // A reload puts the reader back where they were. The browser tries it before
+  // the peers have arrived, finds a short page and settles near the top. So the position is kept here, set again once the
+  // tables are in, and let go when the reader moves the page, when the page has
+  // grown to it, or after six seconds.
+  let reloadY = null;
+  let restoredY = null;  // where this code last put the page
+  try {
+    // Always manual: with the browser's own restore on, it and this code pull the page two ways.
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const nav = performance.getEntriesByType("navigation")[0];
+    const key = "scrollY:" + location.pathname;
+    if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
+      const v = Number(sessionStorage.getItem(key));
+      if (v > 0) reloadY = v;
+    }
+    // Still waiting to be restored, the page is short: keep the position that waits.
+    const save = () => { try { sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY))); } catch { /* private window */ } };
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+    const letGo = () => { reloadY = null; };
+    for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) window.addEventListener(ev, letGo, { passive: true });
+    // A drag on the scrollbar or a fling is the reader's, not ours.
+    window.addEventListener("scroll", () => { if (reloadY !== null && restoredY !== null && Math.abs(window.scrollY - restoredY) > 40) letGo(); }, { passive: true });
+    setTimeout(letGo, 6000);
+  } catch {
+    // No storage: nothing is saved, so the browser's own restore has to do.
+    try { history.scrollRestoration = "auto"; } catch { /* old browser */ }
+  }
+  function restoreReloadY() {
+    if (reloadY === null) return;
+    if (state.focus) { reloadY = null; return; }
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo(0, Math.min(reloadY, max));
+    restoredY = window.scrollY;
+    if (max >= reloadY) reloadY = null;
+  }
 
   // What the reader is looking at stays where it is on a refresh. Keeping
   // the scroll position alone is not that: when anything above grows or
@@ -735,6 +782,7 @@
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
     holdAnchor(anchor);
+    restoreReloadY();
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
     if (hash && state.lastHash && hash !== state.lastHash) pulseBlock();
@@ -1145,7 +1193,7 @@
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
-    $("kindFilterName").textContent = state.kind || "";
+    $("kindFilterName").textContent = (state.kind || "") + (state.kind === POOL_KIND && state.pool ? " \u00b7 " + state.pool : "");
   }
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1160,6 +1208,11 @@
 
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
+    state.pool = null;
+    applyFilters();
+  }
+  function setPool(pool) {
+    state.pool = state.pool === pool ? null : pool;
     applyFilters();
   }
 
@@ -1169,6 +1222,7 @@
   });
   $("kindFilterClear").addEventListener("click", () => {
     state.kind = null;
+    state.pool = null;
     applyFilters();
   });
 
@@ -1401,11 +1455,32 @@
   // They are shown in one cell on purpose: a peer claiming to be Bitcoin Core
   // while offering nothing and having no known chain is only obvious when the
   // claim and the observation sit next to each other.
+  // A node catching up from this one: a turning arrow, the word and what it
+  // has taken. Always first in the grey line under the place.
+  // What "no headers" means, on hover: Core never got a block header from the peer.
+  const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
+  function mbText(mb) {
+    return mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB";
+  }
+  function syncSpan(p) {
+    const s = document.createElement("span");
+    s.className = "syncing";
+    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`;
+    const ico = document.createElement("span");
+    ico.className = "sync-ico";
+    ico.setAttribute("aria-hidden", "true");
+    ico.textContent = "\u21bb";
+    s.append(ico, " syncing " + mbText(p.sync_mb));
+    return s;
+  }
+
   function kindLabel(p) {
     const flags = [];
+    if (p.sync_mb) flags.push("syncing");
     if (p.no_services) flags.push("no services");
     if (p.no_tx_relay) flags.push("no tx");
-    if (p.chain_unknown) flags.push("chain unknown");
+    // A node that is syncing has sent no headers yet: nothing odd, "syncing" says it.
+    if (p.chain_unknown && !p.sync_mb) flags.push("no headers");
     if (p.fork) flags.push(p.fork);
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
@@ -1429,6 +1504,35 @@
       b.addEventListener("click", () => setKind(kind));
       el.appendChild(b);
     });
+  }
+
+  // With "Pool node" picked, which pools those are: one chip per pool, the
+  // ones not known by name last.
+  function renderPoolMix(card, peers) {
+    if (!peers.length) return;
+    const n = new Map();
+    for (const p of peers) n.set(poolName(p), (n.get(poolName(p)) || 0) + 1);
+    const entries = [...n].sort((a, b) => (a[0] === UNKNOWN_POOL) - (b[0] === UNKNOWN_POOL) || b[1] - a[1] || a[0].localeCompare(b[0]));
+    const el = document.createElement("div");
+    el.className = "kinds chips pool-picks";
+    const label = document.createElement("span");
+    label.className = "picks-label";
+    label.textContent = "Pools:";
+    el.appendChild(label);
+    for (const [pool, count] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip kind-pick" + (state.pool === pool ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + pool);
+      b.title = state.pool === pool ? "Show every pool again"
+        : pool === UNKNOWN_POOL ? "Pool nodes whose pool is not known" : `Show only ${pool}`;
+      b.setAttribute("aria-pressed", String(state.pool === pool));
+      b.addEventListener("click", () => setPool(pool));
+      el.appendChild(b);
+    }
+    card.appendChild(el);
   }
 
   // How spread out a group is: distinct operators and countries. Operators by
@@ -1483,6 +1587,15 @@
       cell: (td, p) => {
         const who = document.createElement("div");
         who.className = "who";
+        // A small arrow at the left: the row opens on a tap or a click.
+        // A mouse or finger hits the row; the keyboard reaches the same thing here.
+        const chev = document.createElement("button");
+        chev.type = "button";
+        chev.className = "chev";
+        chev.setAttribute("aria-label", "Show everything about this peer");
+        chev.setAttribute("aria-expanded", "false");
+        chev.textContent = "\u203a";
+        who.appendChild(chev);
         const f = document.createElement("span");
         f.className = "flag";
         f.textContent = HIDDEN_FLAG[p.network] || flagOf(p.cc);
@@ -1569,7 +1682,7 @@
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // The pill says the kind and nothing else, for every peer: what Core
-        // saw (no services, no tx, chain unknown) goes to the line under it.
+        // saw (no services, no tx, no headers) goes to the line under it.
         // One layout in every row, and the pill is never cut.
         const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
         const never = p.no_relay ? " \u00b7 never first" : "";
@@ -1594,25 +1707,33 @@
         // What Core saw stays grey; the name the peer sends is bright, it is
         // what tells one "Other" from the next. The user's own apps on this
         // Umbrel need no flags: nothing about them is a surprise.
-        const seen = p.app ? "" : flags;
-        const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
+        // Syncing is the one thing that stays: the count above the list includes them.
+        const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
+        const under = [seen, p.pool, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under || never || p.tor_exit) {
           const e = line("sub ua", "");
           // "no tx" says on hover why, where Core's messages tell it.
-          const parts = seen ? seen.split(", ") : [];
+          const parts = (seen ? seen.split(", ") : []).filter((f) => f !== "syncing");
           parts.forEach((f, i) => {
             if (i) e.append(", ");
             // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : "";
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "no headers" ? NO_HEADERS_WHY : "";
             if (why) {
               const s = document.createElement("span");
-              s.className = f === "no tx" ? "no-tx" : "no-tx fork";
+              s.className = f === "no tx" || f === "no headers" ? "no-tx" : "no-tx fork";
               s.textContent = f;
               s.title = why;
               e.append(s);
             } else e.append(f);
           });
-          if (seen && p.subver) e.append(" \u00b7 ");
+          if (parts.length && (p.subver || p.pool)) e.append(" \u00b7 ");
+          // Whose pool it is, where an address proved it or the agent names it.
+          if (p.pool) {
+            const pool = document.createElement("span");
+            pool.className = "pool-name";
+            pool.textContent = p.pool;
+            e.append(pool, p.subver ? " \u00b7 " : "");
+          }
           if (never) {
             const n = document.createElement("span");
             n.className = "never-sub";
@@ -1634,6 +1755,8 @@
             name.textContent = p.subver;
             e.append(name);
           }
+          // Always first in the line.
+          if (seen.includes("syncing")) e.prepend(syncSpan(p), e.firstChild ? " \u00b7 " : "");
           td.appendChild(fit(e, under));
         }
         // With a kind filter on, the question is why these peers are in it:
@@ -1641,7 +1764,11 @@
         if (state.kind && p.about) {
           const about = document.createElement("div");
           about.className = "about";
-          about.textContent = p.about;
+          // The list says why in one or two lines; the claim is the name beside it,
+          // and everything, the claim too, is in the panel that opens on a tap.
+          const probably = p.about.split("\n").find((l) => l.startsWith("Probably:"));
+          about.textContent = probably || p.about;
+          about.classList.add(probably ? "short" : "clip");
           td.appendChild(about);
         }
       },
@@ -1673,7 +1800,159 @@
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
   ];
 
+  // What is known of a peer, in full: the sentences behind the words in its
+  // row, what it announced, the connection, the traffic and where it sits.
+  // Opens under the row on a tap or a click (a phone has no hover), and stays
+  // open across a refresh.
+  const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
+  const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
+  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
+  function peerDetail(p) {
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    };
+    const panel = el("div", "pd");
+    const block = (title) => {
+      const b = el("section", "pd-block");
+      b.appendChild(el("h4", "", title));
+      panel.appendChild(b);
+      return b;
+    };
+    const stat = (label, big, small) => {
+      const s = el("div", "pd-stat");
+      s.append(el("span", "pd-label", label), el("span", "pd-big", big));
+      if (small) s.appendChild(el("span", "pd-small", small));
+      return s;
+    };
+
+    // What it is, and why each word in the row is there.
+    const what = block("What it is");
+    // Under a kind filter the row shows only part of it; the panel has all of it.
+    if (p.about) {
+      for (const line of p.about.split("\n")) {
+        const m = /^(Claims|Probably):\s*(.*)$/.exec(line);
+        const row = el("p", "pd-about");
+        if (m) row.append(el("span", "pd-tag " + m[1].toLowerCase(), m[1]), " " + m[2]);
+        else row.textContent = line;
+        what.appendChild(row);
+      }
+    }
+    if (p.pool_proof) what.appendChild(el("p", "pd-about", p.pool_proof));
+    const flags = [];
+    if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
+    if (p.no_relay) flags.push(["never first", neverNote(p)]);
+    if (p.no_services) flags.push(["no services", NO_SERVICES_WHY]);
+    if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
+    if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
+    if (p.fork) flags.push([p.fork, p.fork_why]);
+    if (p.app) flags.push(["Umbrel app", p.app]);
+    for (const [word, why, cls] of flags) {
+      const row = el("p", "pd-flag-row");
+      row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
+      what.appendChild(row);
+    }
+    // The Umbrel app only adds context; it does not take the honest line away.
+    const onlyContext = !what.querySelector(".pd-about") && !flags.some(f => f[0] !== "Umbrel app");
+    if (!what.querySelector("p") || onlyContext) {
+      if (p.kind.startsWith("Node")) {
+        // A node with nothing to explain: say what is good about it, from what it did.
+        const good = ["says what it is"];
+        if (p.services && p.services.length) good.push("offers " + andList(p.services));
+        if (!p.no_tx_relay) good.push("relays transactions");
+        if (!p.chain_unknown) good.push("shares its block headers");
+        // Ten minutes is what the behaviour rules need before they speak: sooner, only "so far".
+        const settled = p.conntime && Date.now() / 1000 - p.conntime >= 600;
+        what.insertBefore(el("p", "pd-about", (settled ? "An honest node: it " : "Nothing odd so far: it ") + andList(good) + "."), what.querySelector("p"));
+      } else if (!what.querySelector("p")) {
+        // Nothing to say about the others either: no block rather than a made-up one.
+        what.remove();
+        panel.classList.add("pd-two");
+      }
+    }
+
+    // The line: how it is connected, how fast, how long, how much each way.
+    const line = block("Connection");
+    const tiles = el("div", "pd-tiles");
+    if (p.ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.ping_ms), p.min_ping_ms != null ? "lowest " + fmtPing(p.min_ping_ms) : ""));
+    if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
+    tiles.appendChild(stat("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type)].filter(Boolean).join(" \u00b7 "),
+      netLabel(p.network) + (p.transport ? " \u00b7 " + p.transport : "")));
+    line.appendChild(tiles);
+    if (p.tor_exit) {
+      const tor = el("p", "pd-flag-row");
+      tor.append(el("span", "pd-flag", "Tor exit"), " " + TOR_EXIT_TITLE.replace(/^Tor exit: /, "Reached through a Tor exit: "));
+      line.appendChild(tor);
+    }
+    const total = Math.max(1, p.bytes_sent + p.bytes_recv);
+    const traffic = el("div", "pd-traffic");
+    const bar = el("div", "pd-bar");
+    const sent = el("span", "pd-sent"), got = el("span", "pd-got");
+    sent.style.flexGrow = String(Math.max(p.bytes_sent / total, 0.02));
+    got.style.flexGrow = String(Math.max(p.bytes_recv / total, 0.02));
+    bar.append(sent, got);
+    const ratio = p.bytes_recv > 0 ? p.bytes_sent / p.bytes_recv : 0;
+    traffic.append(el("span", "pd-label", "Traffic"), bar,
+      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it` + (ratio >= 10 ? ` \u00b7 ${Math.round(ratio)}\u00d7 more out than in` : "")));
+    line.appendChild(traffic);
+
+    // What it announced and where it sits.
+    const who = block("Announced");
+    who.appendChild(el("p", "pd-ua", p.subver || "no name sent"));
+    const svc = el("div", "pd-svc");
+    if (p.services && p.services.length) for (const s of p.services) svc.appendChild(el("span", "pd-chip", s));
+    else svc.appendChild(el("span", "pd-chip none", p.no_services ? "no services" : "services unknown"));
+    who.appendChild(svc);
+    if (p.version) who.appendChild(el("p", "pd-small", "Protocol " + p.version));
+    if (state.data && state.data.sibling) {
+      const lab = el("a", "pd-lab", "Open this peer in Bitcoin Lab \u2197");
+      lab.href = siblingURL(p.addr);
+      lab.target = LAB_TARGET;
+      who.appendChild(lab);
+    }
+    const where = [p.region, p.cc].filter(Boolean).join(", ");
+    if (where || p.operator) who.appendChild(el("p", "pd-where", [where, p.operator ? p.operator + (p.asn ? " (AS" + p.asn + ")" : "") : ""].filter(Boolean).join(" \u00b7 ")));
+    return panel;
+  }
+  // The detail is a row of its own under the peer, as wide as the table. It
+  // adds no width to any column: its content is 0 wide and as wide as the cell.
+  function detailRow(tr, p) {
+    const row = document.createElement("tr");
+    row.className = "detail-row";
+    const td = document.createElement("td");
+    td.colSpan = tr.cells.length;
+    td.appendChild(peerDetail(p));
+    row.appendChild(td);
+    return row;
+  }
+  // One at a time: opening a peer closes the one that was open, so the list does
+  // not grow without end. What the reader tapped stays where it was on the
+  // screen, although a detail above it has just gone.
+  function toggleDetail(tr, p, key) {
+    const top = tr.getBoundingClientRect().top;
+    const open = tr.nextElementSibling?.classList.contains("detail-row");
+    for (const row of document.querySelectorAll("#tables tr.detail-row")) row.remove();
+    for (const row of document.querySelectorAll("#tables tr.open")) {
+      row.classList.remove("open");
+      row.querySelector(".chev")?.setAttribute("aria-expanded", "false");
+    }
+    state.openRows.clear();
+    if (!open) {
+      tr.after(detailRow(tr, p));
+      tr.classList.add("open");
+      tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
+      state.openRows.add(key);
+    }
+    const d = tr.getBoundingClientRect().top - top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+
   function renderTables() {
+    // A panel left open for a peer that is gone must not pop open when its address comes back.
+    const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
+    for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
     const root = $("tables");
     root.textContent = "";
     for (const g of GROUPS) {
@@ -1704,9 +1983,29 @@
       ni.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
       n.append(ni, " peers");
       mix.appendChild(n);
+      // How many are catching up from this node right now, and what they took.
+      const syncing = kindPool.filter((p) => p.sync_mb);
+      if (syncing.length) {
+        const sc = document.createElement("button");
+        sc.type = "button";
+        sc.className = "chip kind-pick syncing" + (state.kind === SYNCING ? " on" : "");
+        const taken = `${syncing.length} syncing from this node, ${mbText(syncing.reduce((t, p) => t + p.sync_mb, 0))} of blocks taken so far`;
+        sc.title = state.kind === SYNCING ? "Show every kind again" : taken + " - click to show only these";
+        sc.setAttribute("aria-pressed", String(state.kind === SYNCING));
+        const si = document.createElement("i");
+        si.textContent = syncing.length;
+        const ico = document.createElement("span");
+        ico.className = "sync-ico";
+        ico.setAttribute("aria-hidden", "true");
+        ico.textContent = "\u21bb";
+        sc.append(ico, si, " syncing");
+        sc.addEventListener("click", () => setKind(SYNCING));
+        mix.appendChild(sc);
+      }
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
+      if (state.kind === POOL_KIND) renderPoolMix(card, kindPool.filter((p) => p.kind === POOL_KIND));
 
       if (peers.length) {
         const spread = document.createElement("p");
@@ -1796,7 +2095,25 @@
           }
           tr.appendChild(td);
         }
+        const rowKey = g + " " + p.addr;
+        const reopen = state.openRows.has(rowKey);
+        if (reopen) {
+          tr.classList.add("open");
+          tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
+        }
+        tr.addEventListener("click", (ev) => {
+          // Links and buttons keep doing their own thing; so does selecting text.
+          // On a touch screen the address is too small a target for a finger: a tap
+          // on it opens the peer like a tap anywhere else, and the way over to
+          // Bitcoin Lab is a button in the panel.
+          const onAddress = ev.target.closest("a.peer-jump") && window.matchMedia("(pointer: coarse)").matches;
+          if (onAddress) ev.preventDefault();
+          else if (ev.target.closest("a, button, input, select, textarea") && !ev.target.closest(".chev")) return;
+          if (String(window.getSelection()).length > 0) return;
+          toggleDetail(tr, p, rowKey);
+        });
         tbody.appendChild(tr);
+        if (reopen) tbody.appendChild(detailRow(tr, p));
       }
       table.appendChild(tbody);
       wrap.appendChild(table);
