@@ -469,3 +469,24 @@ func TestNoTxWhy(t *testing.T) {
 		t.Errorf("relaying peer: got %q", got)
 	}
 }
+
+// The map's viewBox stands in index.html so the page has its height before
+// world.json is loaded; it has to be world.json's own size.
+func TestMapSizeInHTML(t *testing.T) {
+	var world struct{ W, H float64 }
+	b, err := os.ReadFile("web/world.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &world); err != nil {
+		t.Fatal(err)
+	}
+	html, err := os.ReadFile("web/index.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf(`<svg id="map" viewBox="0 0 %g %g"`, world.W, world.H)
+	if !strings.Contains(string(html), want) {
+		t.Errorf("index.html has no %s", want)
+	}
+}
