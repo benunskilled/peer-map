@@ -594,3 +594,44 @@ td .about.clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient
   .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pd-tiles .pd-link:nth-child(3) { grid-column: span 2; }
 }
+
+/* --- Feel (28.10.2026) --- */
+/* Small links get a finger-sized target without looking any bigger. */
+.sibling-link, .group-card > .more { position: relative; }
+.sibling-link::after, .group-card > .more::after { content: ""; position: absolute; inset: -12px -8px; }
+/* Chips change state softly. */
+.chip { transition: border-color .12s ease, color .12s ease, background-color .12s ease; }
+/* A panel opened by a tap fades in; one redrawn by a refresh does not. */
+.detail-row.opening .pd { animation: pd-in .18s ease-out; }
+@keyframes pd-in { from { opacity: 0; transform: translateY(-4px); } }
+/* A peer that has just connected lights up once. */
+tr.arrived > td { animation: arrived 2.4s ease-out; }
+/* As a card the row is one box: it lights up whole. */
+.cards tr.arrived { animation: arrived 2.4s ease-out; }
+.cards tr.arrived > td { animation: none; }
+@keyframes arrived { from { background-color: rgba(247, 147, 26, .16); } }
+/* Scrolling back up on a phone: the sections, a tap away. */
+.jump-bar { position: fixed; z-index: 30; left: 50%; top: 8px; transform: translate(-50%, -64px); display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(17, 24, 32, .92); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); transition: transform .2s ease; max-width: calc(100vw - 16px); }
+.jump-bar.shown { transform: translate(-50%, 0); }
+.jump-bar button { font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; padding: 8px 11px; border-radius: 999px; white-space: nowrap; }
+.jump-bar button:active { background: var(--panel-2); }
+@media (prefers-reduced-motion: reduce) {
+  .chip, .jump-bar { transition: none; }
+  .detail-row.opening .pd, tr.arrived, tr.arrived > td { animation: none; }
+}
+/* With a mouse: the row's place on the map lights up. */
+.marker.hover .sel { stroke: var(--accent); stroke-width: 2; }
+.marker.hover .glow { opacity: 1; }
+/* A row reached with the arrow keys. */
+#tables tr[data-anchor]:focus { outline: none; }
+#tables tr[data-anchor]:focus-visible > td { background: rgba(247, 147, 26, .07); }
+#tables tr[data-anchor]:focus-visible > td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+/* Column headings stay in view over a long table (not as cards). */
+@media (min-width: 601px) {
+  .scroll:not(.cards) { overflow-x: clip; }
+  .peers thead th { position: sticky; top: 0; z-index: 3; background: var(--panel); box-shadow: 0 1px 0 var(--border); }
+}
+/* With a mouse the sections wait in the bottom right corner. */
+.jump-bar.corner { left: auto; right: 16px; top: auto; bottom: 16px; transform: translateY(80px); }
+.jump-bar.corner.shown { transform: none; }
+@media (prefers-reduced-motion: reduce) { .jump-bar.corner { transition: none; } }

@@ -25,6 +25,22 @@
     } catch { return (cc) => cc; }
   })();
 
+  // A peer that was not there at the last refresh lights up once, so what
+  // changed since the last look is seen without searching. Not on the first
+  // load: then everything would be new.
+  const arrivedAt = new Map();
+  let knownKeys = null;
+  function markArrivals(peers) {
+    const keys = new Set(peers.map((p) => p.group + " " + p.addr));
+    const now = Date.now();
+    if (knownKeys) for (const k of keys) if (!knownKeys.has(k)) arrivedAt.set(k, now);
+    for (const [k, t] of arrivedAt) if (now - t > 3000 || !keys.has(k)) arrivedAt.delete(k);
+    knownKeys = keys;
+  }
+
+  // Smooth scrolling, unless the reader asked the system for less motion.
+  const glide = () => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
+
   const state = {
     data: null,           // last /api/peers reply
     world: null,          // world.json
@@ -97,6 +113,7 @@
       if (!r.ok) throw new Error("HTTP " + r.status);
       state.data = await r.json();
       state.receivedAt = Date.now();
+      markArrivals(state.data.peers);
       next = state.data.next_in || state.data.interval || 10;
       renderWhenFree();
     } catch (e) {
@@ -684,6 +701,98 @@
   // a full row of chips per table pushes the peers off the screen.
   const PHONE_CHIPS = 3;
   const phoneCut = () => !state.allKinds && window.matchMedia("(max-width: 600px)").matches;
+  // Swiping back, or the back button, closes what is open - a panel, then
+  // the filters - before it leaves the page, as in an app. One history entry
+  // stands for "something is open"; closing it by hand takes that entry back.
+  const somethingOpen = () => state.openRows.size > 0 || !!state.kind || !!state.place;
+  function layers() {
+    try {
+      const ours = history.state && history.state.peermapLayer;
+      if (somethingOpen() && !ours) history.pushState({ peermapLayer: true }, "");
+      else if (!somethingOpen() && ours) history.back();
+    } catch { /* sandboxed frame */ }
+  }
+  window.addEventListener("popstate", () => {
+    if (!somethingOpen()) return;
+    if (state.openRows.size) state.openRows.clear();
+    else { state.kind = null; state.sub = null; state.place = null; }
+    applyFilters();
+  });
+
+  // On a phone the page is several screens long. Scrolling back up shows a
+  // small bar with the sections - top, then each table - and it goes again
+  // when the reader scrolls on down or is back at the top.
+  const jumpBar = document.createElement("nav");
+  jumpBar.className = "jump-bar";
+  jumpBar.setAttribute("aria-label", "Jump to");
+  document.body.appendChild(jumpBar);
+  let lastY = window.scrollY;
+  function fillJumpBar() {
+    jumpBar.textContent = "";
+    const go = (label, target) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        const y = target ? target.getBoundingClientRect().top + window.scrollY - 8 : 0;
+        window.scrollTo({ top: Math.max(0, y), behavior: glide() });
+        jumpBar.classList.remove("shown");
+      });
+      jumpBar.appendChild(b);
+    };
+    go("\u2191 Top", null);
+    for (const g of GROUPS) {
+      const c = document.getElementById("group-" + g);
+      if (c) go(LABEL[g], c);
+    }
+  }
+  window.addEventListener("scroll", () => {
+    const y = window.scrollY;
+    const phone = window.matchMedia("(max-width: 600px)").matches;
+    const up = y < lastY - 4, down = y > lastY + 4;
+    // With a mouse the bar sits quietly in a corner whenever the reader is
+    // far down; on a phone it comes only on the way back up.
+    const show = phone ? up && y > window.innerHeight : y > window.innerHeight;
+    const hide = phone ? down || y < window.innerHeight / 2 : y < window.innerHeight;
+    jumpBar.classList.toggle("corner", !phone);
+    if (show) {
+      if (!jumpBar.classList.contains("shown")) { fillJumpBar(); jumpBar.classList.add("shown"); }
+    } else if (hide) jumpBar.classList.remove("shown");
+    if (up || down) lastY = y;
+  }, { passive: true });
+
+  function hoverPlace(p, on) {
+    if (!window.matchMedia("(hover: hover)").matches) return;
+    const g = document.querySelector(`#markers .marker[data-key="${CSS.escape(placeKey(p, renderedMode))}"]`);
+    if (g) g.classList.toggle("hover", on);
+  }
+
+  // The keyboard, as in a desktop app: Esc closes what is open (a panel, then
+  // the filters), the arrow keys go from row to row, Enter opens one.
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest && e.target.closest("input, textarea, select")) return;
+    if (e.key === "Escape" && somethingOpen()) {
+      if (state.openRows.size) state.openRows.clear();
+      else { state.kind = null; state.sub = null; state.place = null; }
+      applyFilters();
+      e.preventDefault();
+      return;
+    }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Enter") return;
+    const rows = [...document.querySelectorAll("#tables tr[data-anchor]")].filter((r) => r.offsetParent);
+    const at = rows.indexOf(document.activeElement);
+    if (e.key === "Enter") {
+      if (at >= 0) { rows[at].click(); e.preventDefault(); }
+      return;
+    }
+    if (at < 0 && !(e.target === document.body || e.target === document.documentElement)) return;
+    const next = at < 0 ? rows.find((r) => r.getBoundingClientRect().top >= 0) : rows[at + (e.key === "ArrowDown" ? 1 : -1)];
+    if (!next) return;
+    e.preventDefault();
+    next.focus({ preventScroll: true });
+    next.scrollIntoView({ block: "nearest", behavior: glide() });
+  });
+
   // A tap on a chip redraws the tables; the card it sits in stays where the
   // finger left it, as in any app - the list below changes, the page does not
   // jump under the reader.
@@ -783,7 +892,18 @@
       if (v > 0) reloadY = v;
     }
     // Still waiting to be restored, the page is short: keep the position that waits.
-    const save = () => { try { sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY))); } catch { /* private window */ } };
+    // The filters come back with the position: a reload should not undo a pick.
+    const fkey = "filters:" + location.pathname;
+    if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
+      const f = JSON.parse(sessionStorage.getItem(fkey) || "null");
+      if (f) Object.assign(state, { kind: f.kind || null, sub: f.sub || null, place: f.place || null });
+    }
+    const save = () => {
+      try {
+        sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY)));
+        sessionStorage.setItem(fkey, JSON.stringify({ kind: state.kind, sub: state.sub, place: state.place }));
+      } catch { /* private window */ }
+    };
     window.addEventListener("pagehide", save);
     document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
     const letGo = () => { reloadY = null; };
@@ -868,7 +988,7 @@
     const row = document.querySelector("tr.focus");
     if (!row) return;
     state.focusDone = true;
-    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.scrollIntoView({ block: "center", behavior: glide() });
   }
 
   // Bitcoin Lab measures which of these peers actually delivers each block
@@ -1270,6 +1390,7 @@
   // purpose: after clicking "5 Pool node" the next question is where those
   // five are, and the map answers it without a second click.
   function applyFilters() {
+    layers();
     renderPlaceFilter();
     renderUnplaced();
     renderMarkers();
@@ -2043,24 +2164,29 @@
     }
     state.openRows.clear();
     if (!open) {
-      tr.after(detailRow(tr, p));
+      const row = detailRow(tr, p);
+      row.classList.add("opening");
+      tr.after(row);
       tr.classList.add("open");
       tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
       state.openRows.add(key);
     }
     const d = tr.getBoundingClientRect().top - top;
     if (Math.abs(d) >= 1) window.scrollBy(0, d);
+    layers();
     // A panel that opens below the screen's edge is brought up, gently and
     // only as far as needed - never so far that the tapped row leaves the top.
     const panel = !open && tr.nextElementSibling;
     if (panel) {
       const rowTop = tr.getBoundingClientRect().top, bottom = panel.getBoundingClientRect().bottom;
       const up = Math.min(bottom + 12 - window.innerHeight, rowTop - 8);
-      if (up > 0) window.scrollBy({ top: up, behavior: "smooth" });
+      if (up > 0) window.scrollBy({ top: up, behavior: glide() });
     }
   }
 
   function renderTables() {
+    // A row reached with the arrow keys keeps the focus through a redraw.
+    const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.anchor;
     // A panel left open for a peer that is gone must not pop open when its address comes back.
     const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
@@ -2207,11 +2333,16 @@
           tr.appendChild(td);
         }
         const rowKey = g + " " + p.addr;
+        if (arrivedAt.has(rowKey)) tr.classList.add("arrived");
         const reopen = state.openRows.has(rowKey);
         if (reopen) {
           tr.classList.add("open");
           tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
         }
+        // With a mouse, the row's place lights up on the map.
+        tr.addEventListener("mouseenter", () => hoverPlace(p, true));
+        tr.addEventListener("mouseleave", () => hoverPlace(p, false));
+        tr.tabIndex = -1;
         tr.addEventListener("click", (ev) => {
           // Links and buttons keep doing their own thing; so does selecting text.
           // On a touch screen the address is too small a target for a finger: a tap
@@ -2241,7 +2372,7 @@
           // Collapsing takes away most of the page under the reader; bring
           // the card back into view if it went off the top.
           const c = $("group-inbound");
-          if (collapsing && c && c.getBoundingClientRect().top < 0) c.scrollIntoView({ block: "start", behavior: "smooth" });
+          if (collapsing && c && c.getBoundingClientRect().top < 0) c.scrollIntoView({ block: "start", behavior: glide() });
         });
         card.appendChild(more);
       }
@@ -2249,6 +2380,10 @@
     }
     for (const row of root.querySelectorAll(".one-line")) fitOneLine(row);
     fitTables();
+    if (focused) {
+      const back = root.querySelector(`tr[data-anchor="${CSS.escape(focused)}"]`);
+      if (back) back.focus({ preventScroll: true });
+    }
   }
 
   // A table that does not fit its card turns each row into a small card of
