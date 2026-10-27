@@ -141,7 +141,9 @@ type Peer struct {
 	// peer itself is somewhere behind it.
 	TorExit bool `json:"tor_exit,omitempty"`
 	// The name of the app when the peer is one of Umbrel's own, such as electrs.
-	App     string `json:"app,omitempty"`
+	App string `json:"app,omitempty"`
+	// The mining pool a pool node belongs to, where that is known (pools.go).
+	Pool    string `json:"pool,omitempty"`
 	Subver  string `json:"subver"`
 	Kind    string `json:"kind"`               // what the user agent claims; see kinds.go
 	About   string `json:"about,omitempty"`    // what that software is, when known
@@ -402,6 +404,21 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				p.About = "Probably: " + lion
 			} else {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
+			}
+		}
+		// A proven address makes a pool's plain bitcoind a pool node too; a
+		// name in the user agent only names the pool of what already is one.
+		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
+			switch {
+			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
+				what, how := "own Bitcoin node", ""
+				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
+					what, how = "block relay", ", ckpool's ckp2p: passes on blocks only, never transactions"
+				}
+				p.Kind, p.Pool = "Pool node", n.pool
+				p.About = n.pool + "'s " + what + how + ". This address " + n.proof
+			case !byAddr && p.Kind == "Pool node":
+				p.Pool = n.pool
 			}
 		}
 		if p.NoTxRelay {

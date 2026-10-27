@@ -438,6 +438,9 @@ table.peers.aligned { table-layout: fixed; }
 .kinds.chips .kind-pick { cursor: pointer; font: inherit; font-size: 12px; }
 .kinds.chips .kind-pick:hover { color: var(--text); border-color: #33475b; }
 .kinds.chips .kind-pick.on { color: var(--text); border-color: var(--accent); }
+/* The pools under "Pool node": a second line of chips, one step in. */
+.kinds.chips.pool-picks { margin: 8px 20px 0; }
+.ua .pool-name { color: var(--text); }
 
 /* Rows: two lines each. */
 .peers td { vertical-align: middle; }
