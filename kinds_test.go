@@ -1170,3 +1170,15 @@ func TestNeutrinoVersion(t *testing.T) {
 		}
 	}
 }
+
+// libbitcoin 4 speaks BIP324: offering P2P_V2 is no sign of a disguise there,
+// before 4 it still is.
+func TestLibbitcoinV2(t *testing.T) {
+	v2 := []string{"NETWORK", "WITNESS", "P2P_V2"}
+	if got := anachronism("/Libbitcoin:4.0.0/", v2); got != "" {
+		t.Errorf("4.0.0: %q", got)
+	}
+	if got := anachronism("/libbitcoin:3.8.0/", v2); got == "" {
+		t.Error("3.8.0 with P2P_V2 not flagged")
+	}
+}

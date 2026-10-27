@@ -533,8 +533,10 @@ var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
 // The Bitcore library by name: /bitcore:1.1.0/, nothing after it.
 var bitcoreLibrary = regexp.MustCompile(`^/bitcore:[0-9][0-9.]*/$`)
 
-// Software with no version that ever spoke the v2 transport.
-var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin)`)
+// Software with no version that ever spoke the v2 transport. libbitcoin only
+// before 4: libbitcoin-network took BIP324 in August 2026 (#856), for the 4.0
+// node, which offers P2P_V2.
+var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin:[0-3]\.)`)
 
 // anachronism returns what a peer offers that the software it names never
 // had, as a sentence for "Probably:", or "".
