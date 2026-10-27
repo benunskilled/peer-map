@@ -385,7 +385,7 @@ func TestBitcoinjTooNew(t *testing.T) {
 		// A version Core did not report says nothing either way.
 		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
 		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
-		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "Neutrino"},
+		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "lnd 0.21"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -1154,5 +1154,19 @@ func TestQuietCoreNeedsSomethingOffered(t *testing.T) {
 	}
 	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, map[string]int64{"inv": 70}, hour, now); got == "" {
 		t.Error("offered and still silent: want the reason")
+	}
+}
+
+// neutrino's version tells the lnd generation; any other stays general.
+func TestNeutrinoVersion(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/btcwire:0.5.0/neutrino:0.17.1/":          "lnd 0.21 or newer, such as current Zeus",
+		"/btcwire:0.5.0/neutrino:0.12.0-beta/":     "lnd 0.13 to 0.20, such as Blixt",
+		"/btcwire:0.5.0/neutrino:0.11.0-beta/":     "Neutrino: Lightning wallets on lnd",
+		"/btcwire:0.5.0/neutrino:0.12.0-beta-zap/": "Neutrino: Lightning wallets on lnd",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, "Lightning wallet on "+want) && !strings.HasPrefix(got, want) {
+			t.Errorf("%s: %q, want %q", subver, got, want)
+		}
 	}
 }
