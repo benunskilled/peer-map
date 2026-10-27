@@ -138,9 +138,9 @@ var kindRules = []struct {
 	// its source): the hashhog fleet of ten languages (github.com/hashhog),
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
 	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
-	// Hemi network's Bitcoin daemon (hemilabs/heminetwork), and
-	// illuminodes/mantle.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd|mantle):|/utreexod:`), true},
+	// Hemi network's Bitcoin daemon (hemilabs/heminetwork),
+	// illuminodes/mantle, and gosuda/bitcoin-rs.
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd|mantle|bitcoin-rs):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -247,6 +247,11 @@ var aboutRules = []struct {
 	// One address, 142 sessions in four days, each gone after its version
 	// message. Elastum was an exchange; elastum.io no longer resolves.
 	{regexp.MustCompile(`(?i)/Elastum:`), "Names Elastum, a former exchange; talks to nodes through bitcoinj"},
+	// 26-27.10.2026: one address, five sessions in 40 minutes under protocol
+	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
+	// the version message; three took 7 to 16 MB of blocks each. Not found
+	// anywhere, so only what it did.
+	{regexp.MustCompile(`^BTC RPC Proxy `), "Downloads blocks from this node but is no node: oldest protocol version, offers no services, and says your node is 127.0.0.1:8332"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
@@ -390,6 +395,8 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)libbitcoin`), "libbitcoin, a full node written in C++, independent of Core"},
 	{regexp.MustCompile(`(?i)/bcoin:`), "bcoin, a full node written in JavaScript"},
 	{regexp.MustCompile(`(?i)gocoin`), "Gocoin, a full node and wallet written in Go"},
+	// gosuda/bitcoin-rs, crates/primitives/src/version.rs: "/bitcoin-rs:<version>/".
+	{regexp.MustCompile(`^/bitcoin-rs:`), "bitcoin-rs, a full node written in Rust, independent of Core"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 
