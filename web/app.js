@@ -1817,7 +1817,7 @@
         // Ten minutes is what the behaviour rules need before they speak: sooner, only "so far".
         const settled = p.conntime && Date.now() / 1000 - p.conntime >= 600;
         what.insertBefore(el("p", "pd-about", (settled ? "An honest node: it " : "Nothing odd so far: it ") + andList(good) + "."), what.querySelector("p"));
-      } else {
+      } else if (!what.querySelector("p")) {
         // Nothing to say about the others either: no block rather than a made-up one.
         what.remove();
         panel.classList.add("pd-two");
