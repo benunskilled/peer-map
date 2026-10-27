@@ -751,6 +751,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/Ghost:1.11.42/":                        "Node (Ghost)",
 		"/CamlCoin:0.1.0/":                       "Node (other)",
 		"/rustoshi:0.1.0/":                       "Node (other)",
+		"/bitcoin-rs:0.1.0/":                     "Node (other)",
 		"/tbcd:2.1.0-dev/":                       "Node (other)",
 		"/mantle:0.1.0/":                         "Node (other)",
 		"/mantle-replay-iouring:0.1.0/":          "Other",
@@ -1122,5 +1123,17 @@ func TestPeerCarriesServicesAndVersion(t *testing.T) {
 		ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}}})[0]
 	if p.Version != 70016 || strings.Join(p.Services, ",") != "NETWORK,WITNESS,NETWORK_LIMITED" {
 		t.Errorf("got version %d, services %v", p.Version, p.Services)
+	}
+}
+
+func TestClientsFoundOn27October(t *testing.T) {
+	if got := aboutOf("/bitcoin-rs:0.1.0/"); got == "" {
+		t.Error("bitcoin-rs has no description")
+	}
+	if got, _ := classify("BTC RPC Proxy v0.8.1"); got != "Other" {
+		t.Errorf("BTC RPC Proxy: kind %q, want Other", got)
+	}
+	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Downloads blocks") {
+		t.Errorf("BTC RPC Proxy: about %q", got)
 	}
 }
