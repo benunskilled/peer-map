@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"net/netip"
 	"os"
 	"strings"
@@ -32,6 +33,9 @@ type rawPeer struct {
 	// offers nothing" are different answers and must not collapse into one.
 	ServicesNames []string `json:"servicesnames"`
 	RelayTxes     *bool    `json:"relaytxes"`
+	// The fee rate below which the peer wants no transactions announced, in
+	// BTC/kvB: what its last feefilter message said.
+	MinFeeFilter *float64 `json:"minfeefilter"`
 	// The protocol version from the peer's version message (Core 0.21 and
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
@@ -162,6 +166,10 @@ type Peer struct {
 	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
 	ForkWhy      string `json:"fork_why,omitempty"`
 	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
+	// The lowest fee rate the peer wants to hear of, in sat/vB to one
+	// decimal: only when it sent a feefilter. Core rounds what it sends on
+	// purpose, so more digits would be noise.
+	MinFee *float64 `json:"min_fee,omitempty"`
 	// What the peer announced, for the detail that opens on a tap.
 	Services []string `json:"services,omitempty"`
 	Version  int      `json:"version,omitempty"` // protocol version of its version message
@@ -429,6 +437,10 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
 		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind, r.SyncedHeaders, tip)
+		if r.MinFeeFilter != nil && r.BytesRecvPerMsg["feefilter"] > 0 {
+			v := math.Round(*r.MinFeeFilter*1e5*10) / 10
+			p.MinFee = &v
+		}
 		p.SyncMB = syncingFrom(r.Inbound, r.BytesSentPerMsg, r.SyncedBlocks, tip, r.ConnTime, now)
 		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {

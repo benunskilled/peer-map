@@ -551,7 +551,7 @@ button.chip.syncing { cursor: pointer; }
 .pd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .pd-stat { display: flex; flex-direction: column; min-width: 0; padding: 8px 10px; border-radius: 8px; background: #141b23; border: 1px solid var(--border); }
 .pd-label { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
-.pd-big { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
+.pd-big { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: break-word; line-height: 1.25; }
 .pd-small { font-size: 12px; color: var(--muted); }
 .pd-traffic { display: flex; flex-direction: column; gap: 6px; }
 .pd-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #141b23; gap: 2px; }
@@ -582,3 +582,9 @@ button.chip.syncing { cursor: pointer; }
 .pd-lab:hover { border-color: var(--accent); }
 td .about.short { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 td .about.clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Three tiles are too narrow on a phone for "Outbound": two, the link below. */
+@media (max-width: 600px) {
+  .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pd-tiles .pd-link:nth-child(3) { grid-column: span 2; }
+}

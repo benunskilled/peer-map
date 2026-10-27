@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -488,5 +489,33 @@ func TestMapSizeInHTML(t *testing.T) {
 	want := fmt.Sprintf(`<svg id="map" viewBox="0 0 %g %g"`, world.W, world.H)
 	if !strings.Contains(string(html), want) {
 		t.Errorf("index.html has no %s", want)
+	}
+}
+
+// The fee filter in sat/vB, to one decimal, and only from a peer that sent one.
+func TestMinFee(t *testing.T) {
+	f := func(v float64) *float64 { return &v }
+	for _, c := range []struct {
+		btcPerKvB *float64
+		sent      int64
+		want      string
+	}{
+		{f(0.000001), 32, "0.1"},
+		{f(0.00001), 32, "1"},
+		{f(0.0000123), 32, "1.2"},
+		{f(0), 32, "0"},
+		{f(0.00001), 0, "none"},
+		{nil, 32, "none"},
+	} {
+		r := rawPeer{ID: 1, Addr: "203.0.113.9:8333", ConnectionType: "outbound-full-relay", Subver: "/Satoshi:31.1.0/", Version: 70016,
+			MinFeeFilter: c.btcPerKvB, BytesRecvPerMsg: map[string]int64{"feefilter": c.sent}}
+		p := convert([]rawPeer{r})[0]
+		got := "none"
+		if p.MinFee != nil {
+			got = strconv.FormatFloat(*p.MinFee, 'f', -1, 64)
+		}
+		if got != c.want {
+			t.Errorf("%v sent %d: %s, want %s", c.btcPerKvB, c.sent, got, c.want)
+		}
 	}
 }
