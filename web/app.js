@@ -32,7 +32,8 @@
     place: null,          // location filter from clicking a marker: { key, label }
     kind: null,           // kind filter from clicking an entry in a group's kind line
     sub: null,            // one level under the kind: a pool, a version, a name
-    allChips: false,      // on a phone: every chip, not only the three largest
+    allKinds: false,      // on a phone: every kind chip, not only the three largest
+    allSubs: false,       // every chip one level down, not one line of them
     openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
@@ -665,8 +666,12 @@
       const v = /^\/Satoshi:(\d+)\.(\d+)/.exec(p.subver || "");
       if (v) return (v[1] === "0" ? "0." + v[2] : v[1]) + ".x";
     }
-    // What it pretends to be; who is behind it (LinkingLion) is its pill's to say.
-    if (p.kind === "Disguised") return "as " + uaName(p);
+    // What it pretends to be - a Core node or a wallet; who is behind it
+    // (LinkingLion) is its pill's to say.
+    if (p.kind === "Disguised") {
+      if (/bitcoinj|breadwallet|\/bread:|multibit|bither|wallet/i.test(p.subver || "")) return "as wallet";
+      return /^\/?Satoshi/i.test(p.subver || "") ? "as Core" : "as " + uaName(p);
+    }
     if (p.kind === "Lightning wallet") {
       if (/lnd 0\.21/.test(p.about || "")) return "lnd 0.21+";
       if (/^Older lnd/.test(p.about || "")) return "older lnd";
@@ -678,15 +683,43 @@
   // A phone shows the three largest chips and a "+ n more" that opens the rest:
   // a full row of chips per table pushes the peers off the screen.
   const PHONE_CHIPS = 3;
-  const phoneCut = () => !state.allChips && window.matchMedia("(max-width: 600px)").matches;
-  function moreChip(el, hidden) {
+  const phoneCut = () => !state.allKinds && window.matchMedia("(max-width: 600px)").matches;
+  // A tap on a chip redraws the tables; the card it sits in stays where the
+  // finger left it, as in any app - the list below changes, the page does not
+  // jump under the reader.
+  function steady(btn, change) {
+    const card = btn.closest("section[id]");
+    const id = card && card.id, top = card && card.getBoundingClientRect().top;
+    change();
+    const now = id && document.getElementById(id);
+    if (!now) return;
+    const d = now.getBoundingClientRect().top - top;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+  function moreChip(el, hidden, flag) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "chip kind-pick more-chips";
     b.textContent = "+ " + hidden + " more";
     b.title = "Show every chip";
-    b.addEventListener("click", () => { state.allChips = true; renderTables(); });
+    b.addEventListener("click", () => steady(b, () => { state[flag] = true; renderTables(); }));
     el.appendChild(b);
+  }
+  // Hides chips from the end, the picked one never, until the row and its
+  // "+ n more" fit; then lets the row wrap again for the chips that are left.
+  function fitOneLine(el) {
+    const fits = () => el.scrollWidth <= el.clientWidth + 1;
+    if (fits()) return;
+    const chips = [...el.querySelectorAll("button.kind-pick")].reverse();
+    moreChip(el, 0, "allSubs");
+    const more = el.lastElementChild;
+    let hidden = 0;
+    for (const c of chips) {
+      if (c.classList.contains("on")) continue;
+      c.hidden = true;
+      more.textContent = "+ " + ++hidden + " more";
+      if (fits()) break;
+    }
   }
   const SUB_LABEL = { [POOL_KIND]: "Pools:", Disguised: "Claims:", "Lightning wallet": "lnd:" };
   const subLabel = (kind) => SUB_LABEL[kind] || (kind.startsWith("Node") ? "Versions:" : "Names:");
@@ -1246,6 +1279,7 @@
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
     state.sub = null;
+    state.allSubs = false;
     applyFilters();
   }
   function setSub(sub) {
@@ -1549,10 +1583,10 @@
       b.append(i, " " + kind);
       b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
       b.setAttribute("aria-pressed", String(state.kind === kind));
-      b.addEventListener("click", () => setKind(kind));
+      b.addEventListener("click", () => steady(b, () => setKind(kind)));
       el.appendChild(b);
     });
-    if (cut) moreChip(el, entries.length - PHONE_CHIPS);
+    if (cut) moreChip(el, entries.length - PHONE_CHIPS, "allKinds");
   }
 
   // With a kind picked, what those peers are one level down: one chip per
@@ -1561,20 +1595,17 @@
     const n = new Map();
     for (const p of peers) n.set(subOf(p), (n.get(subOf(p)) || 0) + 1);
     if (n.size < 2 && !state.sub) return;
+    // Largest first, like the kinds above: with one line to show, the largest
+    // are the ones to see. What is not known by name comes last.
     const last = (s) => s === UNKNOWN_POOL || s === NO_NAME;
-    const ver = (s) => (/^(\d+(?:\.\d+)?)\.x$/.exec(s) || [])[1];
-    const entries = [...n].sort((a, b) => last(a[0]) - last(b[0])
-      || (ver(a[0]) && ver(b[0]) ? parseFloat(ver(b[0])) - parseFloat(ver(a[0])) : b[1] - a[1] || a[0].localeCompare(b[0])));
+    const entries = [...n].sort((a, b) => last(a[0]) - last(b[0]) || b[1] - a[1] || a[0].localeCompare(b[0]));
     const el = document.createElement("div");
     el.className = "kinds chips pool-picks";
     const label = document.createElement("span");
     label.className = "picks-label";
     label.textContent = subLabel(kind);
     el.appendChild(label);
-    const cut = !state.sub && phoneCut() && entries.length > PHONE_CHIPS + 1;
-    // The phone keeps the largest three, still in their order.
-    const keep = cut ? new Set([...entries].sort((a, b) => b[1] - a[1]).slice(0, PHONE_CHIPS).map((e) => e[0])) : null;
-    for (const [sub, count] of cut ? entries.filter((e) => keep.has(e[0])) : entries) {
+    for (const [sub, count] of entries) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip kind-pick" + (state.sub === sub ? " on" : "");
@@ -1583,11 +1614,13 @@
       b.append(i, " " + sub);
       b.title = state.sub === sub ? "Show all of them again" : `Show only ${sub}`;
       b.setAttribute("aria-pressed", String(state.sub === sub));
-      b.addEventListener("click", () => setSub(sub));
+      b.addEventListener("click", () => steady(b, () => setSub(sub)));
       el.appendChild(b);
     }
-    if (cut) moreChip(el, entries.length - PHONE_CHIPS);
     card.appendChild(el);
+    // One line only: what does not fit waits behind "+ n more", fitted in
+    // renderTables before the page is drawn, so nothing flickers.
+    if (!state.allSubs) el.classList.add("one-line");
   }
 
   // How spread out a group is: distinct operators and countries. Operators by
@@ -2017,6 +2050,14 @@
     }
     const d = tr.getBoundingClientRect().top - top;
     if (Math.abs(d) >= 1) window.scrollBy(0, d);
+    // A panel that opens below the screen's edge is brought up, gently and
+    // only as far as needed - never so far that the tapped row leaves the top.
+    const panel = !open && tr.nextElementSibling;
+    if (panel) {
+      const rowTop = tr.getBoundingClientRect().top, bottom = panel.getBoundingClientRect().bottom;
+      const up = Math.min(bottom + 12 - window.innerHeight, rowTop - 8);
+      if (up > 0) window.scrollBy({ top: up, behavior: "smooth" });
+    }
   }
 
   function renderTables() {
@@ -2069,7 +2110,7 @@
         ico.setAttribute("aria-hidden", "true");
         ico.textContent = "\u21bb";
         sc.append(ico, si, " syncing");
-        sc.addEventListener("click", () => setKind(SYNCING));
+        sc.addEventListener("click", () => steady(sc, () => setKind(SYNCING)));
         mix.appendChild(sc);
       }
       if (kindPool.length) renderKindMix(mix, kindPool);
@@ -2206,6 +2247,7 @@
       }
       root.appendChild(card);
     }
+    for (const row of root.querySelectorAll(".one-line")) fitOneLine(row);
     fitTables();
   }
 
