@@ -1194,3 +1194,16 @@ func TestLinkingLionShowsItsOwnEvidence(t *testing.T) {
 		t.Errorf("%q", got.About)
 	}
 }
+
+// Core 32 speaks 70017; a Core 22 to 31 that does is none.
+func TestProtocol70017(t *testing.T) {
+	if got := protocolMismatch("/Satoshi:32.0.0/", 70017); got != "" {
+		t.Errorf("32.0.0: %q", got)
+	}
+	if got := protocolMismatch("/Satoshi:31.1.0/", 70017); got != "not Bitcoin Core - it speaks protocol 70017, which Core 31 never did" {
+		t.Errorf("31.1.0: %q", got)
+	}
+	if got := protocolMismatch("/Satoshi:31.99.0/", 70017); got != "" {
+		t.Errorf("31.99 dev build: %q", got)
+	}
+}
