@@ -1458,6 +1458,11 @@
   // A node catching up from this one: a turning arrow, the word and what it
   // has taken. Always first in the grey line under the place.
   // What "no headers" means, on hover: Core never got a block header from the peer.
+  // BIP159: NETWORK_LIMITED alone promises only the last 288 blocks. Every
+  // Core since 0.16 sets it next to NETWORK, so only a node without NETWORK is
+  // pruned. Said of nodes only: a disguised peer's bits are as made up as its name.
+  const PRUNED_WHY = "Keeps only recent blocks";
+  const isPruned = (p) => p.kind.startsWith("Node") && !!p.services && p.services.includes("NETWORK_LIMITED") && !p.services.includes("NETWORK");
   const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
   function mbText(mb) {
     return mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : mb + " MB";
@@ -1482,6 +1487,7 @@
     // A node that is syncing has sent no headers yet: nothing odd, "syncing" says it.
     if (p.chain_unknown && !p.sync_mb) flags.push("no headers");
     if (p.fork) flags.push(p.fork);
+    if (isPruned(p)) flags.push("pruned");
     return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
   }
 
@@ -1717,10 +1723,10 @@
           parts.forEach((f, i) => {
             if (i) e.append(", ");
             // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "no headers" ? NO_HEADERS_WHY : "";
+            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "no headers" ? NO_HEADERS_WHY : f === "pruned" ? PRUNED_WHY : "";
             if (why) {
               const s = document.createElement("span");
-              s.className = f === "no tx" || f === "no headers" ? "no-tx" : "no-tx fork";
+              s.className = f === "no tx" || f === "no headers" || f === "pruned" ? "no-tx" : "no-tx fork";
               s.textContent = f;
               s.title = why;
               e.append(s);
@@ -1848,14 +1854,20 @@
     if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
     if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
     if (p.fork) flags.push([p.fork, p.fork_why]);
-    if (p.app) flags.push(["Umbrel app", p.app]);
+    if (isPruned(p)) flags.push(["pruned", PRUNED_WHY, "", true]);
+    // The fee rate below which it wants no transactions announced. A peer that
+    // takes none at all sends the highest there is: "no tx" says that already.
+    if (p.min_fee != null && p.min_fee < 1000)
+      flags.push([(p.min_fee < 10 ? p.min_fee.toFixed(1).replace(/\.0$/, "") : Math.round(p.min_fee)) + " sat/vB", "Min fee: cheaper transactions are not sent to it", "", true]);
+    if (p.app) flags.push(["Umbrel app", p.app, "", true]);
     for (const [word, why, cls] of flags) {
       const row = el("p", "pd-flag-row");
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
       what.appendChild(row);
     }
-    // The Umbrel app only adds context; it does not take the honest line away.
-    const onlyContext = !what.querySelector(".pd-about") && !flags.some(f => f[0] !== "Umbrel app");
+    // Pruned, the fee filter and the Umbrel app only add context; they do not
+    // take the honest line away.
+    const onlyContext = !what.querySelector(".pd-about") && flags.every((f) => f[3]);
     if (!what.querySelector("p") || onlyContext) {
       if (p.kind.startsWith("Node")) {
         // A node with nothing to explain: say what is good about it, from what it did.
@@ -1878,8 +1890,13 @@
     const tiles = el("div", "pd-tiles");
     if (p.ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.ping_ms), p.min_ping_ms != null ? "lowest " + fmtPing(p.min_ping_ms) : ""));
     if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
-    tiles.appendChild(stat("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type)].filter(Boolean).join(" \u00b7 "),
-      netLabel(p.network) + (p.transport ? " \u00b7 " + p.transport : "")));
+    // The group is the big word; how the link runs goes under it, so a phone
+    // never has to break "Outbound" in two.
+    const link = stat("Link", LABEL[p.group],
+      [typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type), netLabel(p.network), p.transport].filter(Boolean).join(" \u00b7 "));
+    link.classList.add("pd-link");
+    tiles.appendChild(link);
+
     line.appendChild(tiles);
     if (p.tor_exit) {
       const tor = el("p", "pd-flag-row");
