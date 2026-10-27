@@ -625,6 +625,9 @@ func protocolMismatch(subver string, version int) string {
 		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, older than any Core since 0.21", version)
 	case !newer && version >= 70016:
 		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
+	// Core 32 (tagged 21.10.2026) raised it to 70017 (node/protocol_version.h).
+	case newer && maj <= 31 && version > 70016:
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %s never did", version, coreMajor(maj, mnr))
 	}
 	return ""
 }
@@ -1177,4 +1180,12 @@ func withAlso(about string, reasons []string) string {
 		about += "\nAlso: " + why
 	}
 	return about
+}
+
+// coreMajor is the release number people say: 0.21 for 0.x, 31 after.
+func coreMajor(maj, mnr int) string {
+	if maj == 0 {
+		return fmt.Sprintf("0.%d", mnr)
+	}
+	return fmt.Sprint(maj)
 }

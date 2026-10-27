@@ -31,7 +31,8 @@
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
     kind: null,           // kind filter from clicking an entry in a group's kind line
-    pool: null,           // under "Pool node": one pool, or UNKNOWN_POOL
+    sub: null,            // one level under the kind: a pool, a version, a name
+    allChips: false,      // on a phone: every chip, not only the three largest
     openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
     view: { k: 1, x: 0, y: 0 },
@@ -650,11 +651,47 @@
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
   const SYNCING = "syncing";
-  // Under "Pool node" the pools are picked the same way, one level down.
-  const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool";
-  const poolName = (p) => p.pool || UNKNOWN_POOL;
+  // Under a kind its peers are picked the same way, one level down: pools by
+  // name, nodes by version, everything else by the software it names.
+  const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool", NO_NAME = "no name";
+  const uaName = (p) => {
+    const parts = (p.subver || "").split("/").filter(Boolean);
+    const name = (parts[parts.length - 1] || "").split(/[:(]/)[0].trim();
+    return name === "Satoshi" ? "Core" : name || NO_NAME;
+  };
+  const subOf = (p) => {
+    if (p.kind === POOL_KIND) return p.pool || UNKNOWN_POOL;
+    if (p.kind.startsWith("Node")) {
+      const v = /^\/Satoshi:(\d+)\.(\d+)/.exec(p.subver || "");
+      if (v) return (v[1] === "0" ? "0." + v[2] : v[1]) + ".x";
+    }
+    // What it pretends to be; who is behind it (LinkingLion) is its pill's to say.
+    if (p.kind === "Disguised") return "as " + uaName(p);
+    if (p.kind === "Lightning wallet") {
+      if (/lnd 0\.21/.test(p.about || "")) return "lnd 0.21+";
+      if (/^Older lnd/.test(p.about || "")) return "older lnd";
+    }
+    // Wasabi and Ginger borrow Core's names: the about says which it is.
+    const w = /(Wasabi|Ginger)/.exec(p.about || "");
+    return w && p.kind === "Wallet" ? w[1] : uaName(p);
+  };
+  // A phone shows the three largest chips and a "+ n more" that opens the rest:
+  // a full row of chips per table pushes the peers off the screen.
+  const PHONE_CHIPS = 3;
+  const phoneCut = () => !state.allChips && window.matchMedia("(max-width: 600px)").matches;
+  function moreChip(el, hidden) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip kind-pick more-chips";
+    b.textContent = "+ " + hidden + " more";
+    b.title = "Show every chip";
+    b.addEventListener("click", () => { state.allChips = true; renderTables(); });
+    el.appendChild(b);
+  }
+  const SUB_LABEL = { [POOL_KIND]: "Pools:", Disguised: "Claims:", "Lightning wallet": "lnd:" };
+  const subLabel = (kind) => SUB_LABEL[kind] || (kind.startsWith("Node") ? "Versions:" : "Names:");
   const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb
-    : p.kind === state.kind && (state.kind !== POOL_KIND || !state.pool || poolName(p) === state.pool));
+    : p.kind === state.kind && (!state.sub || subOf(p) === state.sub));
 
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
@@ -1193,7 +1230,7 @@
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.kind;
-    $("kindFilterName").textContent = (state.kind || "") + (state.kind === POOL_KIND && state.pool ? " \u00b7 " + state.pool : "");
+    $("kindFilterName").textContent = (state.kind || "") + (state.kind && state.sub ? " \u00b7 " + state.sub : "");
   }
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1208,11 +1245,11 @@
 
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
-    state.pool = null;
+    state.sub = null;
     applyFilters();
   }
-  function setPool(pool) {
-    state.pool = state.pool === pool ? null : pool;
+  function setSub(sub) {
+    state.sub = state.sub === sub ? null : sub;
     applyFilters();
   }
 
@@ -1222,7 +1259,7 @@
   });
   $("kindFilterClear").addEventListener("click", () => {
     state.kind = null;
-    state.pool = null;
+    state.sub = null;
     applyFilters();
   });
 
@@ -1498,7 +1535,12 @@
     const n = new Map();
     for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    entries.forEach(([kind, count]) => {
+    const cut = !state.kind && phoneCut() && entries.length > PHONE_CHIPS + 1;
+    entries.forEach(([kind, count], idx) => {
+      if (cut && idx >= PHONE_CHIPS) return;
+      // With one kind picked the others step aside: on a phone they would
+      // fill the screen above the chips that matter now.
+      if (state.kind && state.kind !== kind) return;
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip kind-pick" + (state.kind === kind ? " on" : "");
@@ -1510,34 +1552,41 @@
       b.addEventListener("click", () => setKind(kind));
       el.appendChild(b);
     });
+    if (cut) moreChip(el, entries.length - PHONE_CHIPS);
   }
 
-  // With "Pool node" picked, which pools those are: one chip per pool, the
-  // ones not known by name last.
-  function renderPoolMix(card, peers) {
-    if (!peers.length) return;
+  // With a kind picked, what those peers are one level down: one chip per
+  // pool, version or name, the unknown ones last. Nothing to pick from one.
+  function renderSubMix(card, kind, peers) {
     const n = new Map();
-    for (const p of peers) n.set(poolName(p), (n.get(poolName(p)) || 0) + 1);
-    const entries = [...n].sort((a, b) => (a[0] === UNKNOWN_POOL) - (b[0] === UNKNOWN_POOL) || b[1] - a[1] || a[0].localeCompare(b[0]));
+    for (const p of peers) n.set(subOf(p), (n.get(subOf(p)) || 0) + 1);
+    if (n.size < 2 && !state.sub) return;
+    const last = (s) => s === UNKNOWN_POOL || s === NO_NAME;
+    const ver = (s) => (/^(\d+(?:\.\d+)?)\.x$/.exec(s) || [])[1];
+    const entries = [...n].sort((a, b) => last(a[0]) - last(b[0])
+      || (ver(a[0]) && ver(b[0]) ? parseFloat(ver(b[0])) - parseFloat(ver(a[0])) : b[1] - a[1] || a[0].localeCompare(b[0])));
     const el = document.createElement("div");
     el.className = "kinds chips pool-picks";
     const label = document.createElement("span");
     label.className = "picks-label";
-    label.textContent = "Pools:";
+    label.textContent = subLabel(kind);
     el.appendChild(label);
-    for (const [pool, count] of entries) {
+    const cut = !state.sub && phoneCut() && entries.length > PHONE_CHIPS + 1;
+    // The phone keeps the largest three, still in their order.
+    const keep = cut ? new Set([...entries].sort((a, b) => b[1] - a[1]).slice(0, PHONE_CHIPS).map((e) => e[0])) : null;
+    for (const [sub, count] of cut ? entries.filter((e) => keep.has(e[0])) : entries) {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "chip kind-pick" + (state.pool === pool ? " on" : "");
+      b.className = "chip kind-pick" + (state.sub === sub ? " on" : "");
       const i = document.createElement("i");
       i.textContent = count;
-      b.append(i, " " + pool);
-      b.title = state.pool === pool ? "Show every pool again"
-        : pool === UNKNOWN_POOL ? "Pool nodes whose pool is not known" : `Show only ${pool}`;
-      b.setAttribute("aria-pressed", String(state.pool === pool));
-      b.addEventListener("click", () => setPool(pool));
+      b.append(i, " " + sub);
+      b.title = state.sub === sub ? "Show all of them again" : `Show only ${sub}`;
+      b.setAttribute("aria-pressed", String(state.sub === sub));
+      b.addEventListener("click", () => setSub(sub));
       el.appendChild(b);
     }
+    if (cut) moreChip(el, entries.length - PHONE_CHIPS);
     card.appendChild(el);
   }
 
@@ -2006,7 +2055,7 @@
       mix.appendChild(n);
       // How many are catching up from this node right now, and what they took.
       const syncing = kindPool.filter((p) => p.sync_mb);
-      if (syncing.length) {
+      if (syncing.length && (!state.kind || state.kind === SYNCING)) {
         const sc = document.createElement("button");
         sc.type = "button";
         sc.className = "chip kind-pick syncing" + (state.kind === SYNCING ? " on" : "");
@@ -2026,7 +2075,7 @@
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
-      if (state.kind === POOL_KIND) renderPoolMix(card, kindPool.filter((p) => p.kind === POOL_KIND));
+      if (state.kind && state.kind !== SYNCING) renderSubMix(card, state.kind, kindPool.filter((p) => p.kind === state.kind));
 
       if (peers.length) {
         const spread = document.createElement("p");
