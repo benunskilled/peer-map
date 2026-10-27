@@ -251,7 +251,7 @@ var aboutRules = []struct {
 	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
 	// the version message; three took 7 to 16 MB of blocks each. Not found
 	// anywhere, so only what it did.
-	{regexp.MustCompile(`^BTC RPC Proxy `), "Downloads blocks from this node but is no node: oldest protocol version, offers no services, and says your node is 127.0.0.1:8332"},
+	{regexp.MustCompile(`^BTC RPC Proxy `), "Probably not a node: seen taking blocks under the oldest protocol, with no services and 127.0.0.1:8332 as our address"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},

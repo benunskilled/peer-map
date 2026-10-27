@@ -1539,9 +1539,12 @@
         const who = document.createElement("div");
         who.className = "who";
         // A small arrow at the left: the row opens on a tap or a click.
-        const chev = document.createElement("span");
+        // A mouse or finger hits the row; the keyboard reaches the same thing here.
+        const chev = document.createElement("button");
+        chev.type = "button";
         chev.className = "chev";
-        chev.setAttribute("aria-hidden", "true");
+        chev.setAttribute("aria-label", "Show everything about this peer");
+        chev.setAttribute("aria-expanded", "false");
         chev.textContent = "\u203a";
         who.appendChild(chev);
         const f = document.createElement("span");
@@ -1655,7 +1658,8 @@
         // What Core saw stays grey; the name the peer sends is bright, it is
         // what tells one "Other" from the next. The user's own apps on this
         // Umbrel need no flags: nothing about them is a surprise.
-        const seen = p.app ? "" : flags;
+        // Syncing is the one thing that stays: the count above the list includes them.
+        const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
         const under = [seen, p.subver].filter(Boolean).join(" \u00b7 ");
         if (under || never || p.tor_exit) {
           const e = line("sub ua", "");
@@ -1705,7 +1709,7 @@
           const about = document.createElement("div");
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
-          // and everything is in the panel that opens on a tap.
+          // and everything, the claim too, is in the panel that opens on a tap.
           const probably = p.about.split("\n").find((l) => l.startsWith("Probably:"));
           about.textContent = probably || p.about;
           about.classList.add(probably ? "short" : "clip");
@@ -1770,8 +1774,8 @@
 
     // What it is, and why each word in the row is there.
     const what = block("What it is");
-    // With a kind filter on, the description already stands under the kind.
-    if (p.about && !state.kind) {
+    // Under a kind filter the row shows only part of it; the panel has all of it.
+    if (p.about) {
       for (const line of p.about.split("\n")) {
         const m = /^(Claims|Probably):\s*(.*)$/.exec(line);
         const row = el("p", "pd-about");
@@ -1871,11 +1875,15 @@
     const top = tr.getBoundingClientRect().top;
     const open = tr.nextElementSibling?.classList.contains("detail-row");
     for (const row of document.querySelectorAll("#tables tr.detail-row")) row.remove();
-    for (const row of document.querySelectorAll("#tables tr.open")) row.classList.remove("open");
+    for (const row of document.querySelectorAll("#tables tr.open")) {
+      row.classList.remove("open");
+      row.querySelector(".chev")?.setAttribute("aria-expanded", "false");
+    }
     state.openRows.clear();
     if (!open) {
       tr.after(detailRow(tr, p));
       tr.classList.add("open");
+      tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
       state.openRows.add(key);
     }
     const d = tr.getBoundingClientRect().top - top;
@@ -2026,7 +2034,10 @@
         }
         const rowKey = g + " " + p.addr;
         const reopen = state.openRows.has(rowKey);
-        if (reopen) tr.classList.add("open");
+        if (reopen) {
+          tr.classList.add("open");
+          tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
+        }
         tr.addEventListener("click", (ev) => {
           // Links and buttons keep doing their own thing; so does selecting text.
           // On a touch screen the address is too small a target for a finger: a tap
@@ -2034,7 +2045,7 @@
           // Bitcoin Lab is a button in the panel.
           const onAddress = ev.target.closest("a.peer-jump") && window.matchMedia("(pointer: coarse)").matches;
           if (onAddress) ev.preventDefault();
-          else if (ev.target.closest("a, button, input, select, textarea")) return;
+          else if (ev.target.closest("a, button, input, select, textarea") && !ev.target.closest(".chev")) return;
           if (String(window.getSelection()).length > 0) return;
           toggleDetail(tr, p, rowKey);
         });
