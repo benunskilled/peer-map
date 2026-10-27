@@ -36,6 +36,8 @@ type rawPeer struct {
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
 	SyncedHeaders *int64 `json:"synced_headers"`
+	// The last block this node and the peer share; below zero while unknown.
+	SyncedBlocks *int64 `json:"synced_blocks"`
 	// Bytes received per message type. Read only to count pings and address
 	// requests (see behaviourAbout); nil when Core did not report it.
 	BytesRecvPerMsg map[string]int64 `json:"bytesrecv_per_msg"`
@@ -139,23 +141,31 @@ type Peer struct {
 	// peer itself is somewhere behind it.
 	TorExit bool `json:"tor_exit,omitempty"`
 	// The name of the app when the peer is one of Umbrel's own, such as electrs.
-	App     string `json:"app,omitempty"`
-	Subver  string `json:"subver"`
-	Kind    string `json:"kind"`               // what the user agent claims; see kinds.go
-	About   string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	App string `json:"app,omitempty"`
+	// The mining pool a pool node belongs to, where that is known (pools.go).
+	Pool string `json:"pool,omitempty"`
+	// How the address was proven the pool's: for the panel, not the list.
+	PoolProof string `json:"pool_proof,omitempty"`
+	Subver    string `json:"subver"`
+	Kind      string `json:"kind"`               // what the user agent claims; see kinds.go
+	About     string `json:"about,omitempty"`    // what that software is, when known
+	NoRelay   bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
 	// Observed rather than claimed, and omitted when false so the common peer
 	// carries none of them.
-	NoServices   bool     `json:"no_services,omitempty"`   // advertises NODE_NONE
-	NoTxRelay    bool     `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
-	NoTxWhy      string   `json:"no_tx_why,omitempty"`     // why, where it can be told
-	ChainUnknown bool     `json:"chain_unknown,omitempty"` // Core has never seen a header from it
-	Fork         string   `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
-	ForkWhy      string   `json:"fork_why,omitempty"`
-	PingMs       *float64 `json:"ping_ms"`
+	NoServices   bool   `json:"no_services,omitempty"`   // advertises NODE_NONE
+	NoTxRelay    bool   `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
+	NoTxWhy      string `json:"no_tx_why,omitempty"`     // why, where it can be told
+	ChainUnknown bool   `json:"chain_unknown,omitempty"` // Core has never seen a header from it
+	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
+	ForkWhy      string `json:"fork_why,omitempty"`
+	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
+	// What the peer announced, for the detail that opens on a tap.
+	Services []string `json:"services,omitempty"`
+	Version  int      `json:"version,omitempty"` // protocol version of its version message
+	PingMs   *float64 `json:"ping_ms"`
 	// The lowest round trip Core has ever measured to this peer. Closer to
 	// the line itself than the last ping, which also carries whatever was
 	// queued on either side at that moment - so it is the one a block's last
@@ -311,6 +321,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			Subver: r.Subver, Kind: kind, About: aboutOf(r.Subver), NoRelay: !relays,
 			ConnTime: r.ConnTime, Transport: r.Transport,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
+			Services: r.ServicesNames, Version: r.Version,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
 		// is Core saying nothing. Only the first is worth showing.
@@ -334,7 +345,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				claim, _, _ = strings.Cut(p.About, ",")
 				claim = "the wallet " + claim
 			}
-			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+stayedLong(r.ConnTime, now)
+			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+bitcoinjWhy(r, now)
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case libreKind != "":
@@ -351,16 +362,19 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				func() string { return anachronism(r.Subver, r.ServicesNames) },
 				func() string { return protocolMismatch(r.Subver, r.Version) },
 				func() string {
+					if offersNothingAsCore(r.Subver, r.ServicesNames) {
+						return offersNothingAbout
+					}
+					return ""
+				},
+				func() string {
 					if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
 						return skippedHandshakeAbout(r.BytesRecvPerMsg)
 					}
 					return ""
 				},
 				func() string {
-					if offersNothingAsCore(r.Subver, r.ServicesNames) {
-						return offersNothingAbout
-					}
-					return ""
+					return quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 				},
 			} {
 				if why := check(); why != "" {
@@ -369,13 +383,15 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				}
 			}
 		}
-		if p.Kind == "Other" && p.About == "" {
-			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg)
+		// A pool node or crawler no rule describes (/pydroid-pool:3/,
+		// /p2p-watcher:0.1.0/) gets the same line, rather than none.
+		if (p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler") && p.About == "" {
+			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
 		if p.Kind == noAgentKind && r.Version > 0 {
-			p.About = "Introduced itself but left its name empty: software that keeps quiet about what it is"
+			p.About = noAgentAbout(r.BytesRecvPerMsg, r.ConnTime, now)
 		} else if p.Kind == noAgentKind {
 			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
 		}
@@ -384,16 +400,36 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// who it probably is.
 		if isLinkingLion(r.Addr) || r.mockLinkingLion {
 			p.LinkingLion = true
+			lion := linkingLionAbout
+			if quietAfterHandshake(r.BytesRecvPerMsg, r.ConnTime, now) {
+				lion += linkingLionQuiet
+			}
 			if r.Subver == "" {
-				p.About = "Probably: " + linkingLionAbout
+				p.About = "Probably: " + lion
 			} else {
-				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+linkingLionAbout
+				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
+			}
+		}
+		// A proven address makes a pool's plain bitcoind a pool node too; a
+		// name in the user agent only names the pool of what already is one.
+		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
+			switch {
+			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
+				what := "own Bitcoin node"
+				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
+					what = "block relay (ckp2p)"
+				}
+				p.Kind, p.Pool = "Pool node", n.pool
+				p.About, p.PoolProof = n.pool+"'s "+what, "This address "+n.proof
+			case !byAddr && p.Kind == "Pool node":
+				p.Pool = n.pool
 			}
 		}
 		if p.NoTxRelay {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
 		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind, r.SyncedHeaders, tip)
+		p.SyncMB = syncingFrom(r.Inbound, r.BytesSentPerMsg, r.SyncedBlocks, tip, r.ConnTime, now)
 		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {
 			switch hostOf(r.Addr) {
