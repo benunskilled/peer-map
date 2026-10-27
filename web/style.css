@@ -535,7 +535,11 @@ button.chip.syncing { cursor: pointer; }
 .pd-about { margin: 0 0 6px; color: var(--text); }
 .pd-tag { display: inline-block; min-width: 62px; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
 .pd-tag.probably { color: var(--accent); }
-.pd-flag-row { margin: 0 0 7px; color: var(--muted); }
+/* The word on the left, its reason beside it: a second line starts under the
+   reason, not under the word, and the reasons of all rows start in one column
+   (a longer word moves only its own reason). */
+.pd-flag-row { display: grid; grid-template-columns: minmax(92px, max-content) 1fr; align-items: baseline; margin: 0 0 7px; color: var(--muted); }
+.pd-flag-row .pd-flag { justify-self: start; }
 .pd-flag { display: inline-block; margin-right: 6px; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--border); background: #161d26; color: var(--text); font-size: 12px; white-space: nowrap; }
 .pd-flag.sync { color: #7fe3d6; border-color: rgba(31,191,171,.45); background: rgba(31,191,171,.10); }
 .pd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
