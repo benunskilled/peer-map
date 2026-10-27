@@ -923,7 +923,8 @@ func TestQuietAfterHandshake(t *testing.T) {
 	core := func(recv map[string]int64, ago int64) rawPeer {
 		return rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
 			Subver: "/Satoshi:31.1.0/", Transport: "v1", ConnTime: now.Unix() - ago, RelayTxes: &yes,
-			ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, BytesRecvPerMsg: recv}
+			ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, BytesRecvPerMsg: recv,
+			BytesSentPerMsg: map[string]int64{"inv": 70}}
 	}
 	if got := convert([]rawPeer{core(quiet, 3600)})[0]; got.Kind != fakeWalletKind ||
 		!strings.Contains(got.About, "it asked for nothing after the handshake, not even for addresses") {
@@ -980,8 +981,12 @@ func TestOtherAboutOnlyListens(t *testing.T) {
 	yes, no := true, false
 	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40, "sendaddrv2": 24}
 	hour := now.Unix() - 3600
-	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Unknown software that only listens: hears new transactions, fetches none" {
+	if got := otherAbout(nil, &yes, quiet, map[string]int64{"inv": 120}, hour, now); got != "Unknown software that only listens: hears new transactions, fetches none" {
 		t.Errorf("wants transactions: %q", got)
+	}
+	// Nothing was announced to it, so it cannot be said to hear anything.
+	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Unknown software that only listens: asks for nothing" {
+		t.Errorf("nothing announced: %q", got)
 	}
 	if got := otherAbout(nil, &no, quiet, nil, hour, now); got != "Unknown software that only listens: wants no transactions, asks for nothing" {
 		t.Errorf("wants none: %q", got)
@@ -1135,5 +1140,19 @@ func TestClientsFoundOn27October(t *testing.T) {
 	}
 	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Probably not a node") {
 		t.Errorf("BTC RPC Proxy: about %q", got)
+	}
+}
+
+// A Core connection on a node that announces nothing is no proof of a fake.
+func TestQuietCoreNeedsSomethingOffered(t *testing.T) {
+	now := time.Now()
+	yes := true
+	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40}
+	hour := now.Unix() - 3600
+	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, nil, hour, now); got != "" {
+		t.Errorf("nothing offered: %q", got)
+	}
+	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, map[string]int64{"inv": 70}, hour, now); got == "" {
+		t.Error("offered and still silent: want the reason")
 	}
 }
