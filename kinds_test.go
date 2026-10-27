@@ -1133,7 +1133,7 @@ func TestClientsFoundOn27October(t *testing.T) {
 	if got, _ := classify("BTC RPC Proxy v0.8.1"); got != "Other" {
 		t.Errorf("BTC RPC Proxy: kind %q, want Other", got)
 	}
-	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Downloads blocks") {
+	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Probably not a node") {
 		t.Errorf("BTC RPC Proxy: about %q", got)
 	}
 }
