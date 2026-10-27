@@ -468,7 +468,8 @@ func TestOtherAboutOffersBlocks(t *testing.T) {
 func TestPlainBitcoinjOfferingBlocks(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "/bitcoinj:0.14.5/", Version: 70016, ServicesNames: []string{"NETWORK", "P2P_V2"}}})[0]
-	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
+	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does" +
+		"\nAlso: it offers encrypted v2 connections, which that software never had"
 	if got.Kind != "Disguised" || got.About != want {
 		t.Errorf("kind %q about %q", got.Kind, got.About)
 	}
@@ -539,7 +540,8 @@ func TestBehaviourMakesCoreDisguised(t *testing.T) {
 	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:0.19.0.1/",
 		Transport: "v1", ConnTime: conn, ServicesNames: []string{"WITNESS"},
 		BytesRecvPerMsg: map[string]int64{"getaddr": 24 * 58}}})[0]
-	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once" {
+	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once"+
+		"\nAlso: it lacks NETWORK_LIMITED, which every Core since 0.16 offers" {
 		t.Errorf("got %q / %q", got.Kind, got.About)
 	}
 }
@@ -1180,5 +1182,15 @@ func TestLibbitcoinV2(t *testing.T) {
 	}
 	if got := anachronism("/libbitcoin:3.8.0/", v2); got == "" {
 		t.Error("3.8.0 with P2P_V2 not flagged")
+	}
+}
+
+// LinkingLion's verdict comes from its address; what it did itself stands
+// under it, so the disguise would show without the list too.
+func TestLinkingLionShowsItsOwnEvidence(t *testing.T) {
+	got := convert([]rawPeer{{Addr: "143.20.137.5:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/Satoshi:0.12.1/", Version: 70016, ServicesNames: []string{"NETWORK"}}})[0]
+	if !got.LinkingLion || !strings.Contains(got.About, "Probably: LinkingLion") || !strings.Contains(got.About, "\nAlso: ") {
+		t.Errorf("%q", got.About)
 	}
 }

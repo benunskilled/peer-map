@@ -539,6 +539,9 @@ button.chip.syncing { cursor: pointer; }
 .pd-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; font-size: 13px; line-height: 1.45; }
 .pd-block h4 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .pd-about { margin: 0 0 6px; color: var(--text); }
+/* Claims, Probably, Also: the tag on the left, the text wrapping beside it,
+   in the same column as the reasons of the flags below. */
+.pd-about.tagged { display: grid; grid-template-columns: 92px 1fr; align-items: baseline; }
 .pd-tag { display: inline-block; min-width: 62px; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
 .pd-tag.probably { color: var(--accent); }
 /* The word on the left, its reason beside it: a second line starts under the
