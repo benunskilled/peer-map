@@ -302,9 +302,10 @@ var aboutRules = []struct {
 	// neutrino sends a version fixed in its own code, not lnd's: 0.12.0-beta
 	// from neutrino 0.12 to 0.16 (lnd 0.13 to 0.20), 0.17.1 since neutrino
 	// 0.17.1 (lnd 0.21, June 2026; useragent.go in lightninglabs/neutrino).
-	// Zeus 13.2 ships lnd 0.21.4, Blixt 0.9 lnd 0.20; neither changes the name.
-	{regexp.MustCompile(`(?i)/neutrino:0\.17\.`), "Lightning wallet on lnd 0.21 or newer, such as current Zeus"},
-	{regexp.MustCompile(`(?i)/neutrino:0\.12\.0-beta/`), "Lightning wallet on lnd 0.13 to 0.20, such as Blixt or an older Zeus"},
+	// Zeus 13.2 ships lnd 0.21.4, Blixt 0.9 lnd 0.20, and neither changes the
+	// name; lnd on a server in neutrino mode says the same, so an app is only an example.
+	{regexp.MustCompile(`(?i)/neutrino:0\.17\.`), "lnd 0.21 or newer, without a node of its own (neutrino), e.g. Zeus"},
+	{regexp.MustCompile(`(?i)/neutrino:0\.12\.0-beta/`), "Older lnd, without a node of its own (neutrino), e.g. Blixt or an older Zeus"},
 	{regexp.MustCompile(`(?i)neutrino`), "Neutrino: Lightning wallets on lnd, such as Blixt or Zeus"},
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK"},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node"},

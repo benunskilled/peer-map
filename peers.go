@@ -143,11 +143,13 @@ type Peer struct {
 	// The name of the app when the peer is one of Umbrel's own, such as electrs.
 	App string `json:"app,omitempty"`
 	// The mining pool a pool node belongs to, where that is known (pools.go).
-	Pool    string `json:"pool,omitempty"`
-	Subver  string `json:"subver"`
-	Kind    string `json:"kind"`               // what the user agent claims; see kinds.go
-	About   string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	Pool string `json:"pool,omitempty"`
+	// How the address was proven the pool's: for the panel, not the list.
+	PoolProof string `json:"pool_proof,omitempty"`
+	Subver    string `json:"subver"`
+	Kind      string `json:"kind"`               // what the user agent claims; see kinds.go
+	About     string `json:"about,omitempty"`    // what that software is, when known
+	NoRelay   bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
@@ -381,7 +383,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				}
 			}
 		}
-		if p.Kind == "Other" && p.About == "" {
+		// A pool node or crawler no rule describes (/pydroid-pool:3/,
+		// /p2p-watcher:0.1.0/) gets the same line, rather than none.
+		if (p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler") && p.About == "" {
 			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 		}
 		// Core reports version 0 until the peer's version message arrives:
@@ -411,12 +415,12 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
 			switch {
 			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
-				what, how := "own Bitcoin node", ""
+				what := "own Bitcoin node"
 				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
-					what, how = "block relay", ", ckpool's ckp2p: passes on blocks only, never transactions"
+					what = "block relay (ckp2p)"
 				}
 				p.Kind, p.Pool = "Pool node", n.pool
-				p.About = n.pool + "'s " + what + how + ". This address " + n.proof
+				p.About, p.PoolProof = n.pool+"'s "+what, "This address "+n.proof
 			case !byAddr && p.Kind == "Pool node":
 				p.Pool = n.pool
 			}
