@@ -418,6 +418,12 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
 			}
 		}
+		// One reason is enough for the list; the panel gets every other one, so
+		// a disguise - LinkingLion's too - stands on what the peer did, not on
+		// one rule or one list of addresses alone.
+		if p.Kind == fakeWalletKind {
+			p.About = withAlso(p.About, disguiseEvidence(r, kind, aboutOf(r.Subver), anyWtxid, now))
+		}
 		// A proven address makes a pool's plain bitcoind a pool node too; a
 		// name in the user agent only names the pool of what already is one.
 		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
