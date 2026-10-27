@@ -1131,3 +1131,50 @@ func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {
 	}
 	return lead + "software that keeps quiet about what it is"
 }
+
+// disguiseEvidence is every sign that a peer is not what its user agent says,
+// from the same checks that make it Disguised. kind and walletAbout are what
+// the name alone gave.
+func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now time.Time) []string {
+	var out []string
+	if kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames) {
+		_, guess, _ := strings.Cut(fakeAbout(r.Subver, walletAbout, r.ServicesNames), "\nProbably: ")
+		out = append(out, guess)
+	}
+	if kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version) {
+		out = append(out, bitcoinjTooNewAbout)
+	}
+	out = append(out,
+		behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now),
+		anachronism(r.Subver, r.ServicesNames),
+		protocolMismatch(r.Subver, r.Version))
+	if offersNothingAsCore(r.Subver, r.ServicesNames) {
+		out = append(out, offersNothingAbout)
+	}
+	if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
+		out = append(out, skippedHandshakeAbout(r.BytesRecvPerMsg))
+	}
+	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
+}
+
+// withAlso adds each reason the about does not give yet as an "Also:" line,
+// the evidence without its verdict ("not Bitcoin Core - it lacks ..." says
+// "it lacks ..."): the verdict is the Probably line's.
+func withAlso(about string, reasons []string) string {
+	for _, why := range reasons {
+		if why == "" {
+			continue
+		}
+		if _, evidence, ok := strings.Cut(why, " - "); ok {
+			why = evidence
+		}
+		if strings.Contains(about, why) {
+			continue
+		}
+		if !strings.HasPrefix(why, "it ") {
+			why = "it " + why
+		}
+		about += "\nAlso: " + why
+	}
+	return about
+}

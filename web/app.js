@@ -1839,9 +1839,13 @@
     // Under a kind filter the row shows only part of it; the panel has all of it.
     if (p.about) {
       for (const line of p.about.split("\n")) {
-        const m = /^(Claims|Probably):\s*(.*)$/.exec(line);
+        const m = /^(Claims|Probably|Also):\s*(.*)$/.exec(line);
         const row = el("p", "pd-about");
-        if (m) row.append(el("span", "pd-tag " + m[1].toLowerCase(), m[1]), " " + m[2]);
+        if (m) {
+          row.classList.add("tagged");
+          // Further reasons stand under the first one, without a word of their own.
+          row.append(el("span", "pd-tag " + m[1].toLowerCase(), m[1] === "Also" ? "" : m[1]), el("span", "", m[2]));
+        }
         else row.textContent = line;
         what.appendChild(row);
       }
