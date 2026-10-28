@@ -437,7 +437,7 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 	case wallet && blocks:
 		guess = "a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
 	case wallet && v2:
-		guess = "a scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
+		guess = "a node or scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
 	case misspeltCore(subver) != "":
 		guess = "not Bitcoin Core - " + misspeltCore(subver)
 		if services != nil && len(services) == 0 {
@@ -564,7 +564,7 @@ func anachronism(subver string, services []string) string {
 				if s.major > 0 {
 					since = fmt.Sprint(s.major)
 				}
-				return fmt.Sprintf("a scanner - it offers %s, which Core %s.%s did not have (from Core %s)", s.what, m[1], m[2], since)
+				return fmt.Sprintf("not Bitcoin Core %s.%s - it offers %s, which Core %s.%s did not have (from Core %s)", m[1], m[2], s.what, m[1], m[2], since)
 			}
 		}
 	}
@@ -588,11 +588,11 @@ func anachronism(subver string, services []string) string {
 			}
 		}
 		if len(extra) > 0 {
-			return "a scanner - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
+			return "not what it claims - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
 		}
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
-		return "a scanner - it offers encrypted v2 connections, which that software never had"
+		return "not what it claims - it offers encrypted v2 connections, which that software never had"
 	}
 	return ""
 }
@@ -934,11 +934,11 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 		if relayTxes != nil && *relayTxes {
 			// "Hears" only if we announced something to it.
 			if sent["inv"] > 0 {
-				return "Unknown software that only listens: hears new transactions, fetches none"
+				return "Only listens: hears new transactions, fetches none"
 			}
-			return "Unknown software that only listens: asks for nothing"
+			return "Only listens: asks for nothing"
 		}
-		return "Unknown software that only listens: wants no transactions, asks for nothing"
+		return "Only listens: wants no transactions, asks for nothing"
 	}
 	for _, s := range services {
 		if s == "NETWORK" {
@@ -951,29 +951,39 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 	// nobody asked for, others
 	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
 	// /relay-geo:0.1/ fetching every transaction and announcing none.
+	// A real node always offers a service, so one that offers none cannot be
+	// the node reading below; nil means Core did not say.
+	maybeNode := services == nil || len(services) > 0
+	or := func(node, other string) string {
+		if maybeNode {
+			return node + ", or " + other
+		}
+		return other
+	}
 	switch {
 	// BIP 35: "send me your whole mempool". Seen 22. to 26.10.2026 as /curl:8.5.0/,
 	// twenty times from one address, each right after the handshake.
 	case recv["mempool"] > 0:
-		return "Unknown software that asks for our mempool"
+		return "Asks for our mempool"
 	case recv["tx"] > 0 && recv["inv"] == 0:
-		return "Unknown software that pushes transactions without announcing them"
-	// A block follower that also asks for addresses says so: the list calls
-	// only the one that wants nothing else "only follows new blocks".
-	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0 && recv["getaddr"] > 0:
-		return "Unknown software that follows new blocks: asks for headers and addresses, wants no transactions"
-	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0:
-		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
-	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0 && recv["getaddr"] > 0:
-		return "Unknown software that follows new blocks: wants headers announced and addresses, no transactions"
-	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0:
-		return "Unknown software that follows new blocks: wants headers announced, no transactions"
+		return "Pushes transactions without announcing them"
+	// Headers and no transactions is also what a real node does on a
+	// connection for blocks only (2.2% of 2,553 Core and Knots sessions on
+	// one node, 16. to 28.10.2026), so both readings are given. One that asks
+	// for addresses too runs with blocksonly=1 if it is a node (noTxWhy).
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0 && recv["getaddr"] > 0:
+		return "Asks for headers and addresses and wants no transactions: " + or("a node running blocksonly", "a program that tracks the chain")
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+		return "Asks for headers and wants no transactions: " + or("a block-only connection", "a program that tracks the chain")
 	// Asking for data alone is no sign of listening: a peer that fetches
 	// blocks asks the same way. Only transactions sent to it count.
 	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
-		return "Unknown software that listens to transactions: fetches every one it hears of, announces none"
+		// 0.5% of the real nodes above did the same: one that hears of
+		// everything from others first has nothing to announce.
+		return "Fetches transactions from your node and announces none: " + or("a node that hears of them elsewhere first", "a program collecting them")
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
-		return "Unknown software that collects addresses"
+		// 6.2% of the real nodes above did the same: one in sync asks for no headers.
+		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler")
 	}
 	return "Software with a name we don't recognise"
 }
@@ -1139,16 +1149,18 @@ func syncingFrom(inbound bool, sent map[string]int64, synced *int64, tip, connTi
 // asked for headers and addresses like a full node, 43 asked for addresses
 // and nothing else, the rest said nothing or only answered pings.
 func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {
-	const lead = "Introduced itself but left its name empty: "
+	// The pill says it has no name; the sentence says what it did.
 	switch {
-	case recv["getheaders"] > 0 && (recv["getaddr"] > 0 || recv["sendcmpct"] > 0):
-		return lead + "it asks for headers like a full node does"
+	case recv["getheaders"] > 0 && recv["getaddr"] > 0:
+		return "Asks for headers and addresses, like a full node does"
+	case recv["getheaders"] > 0 && recv["sendcmpct"] > 0:
+		return "Asks for headers and compact blocks, like a full node does"
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
-		return lead + "it asks for addresses and nothing else"
+		return "Asks for addresses, not for headers or blocks"
 	case quietAfterHandshake(recv, connTime, now):
-		return lead + "after the handshake it asked for nothing"
+		return "Introduced itself, then asked for nothing"
 	}
-	return lead + "software that keeps quiet about what it is"
+	return "Introduced itself without a name; nothing it did tells what it is"
 }
 
 // disguiseEvidence is every sign that a peer is not what its user agent says,
@@ -1192,8 +1204,12 @@ func tellOf(about string, lion bool) string {
 			reasons = append(reasons, r)
 		}
 	}
+	claimed := ""
+	if m := tellClaim.FindStringSubmatch(about); m != nil {
+		claimed = m[1]
+	}
 	for _, r := range reasons {
-		if t := shortReason(r); t != "" {
+		if t := shortReason(r, claimed); t != "" {
 			return t
 		}
 	}
@@ -1207,10 +1223,13 @@ var (
 	tellAddrs    = regexp.MustCompile(`asked for addresses (\d+) times`)
 	tellPings    = regexp.MustCompile(`pings every (\d+) second`)
 	tellProtocol = regexp.MustCompile(`speaks protocol (\d+)`)
-	tellLacked   = regexp.MustCompile(`it offers (.+), which Core [0-9.]+ did not have`)
+	tellLacked   = regexp.MustCompile(`it offers (.+), which Core ([0-9.]+) did not have`)
+	tellClaim    = regexp.MustCompile(`^Claims: Bitcoin (?:Core |Knots \(Core )([0-9.]+)`)
 )
 
-func shortReason(r string) string {
+// shortReason is one reason in a few words: what was measured, beside what
+// the peer claims where the two only mean something together.
+func shortReason(r, claimed string) string {
 	if m := tellAddrs.FindStringSubmatch(r); m != nil {
 		return "asks for addresses " + m[1] + "\u00d7"
 	}
@@ -1218,10 +1237,13 @@ func shortReason(r string) string {
 		return "pings every " + m[1] + " s"
 	}
 	if m := tellLacked.FindStringSubmatch(r); m != nil && serviceShort[m[1]] != "" {
-		return "offers " + serviceShort[m[1]] + " its version lacked"
+		return serviceShort[m[1]] + " for Core " + m[2]
 	}
 	if m := tellProtocol.FindStringSubmatch(r); m != nil {
-		return "protocol " + m[1] + " does not fit"
+		if claimed != "" {
+			return "protocol " + m[1] + " for Core " + claimed
+		}
+		return "protocol " + m[1]
 	}
 	for _, t := range []struct{ in, tell string }{
 		{"left out wtxidrelay", "no wtxidrelay"},
@@ -1232,11 +1254,11 @@ func shortReason(r string) string {
 		{"offers blocks, which no wallet does", "offers blocks"},
 		{"speaks v2, which no wallet", "offers v2"},
 		{"v2 connections, which that software never had", "offers v2"},
-		{"which the Bitcore library never does", "offers more than Bitcore"},
+		{"which the Bitcore library never does", "more services than Bitcore"},
 		{"Sat0shi with a zero", "misspelt name"},
 		{"Core calls itself /Satoshi:", "misspelt name"},
 		{"Core writes its name between slashes", "misspelt name"},
-		{"poses as Libre Relay", "poses as Libre Relay"},
+		{"poses as Libre Relay", "Libre Relay bit, no matching release"},
 	} {
 		if strings.Contains(r, t.in) {
 			return t.tell
@@ -1247,26 +1269,21 @@ func shortReason(r string) string {
 
 // behaviourTell is, for a peer whose name says nothing (Other, No user
 // agent), what otherAbout and noAgentAbout saw it do, in a few words for the
-// line under its pill; "" where they saw nothing telling, and the line keeps
-// what Core saw. TestEveryBehaviourHasATell reads those two functions.
+// line under its pill. Only what a real node does not do, or what says it
+// acts like one: where real nodes do the same (headers and no transactions,
+// addresses only, transactions fetched and none announced) it is "", and the
+// line keeps what Core saw. TestEveryBehaviourHasATell reads those two
+// functions.
 func behaviourTell(about string) string {
-	// "only" only where the rule saw it ask for nothing else.
-	if strings.Contains(about, "follows new blocks") {
-		if strings.Contains(about, "addresses") {
-			return "follows new blocks"
-		}
-		return "only follows new blocks"
-	}
 	for _, t := range []struct{ in, tell string }{
-		{"only listens", "only listens"},
-		{"a full node under a name its operator chose", "acts like a full node"},
-		{"asks for our mempool", "asks for our mempool"},
-		{"pushes transactions", "pushes transactions"},
-		{"listens to transactions", "collects transactions"},
-		{"collects addresses", "collects addresses"},
-		{"asks for headers like a full node", "acts like a node"},
-		{"asks for addresses and nothing else", "asks only for addresses"},
+		{"hears new transactions, fetches none", "fetches nothing"},
+		{"asks for nothing", "asks for nothing"},
 		{"asked for nothing", "asks for nothing"},
+		{"a full node under a name its operator chose", "offers blocks"},
+		{"Asks for our mempool", "asks for our mempool"},
+		{"Pushes transactions without announcing them", "sends tx unannounced"},
+		{"Asks for headers and addresses, like a full node", "headers + addresses"},
+		{"Asks for headers and compact blocks, like a full node", "headers + compact blocks"},
 	} {
 		if strings.Contains(about, t.in) {
 			return t.tell
