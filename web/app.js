@@ -115,8 +115,12 @@
       state.receivedAt = Date.now();
       markArrivals(state.data.peers);
       next = state.data.next_in || state.data.interval || 10;
+      state.failed = false;
       renderWhenFree();
+      beat();
     } catch (e) {
+      state.failed = true;
+      renderStatus();
       showError("Peer Map backend not reachable: " + e.message);
     } finally {
       inFlight = false;
@@ -1034,6 +1038,16 @@
   // Named once, in the tooltip and the Disguised explanation, not on every card.
   const LION_CREDIT = "Tracked by 0xB10C, b10c.me";
   const isNode = (p) => p.kind.startsWith("Node (") || p.kind === "Pool node";
+  // A dot in front of the status line beats once when fresh peers arrive.
+  const liveDot = document.createElement("span");
+  liveDot.className = "live-dot";
+  liveDot.setAttribute("aria-hidden", "true");
+  function beat() {
+    liveDot.classList.remove("beat");
+    void liveDot.offsetWidth; // restart the animation
+    liveDot.classList.add("beat");
+  }
+
   function renderStatus() {
     const d = state.data;
     if (!d) return;
@@ -1044,6 +1058,8 @@
     const others = d.peers.length - nodes - disguised;
     const el = $("status");
     el.textContent = `${d.peers.length} peers: ${nodes} nodes, ${disguised} disguised, ${others} others`;
+    liveDot.classList.toggle("stale", state.paused || state.failed);
+    el.prepend(liveDot);
     el.append(` · updated ${since} · ${mode}`);
   }
 
@@ -2211,6 +2227,7 @@
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
     const root = $("tables");
     root.textContent = "";
+    root.removeAttribute("aria-busy");
     for (const g of GROUPS) {
       if (!state.show[g]) continue;
       let peers = state.data.peers.filter((p) => p.group === g);
