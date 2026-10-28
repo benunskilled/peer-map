@@ -151,9 +151,13 @@ type Peer struct {
 	// How the address was proven the pool's: for the panel, not the list.
 	PoolProof string `json:"pool_proof,omitempty"`
 	Subver    string `json:"subver"`
-	Kind      string `json:"kind"`               // what the user agent claims; see kinds.go
-	About     string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay   bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	Kind      string `json:"kind"`            // what the user agent claims; see kinds.go
+	About     string `json:"about,omitempty"` // what that software is, when known
+	// Where the name is false or says nothing (Disguised, Other, No user
+	// agent), what the peer does in a few words: the list shows it under the
+	// pill, the panel the whole sentence (tellOf, behaviourTell).
+	Tell    string `json:"tell,omitempty"`
+	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
@@ -423,6 +427,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// one rule or one list of addresses alone.
 		if p.Kind == fakeWalletKind {
 			p.About = withAlso(p.About, disguiseEvidence(r, kind, aboutOf(r.Subver), anyWtxid, now))
+			p.Tell = tellOf(p.About, p.LinkingLion)
+		} else if p.Kind == "Other" || p.Kind == noAgentKind {
+			p.Tell = behaviourTell(p.About)
 		}
 		// A proven address makes a pool's plain bitcoind a pool node too; a
 		// name in the user agent only names the pool of what already is one.
