@@ -90,7 +90,10 @@
       if (e.target.closest("button, a")) return;
       if (folded.has(id)) folded.delete(id); else folded.add(id);
       store.set(FOLD_KEY, JSON.stringify([...folded]));
+      // What the reader looks at stays put while a card above opens or closes.
+      const a = readAnchor();
       show();
+      holdAnchor(a);
       if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
     };
     title.addEventListener("click", flip);
@@ -98,6 +101,9 @@
     show();
   }
   foldable($("mapCard"), $("mapHead"), "map");
+  // The block card folds to its summary line, but only when a route is drawn
+  // under it (has-route): without one it is a single line already.
+  foldable($("blockCard"), $("blockSummary"), "block");
 
   // ---------- projection: same Natural Earth polynomial as tools/genmap ----------
   function nePoly(lon, lat) {
@@ -287,6 +293,7 @@
     const more = $("blockMore");
     const line = stops ? $("blockSummary") : $("blockMoreLabel");
     $("blockSummary").hidden = !stops;
+    card.classList.toggle("has-route", Boolean(stops));
     $("blockRoute").hidden = !stops;
     more.classList.toggle("minor", Boolean(stops));
     fillSummary(line, b);
@@ -979,17 +986,28 @@
   // itself (scroll anchoring); Safari does not, and the page jumped up and
   // down there on its own. The anchor is the topmost table row
   // on screen, else the topmost card.
+  // A row is held by its place in its group's table, never by the peer in it
+  // (28.10.2026, the same in Bitcoin Lab): sorted by ping or anything else,
+  // a page that followed one peer up or down the list jumped under a reader
+  // who was only looking. When a peer moves, another one stands in its
+  // place; the list does not move.
+  const anchorRows = (card) => [...card.querySelectorAll("tr[data-anchor]")];
   function readAnchor() {
     if (window.scrollY < 1) return null;
     const onScreen = (e) => { const r = e.getBoundingClientRect(); return r.height && r.bottom > 0 && r.top < innerHeight; };
     const e = [...document.querySelectorAll("#tables tr[data-anchor]")].find(onScreen)
       || [...document.querySelectorAll("main .card[id]")].find(onScreen);
     if (!e) return null;
-    return { sel: e.dataset.anchor ? `tr[data-anchor="${CSS.escape(e.dataset.anchor)}"]` : "#" + CSS.escape(e.id), top: e.getBoundingClientRect().top };
+    const card = e.closest(".card[id]");
+    const i = e.dataset.anchor ? anchorRows(card).indexOf(e) : -1;
+    return { card: card.id, i, top: e.getBoundingClientRect().top };
   }
   function holdAnchor(a) {
     if (!a) return;
-    const e = document.querySelector(a.sel);
+    const card = document.getElementById(a.card);
+    // A table that got shorter than the place: its last row stands nearest.
+    const rows = card && a.i >= 0 ? anchorRows(card) : [];
+    const e = card && (a.i < 0 ? card : rows[Math.min(a.i, rows.length - 1)]);
     if (!e || !e.getBoundingClientRect().height) return;
     const d = e.getBoundingClientRect().top - a.top;
     if (Math.abs(d) >= 1) window.scrollBy(0, d);
@@ -2354,10 +2372,10 @@
         if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
         const b = document.createElement("button");
         b.textContent = c.label;
-        b.addEventListener("click", () => {
+        b.addEventListener("click", () => steady(b, () => {
           state.sort[g] = { key: c.key, dir: c.key === col.key ? -s.dir : 1 };
           renderTables();
-        });
+        }));
         th.appendChild(b);
         hr.appendChild(th);
       }
