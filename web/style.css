@@ -635,3 +635,22 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .jump-bar.corner { left: auto; right: 16px; top: auto; bottom: 16px; transform: translateY(80px); }
 .jump-bar.corner.shown { transform: none; }
 @media (prefers-reduced-motion: reduce) { .jump-bar.corner { transition: none; } }
+
+/* Before the first answer, grey rows stand where the peers will be: the page
+   does not grow by a screen at once when they arrive, and it reads as
+   loading rather than as empty. */
+.skeleton-card .group-head h2 { color: var(--muted); }
+.sk-row { padding: 14px 20px; border-top: 1px solid var(--border); }
+.sk-row i { display: block; height: 10px; border-radius: 5px; background: var(--border); opacity: .55; animation: skeleton 1.4s ease-in-out infinite; }
+.sk-row i + i { width: 55%; margin-top: 8px; }
+.skeleton-card .sk-row:first-of-type { margin-top: 12px; }
+@keyframes skeleton { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .sk-row i { animation: none; } }
+
+/* The dot in front of the status line: beats on fresh numbers, grey while
+   paused or when the backend did not answer. */
+.live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #3fb950; vertical-align: 1px; }
+.live-dot.stale { background: var(--muted); }
+.live-dot.beat { animation: beat .9s ease-out; }
+@keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, .7); } 100% { box-shadow: 0 0 0 7px rgba(63, 185, 80, 0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot.beat { animation: none; } }
