@@ -351,9 +351,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 table.peers.measure { width: auto; }
 table.peers.aligned { table-layout: fixed; }
 .peers.aligned td { overflow: hidden; text-overflow: ellipsis; }
-/* Laid out, the kind's line may use the whole column (alignColumns gives it
-   the card's spare width); measured, it keeps its cap, so one long name does
-   not cost every table a column. */
+/* Laid out, the kind's line may use the whole column; measured, it keeps
+   its cap, so one long line does not cost every table a column. */
 .peers.aligned small.ua { max-width: none; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
