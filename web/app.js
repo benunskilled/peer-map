@@ -1108,7 +1108,8 @@
     el.textContent = `${d.peers.length} peers: ${nodes} nodes, ${disguised} disguised, ${others} others`;
     liveDot.classList.toggle("stale", state.paused || state.failed);
     el.prepend(liveDot);
-    el.append(` · updated ${since} · ${mode}`);
+    // The dot says it is live; when and how often only on hover.
+    el.title = `Updated ${since} · ${mode}`;
   }
 
   // ---------- map ----------
