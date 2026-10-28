@@ -1707,9 +1707,8 @@
   // ---------- tables ----------
 
   // The kind is what the peer calls itself, the flags are what Core observed.
-  // They are shown in one cell on purpose: a peer claiming to be Bitcoin Core
-  // while offering nothing and having no known chain is only obvious when the
-  // claim and the observation sit next to each other.
+  // A claim that does not fit what was observed shows as the reason under the
+  // pill (p.tell); the flags themselves are in the panel.
   // A node catching up from this one: a turning arrow, the word and what it
   // has taken. Always first in the grey line under the place.
   // What "no headers" means, on hover: Core never got a block header from the peer.
@@ -1734,17 +1733,6 @@
     return s;
   }
 
-  function kindLabel(p) {
-    const flags = [];
-    if (p.sync_mb) flags.push("syncing");
-    if (p.no_services) flags.push("no services");
-    if (p.no_tx_relay) flags.push("no tx");
-    // A node that is syncing has sent no headers yet: nothing odd, "syncing" says it.
-    if (p.chain_unknown && !p.sync_mb) flags.push("no headers");
-    if (p.fork) flags.push(p.fork);
-    if (isPruned(p)) flags.push("pruned");
-    return flags.length ? p.kind + " \u00b7 " + flags.join(", ") : p.kind;
-  }
 
   // The mix under a heading counts what is in the table - and each count is
   // the way to those peers. Clicking "5 Pool node" shows exactly those five,
@@ -1954,9 +1942,8 @@
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // The pill says the kind and nothing else, for every peer: what Core
-        // saw (no services, no tx, no headers) goes to the line under it.
+        // saw (no services, no tx, no headers) is in the panel.
         // One layout in every row, and the pill is never cut.
-        const flags = kindLabel(p).slice(p.kind.length).replace(/^ \u00b7 /, "");
         const never = p.no_relay ? " \u00b7 never first" : "";
         const label = (p.linking_lion ? "LinkingLion" : p.kind) + never;
         if (p.no_relay) {
@@ -1976,53 +1963,55 @@
         }
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         td.appendChild(pill);
-        // What Core saw, in grey, under the pill - on a wide screen only. A
-        // phone card is the place, the address and the pill and nothing more,
-        // the same height for every peer; the rest is in the panel (style.css).
-        // The name the peer sends is in the panel on every screen: it made one
-        // row longer than the next (28.10.2026). The user's own apps on this
-        // Umbrel need no flags: nothing about them is a surprise.
-        const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
-        const under = [seen, p.pool].filter(Boolean).join(" \u00b7 ");
+        // The grey line under the pill, on a wide screen only, is for what
+        // the pill cannot say: why a peer is Disguised, or what an unknown or
+        // nameless one does (p.tell); which pool a pool node is; that a node
+        // is syncing from this one, keeps only recent blocks or enforces rules
+        // of its own (fork) - its own settings, whoever is faster. What else Core saw (no tx, no headers)
+        // is normal for many peers and only in the panel, with why
+        // (28.10.2026: one line for the reason, not a list of flags). A phone
+        // card is the place, the address and the pill and nothing more.
         const probably = p.about ? p.about.split("\n").find((l) => l.startsWith("Probably:")) : "";
-        // A disguised peer says instead why, in a few words: one reason, the
-        // first one, the same as the panel's; the others are there under
-        // "Also". With a kind filter on, the sentence below says it already.
-        if (p.tell && !(state.kind && p.about)) {
+        // With a kind filter on, the sentence below says the reason already.
+        const tell = p.tell && !(state.kind && p.about) ? p.tell : "";
+        const syncing = !!p.sync_mb;
+        const pruned = isPruned(p);
+        if (tell || p.pool || syncing || pruned || p.fork) {
           const e = line("sub ua", "");
-          const s = document.createElement("span");
-          s.className = "no-tx";
-          s.textContent = p.tell;
-          if (probably) s.title = probably.slice("Probably: ".length);
-          e.append(s);
-          td.appendChild(fit(e, p.tell));
-        } else if (under) {
-          const e = line("sub ua", "");
-          // "no tx" says on hover why, where Core's messages tell it.
-          const parts = (seen ? seen.split(", ") : []).filter((f) => f !== "syncing");
-          parts.forEach((f, i) => {
-            if (i) e.append(", ");
-            // The same for other rules the peer says it enforces.
-            const why = f === "no tx" ? p.no_tx_why : f === p.fork ? p.fork_why : f === "no headers" ? NO_HEADERS_WHY : f === "pruned" ? PRUNED_WHY : "";
-            if (why) {
-              const s = document.createElement("span");
-              s.className = f === "no tx" || f === "no headers" || f === "pruned" ? "no-tx" : "no-tx fork";
-              s.textContent = f;
-              s.title = why;
-              e.append(s);
-            } else e.append(f);
-          });
-          if (parts.length && p.pool) e.append(" \u00b7 ");
+          if (syncing) e.append(syncSpan(p));
+          if (tell) {
+            const s = document.createElement("span");
+            s.className = "no-tx";
+            s.textContent = tell;
+            if (probably) s.title = probably.slice("Probably: ".length);
+            if (e.firstChild) e.append(" \u00b7 ");
+            e.append(s);
+          }
+          if (p.fork) {
+            const s = document.createElement("span");
+            s.className = "no-tx fork";
+            s.textContent = p.fork;
+            if (p.fork_why) s.title = p.fork_why;
+            if (e.firstChild) e.append(" \u00b7 ");
+            e.append(s);
+          }
+          if (pruned) {
+            const s = document.createElement("span");
+            s.className = "no-tx";
+            s.textContent = "pruned";
+            s.title = PRUNED_WHY;
+            if (e.firstChild) e.append(" \u00b7 ");
+            e.append(s);
+          }
           // Whose pool it is, where an address proved it or the agent names it.
           if (p.pool) {
             const pool = document.createElement("span");
             pool.className = "pool-name";
             pool.textContent = p.pool;
+            if (e.firstChild) e.append(" \u00b7 ");
             e.append(pool);
           }
-          // Always first in the line.
-          if (seen.includes("syncing")) e.prepend(syncSpan(p), e.firstChild ? " \u00b7 " : "");
-          td.appendChild(fit(e, under));
+          td.appendChild(fit(e, e.textContent));
         }
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then.

@@ -40,11 +40,12 @@ func TestShortReasons(t *testing.T) {
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + skippedHandshakeAbout(map[string]int64{"sendaddrv2": 1}), "no wtxidrelay"},
 		{"Claims: Bitcoin Core 28.1.0\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services"},
 		{"Claims: Bitcoin Core 31.1.0\nProbably: " + anachronism("/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS"}), "no NETWORK_LIMITED"},
-		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015), "protocol 70015 does not fit"},
+		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015), "protocol 70015 for Core 25.1.0"},
 		{"Claims: x\nProbably: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18×"},
 		{"Claims: x\nProbably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s"},
 		{"Claims: x\nProbably: " + bitcoinjTooNewAbout, "newer protocol than the wallet"},
-		{"Claims: x\nProbably: " + anachronism("/Satoshi:0.15.0/Knots:20170914/", []string{"NETWORK", "P2P_V2"}), "offers v2 its version lacked"},
+		{"Claims: x\nProbably: " + anachronism("/Satoshi:0.15.0/Knots:20170914/", []string{"NETWORK", "P2P_V2"}), "v2 for Core 0.15"},
+		{fakeAbout("/Satoshi:0.11.0/", "", nil) + "\nAlso: " + protocolMismatch("/Satoshi:0.11.0/", 70016), "protocol 70016 for Core 0.11.0"},
 		{fakeAbout("/Sat0shi:25.0.0/", "", nil), "misspelt name"},
 		{fakeAbout("Satoshi:25.0.0", "", nil), "misspelt name"},
 		{fakeAbout("/Satoshi9:25.0.0/", "", nil), "misspelt name"},
@@ -70,12 +71,24 @@ func TestEveryBehaviourHasATell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	quiet := map[string]bool{"Software with a name we don't recognise": true, "software that keeps quiet about what it is": true}
+	// No short form where nothing was seen, and where real nodes do the
+	// same (see otherAbout): there the line keeps what Core saw.
+	// The sentences with two readings are built from parts and not read
+	// here; TestBlockFollowerHasNoTell and TestTwoReadings cover them.
+	quiet := map[string]bool{
+		"Software with a name we don't recognise":                           true,
+		"Introduced itself without a name; nothing it did tells what it is": true,
+		"Asks for headers and addresses and wants no transactions: ":        true,
+		"Asks for headers and wants no transactions: ":                      true,
+		"Fetches transactions from your node and announces none: ":          true,
+		"Asks for addresses, not for headers or blocks: ":                   true,
+		"Asks for addresses, not for headers or blocks":                     true,
+	}
 	n := 0
 	for _, fn := range []string{"func otherAbout(", "func noAgentAbout("} {
 		body := string(src[strings.Index(string(src), fn):])
 		body = body[:strings.Index(body, "\n}\n")]
-		for _, m := range regexp.MustCompile(`return (?:lead \+ )?"([^"]+)"`).FindAllStringSubmatch(body, -1) {
+		for _, m := range regexp.MustCompile(`return "([^"]+)"`).FindAllStringSubmatch(body, -1) {
 			n++
 			got := behaviourTell(m[1])
 			if quiet[m[1]] != (got == "") {
@@ -88,23 +101,36 @@ func TestEveryBehaviourHasATell(t *testing.T) {
 	}
 }
 
-func TestBlockFollowerOnlyWhenNothingElse(t *testing.T) {
+// Headers and no transactions is what a real node's block-only connection
+// does too: the list says nothing about it, the panel gives both readings.
+func TestBlockFollowerHasNoTell(t *testing.T) {
 	no := false
-	for _, c := range []struct {
-		recv map[string]int64
-		want string
-	}{
-		{map[string]int64{"getheaders": 1}, "only follows new blocks"},
-		{map[string]int64{"getheaders": 1, "getaddr": 1}, "follows new blocks"},
-		{map[string]int64{"sendheaders": 1}, "only follows new blocks"},
-		{map[string]int64{"sendheaders": 1, "getaddr": 1}, "follows new blocks"},
-	} {
-		about := otherAbout(nil, &no, c.recv, map[string]int64{}, time.Now().Unix()-60, time.Now())
-		if got := behaviourTell(about); got != c.want {
-			t.Errorf("%v: %q tells %q, want %q", c.recv, about, got, c.want)
+	for _, recv := range []map[string]int64{{"getheaders": 1}, {"getheaders": 1, "getaddr": 1}, {"sendheaders": 1}} {
+		about := otherAbout(nil, &no, recv, map[string]int64{}, time.Now().Unix()-60, time.Now())
+		if got := behaviourTell(about); got != "" {
+			t.Errorf("%v: %q tells %q", recv, about, got)
 		}
 	}
-	if got := behaviourTell(noAgentAbout(map[string]int64{"getheaders": 1, "getaddr": 1}, 0, time.Now())); got != "acts like a node" {
+	if got := behaviourTell(noAgentAbout(map[string]int64{"getheaders": 1, "getaddr": 1}, 0, time.Now())); got != "headers + addresses" {
 		t.Errorf("a nameless node tells %q", got)
+	}
+	if got := behaviourTell(noAgentAbout(map[string]int64{"getheaders": 1, "sendcmpct": 1}, 0, time.Now())); got != "headers + compact blocks" {
+		t.Errorf("a nameless node with compact blocks tells %q", got)
+	}
+}
+
+// A peer offering no service cannot be the node reading: a real node always
+// offers one.
+func TestTwoReadings(t *testing.T) {
+	no := false
+	recv := map[string]int64{"getheaders": 1}
+	if got := otherAbout([]string{"WITNESS"}, &no, recv, nil, time.Now().Unix()-60, time.Now()); got != "Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain" {
+		t.Errorf("with services: %q", got)
+	}
+	if got := otherAbout([]string{}, &no, recv, nil, time.Now().Unix()-60, time.Now()); got != "Asks for headers and wants no transactions: a program that tracks the chain" {
+		t.Errorf("without services: %q", got)
+	}
+	if got := otherAbout([]string{}, &no, map[string]int64{"getaddr": 2}, nil, time.Now().Unix()-60, time.Now()); got != "Asks for addresses, not for headers or blocks: a crawler" {
+		t.Errorf("addresses without services: %q", got)
 	}
 }
