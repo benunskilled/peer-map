@@ -2477,7 +2477,7 @@
     return { tables, widths };
   }
   // For the question whether columns must go, Kind counts as wide as an
-  // ordinary entry needs (a pill and /Satoshi:31.1.0/): one long text
+  // ordinary entry needs (a pill and a line of what Core saw): one long text
   // among two hundred peers took Operator, Net, Ping and Connected away from
   // all three tables and left Outbound and Manual mostly empty. A longer
   // text is cut and shown whole on hover.
@@ -2488,19 +2488,30 @@
     for (const [k, v] of widths) sum += k === "k-kind" ? Math.min(v, KIND_MIN) : v;
     return tables.some((t) => sum > t.parentElement.clientWidth + 1);
   }
-  // Kind takes whatever the card has left over, so its text is cut only when
-  // there is truly no room.
+  // Kind gets what it needs - cut, and whole on hover, only when there is
+  // truly no room - and what the card has left over is shared by every
+  // column in proportion to its width. Kind used to take all of it, which was
+  // right while it carried the peer's own name; without that it stood half
+  // empty across a wide screen (28.10.2026).
   function alignColumns(wraps) {
     const { tables, widths } = sharedWidths(wraps);
     let others = 0;
     for (const [k, v] of widths) if (k !== "k-kind") others += Math.ceil(v);
     for (const t of tables) {
       const spare = t.parentElement.clientWidth - others;
-      for (const th of t.tHead.rows[0].cells) {
+      const kind = Math.max(KIND_MIN, Math.min(spare, Math.ceil(widths.get("k-kind") || 0)));
+      const total = others + kind;
+      const grow = spare > kind ? (t.parentElement.clientWidth) / total : 1;
+      let used = 0;
+      const cells = [...t.tHead.rows[0].cells];
+      cells.forEach((th, i) => {
         const k = colKey(th);
-        const w = k === "k-kind" ? Math.max(KIND_MIN, spare) : Math.ceil(widths.get(k));
+        const base = k === "k-kind" ? (spare > kind ? kind : Math.max(KIND_MIN, spare)) : Math.ceil(widths.get(k));
+        // The last column takes the rounding, so the row ends at the card's edge.
+        const w = i === cells.length - 1 && grow > 1 ? t.parentElement.clientWidth - used : Math.floor(base * grow);
+        used += w;
         th.style.width = w + "px";
-      }
+      });
       t.classList.add("aligned");
     }
   }
