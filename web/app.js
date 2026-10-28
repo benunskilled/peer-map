@@ -848,7 +848,26 @@
   let heldSince = 0;
   let renderPending = false;
   const HOLD_MAX_MS = 30000;
+  // Also while a finger is on the glass or the page still glides: the rows
+  // the reader was following moved under it, and the scroll correction that
+  // keeps their place cut Safari's glide short with a jolt (iPhone,
+  // 28.10.2026). The refresh comes once the page has been still for half a
+  // second.
+  let touching = 0;
+  let scrolledAt = 0;
+  let settleTimer = 0;
+  const moving = () => (touching && Date.now() - touching < 15000) || Date.now() - scrolledAt < 500;
+  const settle = () => {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => (moving() ? settle() : freed()), 520);
+  };
+  window.addEventListener("touchstart", () => { touching = Date.now(); }, { passive: true, capture: true });
+  for (const t of ["touchend", "touchcancel"]) {
+    window.addEventListener(t, () => { touching = 0; settle(); }, { passive: true, capture: true });
+  }
+  window.addEventListener("scroll", () => { scrolledAt = Date.now(); settle(); }, { passive: true });
   function busy() {
+    if (moving()) return true;
     const sel = window.getSelection && window.getSelection();
     if (sel && !sel.isCollapsed) return true;
     if (pressedAt && Date.now() - pressedAt < 2000) return true;
