@@ -1948,13 +1948,15 @@
         }
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         td.appendChild(pill);
-        // What Core saw stays grey; the name the peer sends is bright, it is
-        // what tells one "Other" from the next. The user's own apps on this
+        // What Core saw, in grey, under the pill - on a wide screen only. A
+        // phone card is the place, the address and the pill and nothing more,
+        // the same height for every peer; the rest is in the panel (style.css).
+        // The name the peer sends is in the panel on every screen: it made one
+        // row longer than the next (28.10.2026). The user's own apps on this
         // Umbrel need no flags: nothing about them is a surprise.
-        // Syncing is the one thing that stays: the count above the list includes them.
         const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
-        const under = [seen, p.pool, p.subver].filter(Boolean).join(" \u00b7 ");
-        if (under || never || p.tor_exit) {
+        const under = [seen, p.pool].filter(Boolean).join(" \u00b7 ");
+        if (under) {
           const e = line("sub ua", "");
           // "no tx" says on hover why, where Core's messages tell it.
           const parts = (seen ? seen.split(", ") : []).filter((f) => f !== "syncing");
@@ -1970,34 +1972,13 @@
               e.append(s);
             } else e.append(f);
           });
-          if (parts.length && (p.subver || p.pool)) e.append(" \u00b7 ");
+          if (parts.length && p.pool) e.append(" \u00b7 ");
           // Whose pool it is, where an address proved it or the agent names it.
           if (p.pool) {
             const pool = document.createElement("span");
             pool.className = "pool-name";
             pool.textContent = p.pool;
-            e.append(pool, p.subver ? " \u00b7 " : "");
-          }
-          if (never) {
-            const n = document.createElement("span");
-            n.className = "never-sub";
-            n.textContent = "never first" + (under ? " \u00b7 " : "");
-            e.prepend(n);
-          }
-          // A phone card has no operator column, where "Tor exit" stands on a
-          // wide screen: it leads this line there instead.
-          if (p.tor_exit) {
-            const t = document.createElement("span");
-            t.className = "tor-sub tor-exit";
-            t.textContent = "Tor exit" + (under || never ? " \u00b7 " : "");
-            t.title = TOR_EXIT_TITLE;
-            e.prepend(t);
-          }
-          if (p.subver) {
-            const name = document.createElement("span");
-            name.className = "ua-name";
-            name.textContent = p.subver;
-            e.append(name);
+            e.append(pool);
           }
           // Always first in the line.
           if (seen.includes("syncing")) e.prepend(syncSpan(p), e.firstChild ? " \u00b7 " : "");
