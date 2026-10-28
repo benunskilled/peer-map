@@ -74,6 +74,31 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
   };
 
+  // Every card folds to its title on a tap, and stays folded on this device:
+  // open unless the reader closed it (28.10.2026).
+  const FOLD_KEY = "peermap.folded";
+  const folded = new Set((() => { try { return JSON.parse(store.get(FOLD_KEY)) || []; } catch { return []; } })());
+  function foldable(card, title, id) {
+    title.classList.add("fold-title");
+    title.tabIndex = 0;
+    title.setAttribute("role", "button");
+    const show = () => {
+      card.classList.toggle("folded", folded.has(id));
+      title.setAttribute("aria-expanded", String(!folded.has(id)));
+    };
+    const flip = (e) => {
+      if (e.target.closest("button, a")) return;
+      if (folded.has(id)) folded.delete(id); else folded.add(id);
+      store.set(FOLD_KEY, JSON.stringify([...folded]));
+      show();
+      if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
+    };
+    title.addEventListener("click", flip);
+    title.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(e); } });
+    show();
+  }
+  foldable($("mapCard"), $("mapHead"), "map");
+
   // ---------- projection: same Natural Earth polynomial as tools/genmap ----------
   function nePoly(lon, lat) {
     const l = lon * Math.PI / 180, p = lat * Math.PI / 180;
@@ -2203,6 +2228,23 @@
     }
   }
 
+  // Back to the top ten. Closing takes away most of the page under the
+  // reader; bring the card back into view if it went off the top.
+  function topOnly() {
+    state.showAllInbound = false;
+    renderTables();
+    const c = $("group-inbound");
+    if (c && c.getBoundingClientRect().top < 0) c.scrollIntoView({ block: "start", behavior: glide() });
+  }
+  function stickOn() {
+    const stick = document.querySelector("#tables .stick");
+    if (!stick) return;
+    const card = stick.parentElement;
+    stick.classList.toggle("on", card.querySelector(".group-head").getBoundingClientRect().bottom < 0
+      && card.getBoundingClientRect().bottom > 140);
+  }
+  window.addEventListener("scroll", stickOn, { passive: true });
+
   function renderTables() {
     // A row reached with the arrow keys keeps the focus through a redraw.
     const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.anchor;
@@ -2229,6 +2271,7 @@
       const sw = document.createElement("span");
       sw.className = "swatch s-" + g;
       h.append(sw, LABEL[g]);
+      foldable(card, h, "group-" + g);
       // The count and the mix of kinds as chips beside the name. Counted
       // before this group's own kind filter, so a group the filter emptied
       // still offers the way back - and switching kinds is one click.
@@ -2386,20 +2429,37 @@
         more.className = "more";
         more.textContent = state.showAllInbound ? `Show top ${INBOUND_LIMIT} only` : `Show all ${peers.length}`;
         more.addEventListener("click", () => {
-          const collapsing = state.showAllInbound;
-          state.showAllInbound = !state.showAllInbound;
+          if (state.showAllInbound) return topOnly();
+          state.showAllInbound = true;
           renderTables();
-          // Collapsing takes away most of the page under the reader; bring
-          // the card back into view if it went off the top.
-          const c = $("group-inbound");
-          if (collapsing && c && c.getBoundingClientRect().top < 0) c.scrollIntoView({ block: "start", behavior: glide() });
         });
         card.appendChild(more);
+        // The whole list open: its name and the way back to the top ten ride
+        // along at the top of the screen once the head has scrolled away, so
+        // nobody has to scroll to the end to close it.
+        if (state.showAllInbound) {
+          const stick = document.createElement("div");
+          stick.className = "stick";
+          const bar = document.createElement("div");
+          const name = document.createElement("span");
+          const ssw = document.createElement("span");
+          ssw.className = "swatch s-" + g;
+          name.append(ssw, `${LABEL[g]} · ${peers.length}`);
+          const back = document.createElement("button");
+          back.type = "button";
+          back.className = "btn";
+          back.textContent = `Top ${INBOUND_LIMIT}`;
+          back.addEventListener("click", topOnly);
+          bar.append(name, back);
+          stick.appendChild(bar);
+          summary.after(stick);
+        }
       }
       root.appendChild(card);
     }
     for (const row of root.querySelectorAll(".one-line")) fitOneLine(row);
     fitTables();
+    stickOn();
     if (focused) {
       const back = root.querySelector(`tr[data-anchor="${CSS.escape(focused)}"]`);
       if (back) back.focus({ preventScroll: true });
