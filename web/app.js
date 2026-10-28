@@ -2149,13 +2149,14 @@
     if (!what.querySelector("p") || onlyContext) {
       if (p.kind.startsWith("Node")) {
         // A node with nothing to explain: say what is good about it, from what it did.
+        // Not its services: they stand under Announced, and NETWORK_LIMITED in a
+        // sentence read as pruned. Not "honest" either: nothing odd is all we know.
         const good = ["says what it is"];
-        if (p.services && p.services.length) good.push("offers " + andList(p.services));
         if (!p.no_tx_relay) good.push("relays transactions");
         if (!p.chain_unknown) good.push("shares its block headers");
         // Ten minutes is what the behaviour rules need before they speak: sooner, only "so far".
         const settled = p.conntime && Date.now() / 1000 - p.conntime >= 600;
-        what.insertBefore(el("p", "pd-about", (settled ? "An honest node: it " : "Nothing odd so far: it ") + andList(good) + "."), what.querySelector("p"));
+        what.insertBefore(el("p", "pd-about", (settled ? "Nothing odd: it " : "Nothing odd so far: it ") + andList(good) + "."), what.querySelector("p"));
       } else if (!what.querySelector("p")) {
         // Nothing to say about the others either: no block rather than a made-up one.
         what.remove();
