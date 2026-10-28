@@ -1062,6 +1062,8 @@
   // wallets, crawlers, indexers, unknown - are "others", so the three add up.
   // Named once, in the tooltip and the Disguised explanation, not on every card.
   const LION_CREDIT = "Tracked by 0xB10C, b10c.me";
+  // Until Bitcoin Lab is in Umbrel's own store, its page is the repository.
+  const LAB_PAGE = "https://github.com/benunskilled/bitcoin-lab";
   const isNode = (p) => p.kind.startsWith("Node (") || p.kind === "Pool node";
   // A dot in front of the status line beats once when fresh peers arrive.
   const liveDot = document.createElement("span");
@@ -1942,25 +1944,20 @@
         // software stays in the line under it.
         pill.className = "kind " + (p.linking_lion ? "lion" : p.kind === "Disguised" ? "disg" : p.no_relay ? "never" : "first");
         // The pill says the kind and nothing else, for every peer: what Core
-        // saw (no services, no tx, no headers) is in the panel.
+        // saw (no services, no tx, no headers) is in the panel. Software that
+        // passes no blocks on gets the ⊘ and a muted row; "never first" is
+        // said on hover and in the panel (28.10.2026: beside "offers no
+        // services" it said the same twice, and without Bitcoin Lab next door
+        // nothing in the map says what "first" is).
         // One layout in every row, and the pill is never cut.
-        const never = p.no_relay ? " \u00b7 never first" : "";
-        const label = (p.linking_lion ? "LinkingLion" : p.kind) + never;
+        const label = p.linking_lion ? "LinkingLion" : p.kind;
         if (p.no_relay) {
           const ico = document.createElement("span");
           ico.className = "ico";
           ico.textContent = "⊘";
           pill.append(ico, " ");
         }
-        // On a phone card the pill sits beside the place and stays short:
-        // "never first" moves to the line under it there (style.css).
-        pill.append(p.linking_lion ? "LinkingLion" : p.kind);
-        if (never) {
-          const n = document.createElement("span");
-          n.className = "never-txt";
-          n.textContent = never;
-          pill.append(n);
-        }
+        pill.append(label);
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         td.appendChild(pill);
         // The grey line under the pill, on a wide screen only, is for what
@@ -2114,6 +2111,17 @@
     for (const [word, why, cls] of flags) {
       const row = el("p", "pd-flag-row");
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
+      // Without Bitcoin Lab next door nothing in the map says what "first"
+      // is: where someone wonders, one line says where to find out.
+      if (word === "never first" && !state.data.sibling) {
+        const more = el("span", "pd-more", "Which of your peers bring you new blocks first: ");
+        const a = el("a", "", "Bitcoin Lab \u2197");
+        a.href = LAB_PAGE;
+        a.target = "_blank";
+        a.rel = "noopener";
+        more.appendChild(a);
+        row.appendChild(more);
+      }
       what.appendChild(row);
     }
     // Pruned, the fee filter and the Umbrel app only add context; they do not
