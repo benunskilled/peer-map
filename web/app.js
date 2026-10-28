@@ -1984,7 +1984,19 @@
         // Umbrel need no flags: nothing about them is a surprise.
         const seen = p.app ? (p.sync_mb ? "syncing" : "") : flags;
         const under = [seen, p.pool].filter(Boolean).join(" \u00b7 ");
-        if (under) {
+        const probably = p.about ? p.about.split("\n").find((l) => l.startsWith("Probably:")) : "";
+        // A disguised peer says instead why, in a few words: one reason, the
+        // first one, the same as the panel's; the others are there under
+        // "Also". With a kind filter on, the sentence below says it already.
+        if (p.tell && !(state.kind && p.about)) {
+          const e = line("sub ua", "");
+          const s = document.createElement("span");
+          s.className = "no-tx";
+          s.textContent = p.tell;
+          if (probably) s.title = probably.slice("Probably: ".length);
+          e.append(s);
+          td.appendChild(fit(e, p.tell));
+        } else if (under) {
           const e = line("sub ua", "");
           // "no tx" says on hover why, where Core's messages tell it.
           const parts = (seen ? seen.split(", ") : []).filter((f) => f !== "syncing");
@@ -2019,7 +2031,6 @@
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
           // and everything, the claim too, is in the panel that opens on a tap.
-          const probably = p.about.split("\n").find((l) => l.startsWith("Probably:"));
           about.textContent = probably || p.about;
           about.classList.add(probably ? "short" : "clip");
           td.appendChild(about);

@@ -532,6 +532,12 @@ var serviceSince = []struct {
 	{"WITNESS", "SegWit", 0, 13},
 }
 
+// Each of those in a word, for the line under the pill (tellOf).
+var serviceShort = map[string]string{
+	"encrypted v2 connections": "v2", "compact block filters": "block filters",
+	"the pruned-node service": "pruning", "SegWit": "SegWit",
+}
+
 var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
 
 // The Bitcore library by name: /bitcore:1.1.0/, nothing after it.
@@ -1162,6 +1168,99 @@ func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now ti
 		out = append(out, skippedHandshakeAbout(r.BytesRecvPerMsg))
 	}
 	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
+}
+
+// tellOf is a disguised peer's first reason in a few words, for the line
+// under its pill (28.10.2026: the pill said Disguised, and only the opened
+// row said why). It reads the reasons this file writes, so each of them has
+// a short form here; TestEveryDisguiseHasATell keeps the two together.
+// LinkingLion's own reason is the pill itself, so its first other evidence
+// is told, or that the address is a listed one.
+func tellOf(about string, lion bool) string {
+	lines := strings.Split(about, "\n")
+	var reasons []string
+	for _, l := range lines {
+		if r, ok := strings.CutPrefix(l, "Probably: "); ok && !(lion && strings.HasPrefix(r, "LinkingLion")) {
+			reasons = append(reasons, r)
+		} else if r, ok := strings.CutPrefix(l, "Also: "); ok {
+			reasons = append(reasons, r)
+		}
+	}
+	for _, r := range reasons {
+		if t := shortReason(r); t != "" {
+			return t
+		}
+	}
+	if lion {
+		return "listed address range"
+	}
+	return ""
+}
+
+var (
+	tellAddrs    = regexp.MustCompile(`asked for addresses (\d+) times`)
+	tellPings    = regexp.MustCompile(`pings every (\d+) second`)
+	tellProtocol = regexp.MustCompile(`speaks protocol (\d+)`)
+	tellLacked   = regexp.MustCompile(`it offers (.+), which Core [0-9.]+ did not have`)
+)
+
+func shortReason(r string) string {
+	if m := tellAddrs.FindStringSubmatch(r); m != nil {
+		return "asks for addresses " + m[1] + "\u00d7"
+	}
+	if m := tellPings.FindStringSubmatch(r); m != nil {
+		return "pings every " + m[1] + " s"
+	}
+	if m := tellLacked.FindStringSubmatch(r); m != nil && serviceShort[m[1]] != "" {
+		return "offers " + serviceShort[m[1]] + " its version lacked"
+	}
+	if m := tellProtocol.FindStringSubmatch(r); m != nil {
+		return "protocol " + m[1] + " does not fit"
+	}
+	for _, t := range []struct{ in, tell string }{
+		{"left out wtxidrelay", "no wtxidrelay"},
+		{"offers no services", "offers no services"},
+		{"lacks NETWORK_LIMITED", "no NETWORK_LIMITED"},
+		{"asked for nothing", "asks for nothing"},
+		{"newer protocol than this wallet", "newer protocol than the wallet"},
+		{"offers blocks, which no wallet does", "offers blocks"},
+		{"speaks v2, which no wallet", "offers v2"},
+		{"v2 connections, which that software never had", "offers v2"},
+		{"which the Bitcore library never does", "offers more than Bitcore"},
+		{"Sat0shi with a zero", "misspelt name"},
+		{"Core calls itself /Satoshi:", "misspelt name"},
+		{"Core writes its name between slashes", "misspelt name"},
+		{"poses as Libre Relay", "poses as Libre Relay"},
+	} {
+		if strings.Contains(r, t.in) {
+			return t.tell
+		}
+	}
+	return ""
+}
+
+// behaviourTell is, for a peer whose name says nothing (Other, No user
+// agent), what otherAbout and noAgentAbout saw it do, in a few words for the
+// line under its pill; "" where they saw nothing telling, and the line keeps
+// what Core saw. TestEveryBehaviourHasATell reads those two functions.
+func behaviourTell(about string) string {
+	for _, t := range []struct{ in, tell string }{
+		{"only listens", "only listens"},
+		{"a full node under a name its operator chose", "acts like a full node"},
+		{"asks for our mempool", "asks for our mempool"},
+		{"pushes transactions", "pushes transactions"},
+		{"follows new blocks", "only follows new blocks"},
+		{"listens to transactions", "collects transactions"},
+		{"collects addresses", "collects addresses"},
+		{"asks for headers like a full node", "asks for headers"},
+		{"asks for addresses and nothing else", "asks only for addresses"},
+		{"asked for nothing", "asks for nothing"},
+	} {
+		if strings.Contains(about, t.in) {
+			return t.tell
+		}
+	}
+	return ""
 }
 
 // withAlso adds each reason the about does not give yet as an "Also:" line,
