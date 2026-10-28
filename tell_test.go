@@ -87,3 +87,24 @@ func TestEveryBehaviourHasATell(t *testing.T) {
 		t.Fatalf("found only %d sentences - did the functions move?", n)
 	}
 }
+
+func TestBlockFollowerOnlyWhenNothingElse(t *testing.T) {
+	no := false
+	for _, c := range []struct {
+		recv map[string]int64
+		want string
+	}{
+		{map[string]int64{"getheaders": 1}, "only follows new blocks"},
+		{map[string]int64{"getheaders": 1, "getaddr": 1}, "follows new blocks"},
+		{map[string]int64{"sendheaders": 1}, "only follows new blocks"},
+		{map[string]int64{"sendheaders": 1, "getaddr": 1}, "follows new blocks"},
+	} {
+		about := otherAbout(nil, &no, c.recv, map[string]int64{}, time.Now().Unix()-60, time.Now())
+		if got := behaviourTell(about); got != c.want {
+			t.Errorf("%v: %q tells %q, want %q", c.recv, about, got, c.want)
+		}
+	}
+	if got := behaviourTell(noAgentAbout(map[string]int64{"getheaders": 1, "getaddr": 1}, 0, time.Now())); got != "acts like a node" {
+		t.Errorf("a nameless node tells %q", got)
+	}
+}

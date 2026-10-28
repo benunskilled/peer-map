@@ -958,8 +958,14 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 		return "Unknown software that asks for our mempool"
 	case recv["tx"] > 0 && recv["inv"] == 0:
 		return "Unknown software that pushes transactions without announcing them"
+	// A block follower that also asks for addresses says so: the list calls
+	// only the one that wants nothing else "only follows new blocks".
+	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0 && recv["getaddr"] > 0:
+		return "Unknown software that follows new blocks: asks for headers and addresses, wants no transactions"
 	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0:
 		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
+	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0 && recv["getaddr"] > 0:
+		return "Unknown software that follows new blocks: wants headers announced and addresses, no transactions"
 	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0:
 		return "Unknown software that follows new blocks: wants headers announced, no transactions"
 	// Asking for data alone is no sign of listening: a peer that fetches
@@ -1244,15 +1250,21 @@ func shortReason(r string) string {
 // line under its pill; "" where they saw nothing telling, and the line keeps
 // what Core saw. TestEveryBehaviourHasATell reads those two functions.
 func behaviourTell(about string) string {
+	// "only" only where the rule saw it ask for nothing else.
+	if strings.Contains(about, "follows new blocks") {
+		if strings.Contains(about, "addresses") {
+			return "follows new blocks"
+		}
+		return "only follows new blocks"
+	}
 	for _, t := range []struct{ in, tell string }{
 		{"only listens", "only listens"},
 		{"a full node under a name its operator chose", "acts like a full node"},
 		{"asks for our mempool", "asks for our mempool"},
 		{"pushes transactions", "pushes transactions"},
-		{"follows new blocks", "only follows new blocks"},
 		{"listens to transactions", "collects transactions"},
 		{"collects addresses", "collects addresses"},
-		{"asks for headers like a full node", "asks for headers"},
+		{"asks for headers like a full node", "acts like a node"},
 		{"asks for addresses and nothing else", "asks only for addresses"},
 		{"asked for nothing", "asks for nothing"},
 	} {
