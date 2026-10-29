@@ -478,6 +478,14 @@ a.addr-txt:hover { color: var(--accent); }
 .peers tr:is(.delivered-ever, .delivered-now, .focus) .kind:is(.disg, .lion) { background: linear-gradient(rgba(248,81,73,.12), rgba(248,81,73,.12)), var(--panel); }
 .peers .kind.never { margin-left: -7px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); background: #161d26; color: var(--muted); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
+/* Compact-block directions sit beside the kind, as quiet marks like in Lab. */
+.peers .kind-head { display: inline-grid; grid-template-columns: 32px minmax(0, auto); align-items: center; gap: 6px; max-width: calc(100% + 9px); margin-left: -9px; vertical-align: bottom; }
+.peers .hb-marks { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.peers .kind-head > .kind { margin-left: 0; min-width: 0; }
+.peers .hb { flex: none; font-size: 13px; line-height: 1; cursor: help; }
+/* The grey lines under the pill start where the pill does, past the marks' slot (32px + 6px gap). */
+.peers td.k-kind > small, .peers td.k-kind > .about { padding-left: 38px; }
+.peers td.k-kind > small.ua { max-width: 318px; }
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; color: var(--muted); }
 /* The software a peer names tells peers apart: as bright as the operator. */
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
@@ -512,8 +520,12 @@ a.addr-txt:hover { color: var(--accent); }
 /* The pill lies over the place line only: country and address below it keep
    the whole width, and the place name gives way to the pill. */
 .cards.cards table tr td.k-peer { grid-column: 1 / -1; }
-.cards.cards table tr td.k-peer .who b { padding-right: 132px; max-width: none; }
-.cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
+.cards.cards table tr td.k-peer .who b { padding-right: var(--kind-space, 132px); max-width: none; }
+.cards.cards table tr td.k-kind > .kind-head { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 200px; position: relative; z-index: 1; }
+.cards.cards table tr td.k-kind .kind { max-width: 150px; }
+/* On a card the marks need no fixed slot: an empty one would only take room from the place name. */
+.cards.cards table tr td.k-kind .kind-head { display: inline-flex; }
+.cards.cards table tr td.k-kind .hb-marks:empty { display: none; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
 .cards.cards table tr { --card-indent: 39px; }
 .cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }
@@ -694,3 +706,10 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 /* A soft edge under the bar, so a row passing beneath fades out instead of
    showing half a line. */
 .stick > div::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 20px; background: linear-gradient(var(--panel) 35%, transparent); pointer-events: none; }
+
+/* A small byte table, independent of the peer list's phone-card layout. */
+.pd-traffic-types { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 5px 10px; font-size: 12px; }
+.pd-traffic-group, .pd-traffic-row { display: contents; }
+.pd-traffic-row > span { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pd-traffic-row > span:first-child { text-align: left; white-space: normal; }
+.pd-traffic-heading { color: var(--muted); }
