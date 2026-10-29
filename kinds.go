@@ -84,20 +84,21 @@ var kindRules = []struct {
 	// pools do: its block observer speaks btcd's old wire library and adds
 	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
 	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
-	// /trinetra:/, /p2p-probe:/ and /EMPORION:/ have no public source; in
+	// /trinetra:/ and /p2p-probe:/ have no public source; in
 	// peer-observer's record of the node this was written for (21. to
 	// 29.10.2026) each only did the handshake and left within a second, every
-	// time (39, 3 and 3 sessions). /rske-research:/ and /acsrg-research:/ say
+	// time (39 and 3 sessions). /rske-research:/ and /acsrg-research:/ say
 	// what they are; the second took 81,563 transactions in one session.
 	// /dataforge-observer:/ only listened to what was announced.
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/trinetra:|^/p2p-probe:|^/EMPORION:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:`), false},
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/trinetra:|^/p2p-probe:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other". /cryptexplorer:/ has no
 	// public source; on that node it asked for addresses and nothing else,
 	// in all of its five sessions (peer-observer, 21. to 29.10.2026), and so
-	// did /bip110-observer:/, /topology-probe:/ and /BlockSail:/.
+	// did /topology-probe:/ and /BlockSail:/. BIP-110 Observer collects peer
+	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
 	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:|^/cryptexplorer:|^/bip110-observer:|^/topology-probe:|^/BlockSail:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
@@ -138,7 +139,10 @@ var kindRules = []struct {
 	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs). /multiseed:/ has no public source;
 	// on that node it stayed 52 minutes asking for headers and loading a bloom
 	// filter, and took compact filter headers (peer-observer, 27.10.2026).
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/multiseed:`), false},
+	// EMPORION, renamed SYMMARTYS, fetches headers to verify OpenTimestamps
+	// proofs (bitcoin_headers.py in alexar76/emporion, under the old and new
+	// package names). Both versions send their own name with version 0.3.
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/multiseed:|^/EMPORION:|^/SYMMARTYS:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -150,6 +154,9 @@ var kindRules = []struct {
 	// Bitcoin Ghost (github.com/bitcoin-ghost/ghost): ghostd, a fork of Core
 	// v30, UA_NAME "Ghost" in clientversion.cpp.
 	{"Node (Ghost)", regexp.MustCompile(`^/Ghost:`), true},
+	// BitcoinRocks uses RocksDB and compressed block storage, retaining
+	// Bitcoin consensus (UA_NAME and CMakeLists.txt in BitcoinRocks-Core/BitcoinRocks).
+	{"Node (BitcoinRocks)", regexp.MustCompile(`^/BitcoinRocks:`), true},
 	// Full nodes written from scratch, each sending its own name (checked in
 	// its source): the hashhog fleet of ten languages (github.com/hashhog),
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
@@ -276,6 +283,10 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`^BTC RPC Proxy `), "Probably not a node: seen taking blocks under the oldest protocol, with no services and 127.0.0.1:8332 as our address"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
+	{regexp.MustCompile(`^/BitcoinRocks:`), "BitcoinRocks, an experimental fork of Core using RocksDB and compressed block storage"},
+	{regexp.MustCompile(`(?i)^/EMPORION:`), "EMPORION, a Bitcoin header client for verifying OpenTimestamps proofs; later renamed SYMMARTYS"},
+	{regexp.MustCompile(`(?i)^/SYMMARTYS:`), "SYMMARTYS, formerly EMPORION: follows Bitcoin headers to verify OpenTimestamps proofs"},
+	{regexp.MustCompile(`(?i)^/bip110-observer:`), "BIP-110 Observer, a crawler that collects peer user agents and advertised services"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
 	{regexp.MustCompile(`(?i)^/CamlCoin:`), "CamlCoin, a Bitcoin full node written in OCaml (hashhog)"},
 	{regexp.MustCompile(`(?i)^/rustoshi:`), "rustoshi, a Bitcoin full node written in Rust (hashhog)"},
