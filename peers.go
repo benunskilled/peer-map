@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"net/netip"
 	"os"
 	"strings"
@@ -32,6 +33,9 @@ type rawPeer struct {
 	// offers nothing" are different answers and must not collapse into one.
 	ServicesNames []string `json:"servicesnames"`
 	RelayTxes     *bool    `json:"relaytxes"`
+	// The fee rate below which the peer wants no transactions announced, in
+	// BTC/kvB: what its last feefilter message said.
+	MinFeeFilter *float64 `json:"minfeefilter"`
 	// The protocol version from the peer's version message (Core 0.21 and
 	// later send 70016). Zero when Core did not report it.
 	Version       int    `json:"version"`
@@ -147,9 +151,13 @@ type Peer struct {
 	// How the address was proven the pool's: for the panel, not the list.
 	PoolProof string `json:"pool_proof,omitempty"`
 	Subver    string `json:"subver"`
-	Kind      string `json:"kind"`               // what the user agent claims; see kinds.go
-	About     string `json:"about,omitempty"`    // what that software is, when known
-	NoRelay   bool   `json:"no_relay,omitempty"` // software that passes no blocks on
+	Kind      string `json:"kind"`            // what the user agent claims; see kinds.go
+	About     string `json:"about,omitempty"` // what that software is, when known
+	// Where the name is false or says nothing (Disguised, Other, No user
+	// agent), what the peer does in a few words: the list shows it under the
+	// pill, the panel the whole sentence (tellOf, behaviourTell).
+	Tell    string `json:"tell,omitempty"`
+	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
 	LinkingLion bool `json:"linking_lion,omitempty"`
@@ -162,6 +170,10 @@ type Peer struct {
 	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
 	ForkWhy      string `json:"fork_why,omitempty"`
 	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
+	// The lowest fee rate the peer wants to hear of, in sat/vB to one
+	// decimal: only when it sent a feefilter. Core rounds what it sends on
+	// purpose, so more digits would be noise.
+	MinFee *float64 `json:"min_fee,omitempty"`
 	// What the peer announced, for the detail that opens on a tap.
 	Services []string `json:"services,omitempty"`
 	Version  int      `json:"version,omitempty"` // protocol version of its version message
@@ -410,6 +422,15 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
 			}
 		}
+		// One reason is enough for the list; the panel gets every other one, so
+		// a disguise - LinkingLion's too - stands on what the peer did, not on
+		// one rule or one list of addresses alone.
+		if p.Kind == fakeWalletKind {
+			p.About = withAlso(p.About, disguiseEvidence(r, kind, aboutOf(r.Subver), anyWtxid, now))
+			p.Tell = tellOf(p.About, p.LinkingLion)
+		} else if p.Kind == "Other" || p.Kind == noAgentKind {
+			p.Tell = behaviourTell(p.About)
+		}
 		// A proven address makes a pool's plain bitcoind a pool node too; a
 		// name in the user agent only names the pool of what already is one.
 		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
@@ -429,6 +450,10 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
 		}
 		p.Fork, p.ForkWhy = forkOf(r.ServicesNames, p.Kind, r.SyncedHeaders, tip)
+		if r.MinFeeFilter != nil && r.BytesRecvPerMsg["feefilter"] > 0 {
+			v := math.Round(*r.MinFeeFilter*1e5*10) / 10
+			p.MinFee = &v
+		}
 		p.SyncMB = syncingFrom(r.Inbound, r.BytesSentPerMsg, r.SyncedBlocks, tip, r.ConnTime, now)
 		p.NoRelay = p.NoRelay || p.Fork != ""
 		if r.Inbound {

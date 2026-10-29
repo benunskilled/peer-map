@@ -185,7 +185,7 @@ func TestAnachronism(t *testing.T) {
 		kind     string
 		says     string
 	}{
-		{"/Satoshi:0.14.2/", v2, "Disguised", "Claims: Bitcoin Core 0.14.2\nProbably: a scanner - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
+		{"/Satoshi:0.14.2/", v2, "Disguised", "Claims: Bitcoin Core 0.14.2\nProbably: not Bitcoin Core 0.14 - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
 		{"/Satoshi:25.1.0/", v2, "Disguised", "Core 25.1 did not have"},
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "pruned-node service, which Core 0.15"},
 		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Disguised", "compact block filters"},
@@ -406,7 +406,7 @@ func TestOtherAbouts(t *testing.T) {
 	}{
 		{"/pynode:0.0.1/", 70016, "Probably Bitcoin Core handing over a transaction privately"},
 		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
-		{"", 70016, "Introduced itself but left its name empty"},
+		{"", 70016, "Introduced itself without a name"},
 		{"", 0, "Has not said what it is"},
 		{"/bitcoinj:0.17/", 70013, "bitcoinj, a Java library"},
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
@@ -468,7 +468,8 @@ func TestOtherAboutOffersBlocks(t *testing.T) {
 func TestPlainBitcoinjOfferingBlocks(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "/bitcoinj:0.14.5/", Version: 70016, ServicesNames: []string{"NETWORK", "P2P_V2"}}})[0]
-	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
+	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does" +
+		"\nAlso: it offers encrypted v2 connections, which that software never had"
 	if got.Kind != "Disguised" || got.About != want {
 		t.Errorf("kind %q about %q", got.Kind, got.About)
 	}
@@ -539,7 +540,8 @@ func TestBehaviourMakesCoreDisguised(t *testing.T) {
 	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:0.19.0.1/",
 		Transport: "v1", ConnTime: conn, ServicesNames: []string{"WITNESS"},
 		BytesRecvPerMsg: map[string]int64{"getaddr": 24 * 58}}})[0]
-	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once" {
+	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once"+
+		"\nAlso: it lacks NETWORK_LIMITED, which every Core since 0.16 offers" {
 		t.Errorf("got %q / %q", got.Kind, got.About)
 	}
 }
@@ -706,7 +708,7 @@ func TestNamesSeenOnce(t *testing.T) {
 		}
 	}
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016, Subver: "//", ServicesNames: []string{}}})[0]
-	if !strings.HasPrefix(got.About, "Introduced itself but left its name empty") {
+	if !strings.HasPrefix(got.About, "Introduced itself without a name") {
 		t.Errorf("// about: %q", got.About)
 	}
 }
@@ -727,11 +729,11 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		want  string
 	}{
 		{[]string{"NETWORK", "WITNESS"}, &yes, nil, nil, "Probably a full node under a name its operator chose"},
-		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Unknown software that pushes transactions without announcing them"},
+		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Pushes transactions without announcing them"},
 		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, nil, "Software with a name we don't recognise"},
-		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Unknown software that follows new blocks: asks for headers, wants no transactions"},
-		{[]string{}, &no, map[string]int64{"getaddr": 24}, nil, "Unknown software that collects addresses"},
-		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, map[string]int64{"inv": 17521264, "tx": 5292757}, "Unknown software that listens to transactions: fetches every one it hears of, announces none"},
+		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Asks for headers and wants no transactions: a program that tracks the chain"},
+		{[]string{}, &no, map[string]int64{"getaddr": 24}, nil, "Asks for addresses, not for headers or blocks: a crawler"},
+		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, map[string]int64{"inv": 17521264, "tx": 5292757}, "Fetches transactions from your node and announces none: a program collecting them"},
 		// A VerifiedX validator before it had a name here: asks for blocks,
 		// is sent blocks, no transactions.
 		{[]string{}, &yes, map[string]int64{"getdata": 1647, "getheaders": 354039}, map[string]int64{"block": 21269099, "inv": 565744}, "Software with a name we don't recognise"},
@@ -752,6 +754,9 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/CamlCoin:0.1.0/":                       "Node (other)",
 		"/rustoshi:0.1.0/":                       "Node (other)",
 		"/bitcoin-rs:0.1.0/":                     "Node (other)",
+		"/hotbuns:0.1.0/":                        "Node (other)",
+		"/satd:0.2.1/":                           "Node (other)",
+		"/bitcoinkernel-node:0.1.0/":             "Node (other)",
 		"/tbcd:2.1.0-dev/":                       "Node (other)",
 		"/mantle:0.1.0/":                         "Node (other)",
 		"/mantle-replay-iouring:0.1.0/":          "Other",
@@ -981,18 +986,18 @@ func TestOtherAboutOnlyListens(t *testing.T) {
 	yes, no := true, false
 	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40, "sendaddrv2": 24}
 	hour := now.Unix() - 3600
-	if got := otherAbout(nil, &yes, quiet, map[string]int64{"inv": 120}, hour, now); got != "Unknown software that only listens: hears new transactions, fetches none" {
+	if got := otherAbout(nil, &yes, quiet, map[string]int64{"inv": 120}, hour, now); got != "Only listens: hears new transactions, fetches none" {
 		t.Errorf("wants transactions: %q", got)
 	}
 	// Nothing was announced to it, so it cannot be said to hear anything.
-	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Unknown software that only listens: asks for nothing" {
+	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Only listens: asks for nothing" {
 		t.Errorf("nothing announced: %q", got)
 	}
-	if got := otherAbout(nil, &no, quiet, nil, hour, now); got != "Unknown software that only listens: wants no transactions, asks for nothing" {
+	if got := otherAbout(nil, &no, quiet, nil, hour, now); got != "Only listens: wants no transactions, asks for nothing" {
 		t.Errorf("wants none: %q", got)
 	}
 	// Listing NETWORK does not make a silent peer a full node.
-	if got := otherAbout([]string{"NETWORK"}, &yes, quiet, nil, hour, now); !strings.Contains(got, "only listens") {
+	if got := otherAbout([]string{"NETWORK"}, &yes, quiet, nil, hour, now); !strings.Contains(got, "Only listens") {
 		t.Errorf("NETWORK but silent: %q", got)
 	}
 	// Not long enough yet, or it did ask: the older lines stand.
@@ -1000,7 +1005,7 @@ func TestOtherAboutOnlyListens(t *testing.T) {
 		t.Errorf("one minute: %q", got)
 	}
 	asks := map[string]int64{"version": 126, "verack": 24, "getaddr": 24}
-	if got := otherAbout(nil, &yes, asks, nil, hour, now); got != "Unknown software that collects addresses" {
+	if got := otherAbout(nil, &yes, asks, nil, hour, now); got != "Asks for addresses, not for headers or blocks: a node already in sync, or a crawler" {
 		t.Errorf("collects addresses: %q", got)
 	}
 }
@@ -1018,11 +1023,11 @@ func TestOtherAboutWhatItDid(t *testing.T) {
 		want  string
 	}{
 		{"mempool", &yes, map[string]int64{"version": 126, "verack": 24, "mempool": 24}, nil,
-			"Unknown software that asks for our mempool"},
+			"Asks for our mempool"},
 		{"asks for headers", &no, map[string]int64{"version": 126, "getheaders": 1061}, nil,
-			"Unknown software that follows new blocks: asks for headers, wants no transactions"},
+			"Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain"},
 		{"only wants them announced", &no, map[string]int64{"version": 126, "sendheaders": 24}, nil,
-			"Unknown software that follows new blocks: wants headers announced, no transactions"},
+			"Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain"},
 	}
 	for _, c := range cases {
 		if got := otherAbout(nil, c.relay, c.recv, c.sent, 0, now); got != c.want {
@@ -1105,15 +1110,15 @@ func TestNoAgentAbout(t *testing.T) {
 		want string
 	}{
 		{"a full node without a name", map[string]int64{"version": 126, "verack": 24, "getheaders": 1061, "getaddr": 24, "sendcmpct": 33}, hour,
-			"Introduced itself but left its name empty: it asks for headers like a full node does"},
+			"Asks for headers and addresses, like a full node does"},
 		{"addresses only", map[string]int64{"version": 126, "verack": 24, "getaddr": 24, "pong": 32}, hour,
-			"Introduced itself but left its name empty: it asks for addresses and nothing else"},
+			"Asks for addresses, not for headers or blocks"},
 		{"quiet for an hour", map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30}, hour,
-			"Introduced itself but left its name empty: after the handshake it asked for nothing"},
+			"Introduced itself, then asked for nothing"},
 		{"just arrived", map[string]int64{"version": 126, "verack": 24}, now.Unix() - 5,
-			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+			"Introduced itself without a name; nothing it did tells what it is"},
 		{"no counters", nil, hour,
-			"Introduced itself but left its name empty: software that keeps quiet about what it is"},
+			"Introduced itself without a name; nothing it did tells what it is"},
 	}
 	for _, c := range cases {
 		if got := noAgentAbout(c.recv, c.conn, now); got != c.want {
@@ -1168,5 +1173,40 @@ func TestNeutrinoVersion(t *testing.T) {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: %q, want %q", subver, got, want)
 		}
+	}
+}
+
+// libbitcoin 4 speaks BIP324: offering P2P_V2 is no sign of a disguise there,
+// before 4 it still is.
+func TestLibbitcoinV2(t *testing.T) {
+	v2 := []string{"NETWORK", "WITNESS", "P2P_V2"}
+	if got := anachronism("/Libbitcoin:4.0.0/", v2); got != "" {
+		t.Errorf("4.0.0: %q", got)
+	}
+	if got := anachronism("/libbitcoin:3.8.0/", v2); got == "" {
+		t.Error("3.8.0 with P2P_V2 not flagged")
+	}
+}
+
+// LinkingLion's verdict comes from its address; what it did itself stands
+// under it, so the disguise would show without the list too.
+func TestLinkingLionShowsItsOwnEvidence(t *testing.T) {
+	got := convert([]rawPeer{{Addr: "143.20.137.5:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/Satoshi:0.12.1/", Version: 70016, ServicesNames: []string{"NETWORK"}}})[0]
+	if !got.LinkingLion || !strings.Contains(got.About, "Probably: LinkingLion") || !strings.Contains(got.About, "\nAlso: ") {
+		t.Errorf("%q", got.About)
+	}
+}
+
+// Core 32 speaks 70017; a Core 22 to 31 that does is none.
+func TestProtocol70017(t *testing.T) {
+	if got := protocolMismatch("/Satoshi:32.0.0/", 70017); got != "" {
+		t.Errorf("32.0.0: %q", got)
+	}
+	if got := protocolMismatch("/Satoshi:31.1.0/", 70017); got != "not Bitcoin Core - it speaks protocol 70017, which Core 31 never did" {
+		t.Errorf("31.1.0: %q", got)
+	}
+	if got := protocolMismatch("/Satoshi:31.99.0/", 70017); got != "" {
+		t.Errorf("31.99 dev build: %q", got)
 	}
 }

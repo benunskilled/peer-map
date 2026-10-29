@@ -351,9 +351,8 @@ table.peers { width: 100%; border-collapse: separate; border-spacing: 0; font-si
 table.peers.measure { width: auto; }
 table.peers.aligned { table-layout: fixed; }
 .peers.aligned td { overflow: hidden; text-overflow: ellipsis; }
-/* Laid out, the kind's line may use the whole column (alignColumns gives it
-   the card's spare width); measured, it keeps its cap, so one long name does
-   not cost every table a column. */
+/* Laid out, the kind's line may use the whole column; measured, it keeps
+   its cap, so one long line does not cost every table a column. */
 .peers.aligned small.ua { max-width: none; }
 .peers th, .peers td { padding: 9px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .peers tbody tr:not(.focus):not(.delivered-now):hover td { background: #17202a; }
@@ -372,7 +371,7 @@ table.peers.aligned { table-layout: fixed; }
    without turning the table into a wall of blue. */
 .peer-jump { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); }
 .peer-jump:hover { color: var(--accent); text-decoration-color: var(--accent); }
-/* Software that passes no blocks on: the row in muted text and a quiet "never first" pill rather than a colour -
+/* Software that passes no blocks on: the row in muted text and a quiet ⊘ pill rather than a colour -
    every hue in this window already means a connection type, and a fourth meaning on the same axis is one a
    colour-blind reader cannot separate. It is not a fault either; a wallet is doing what a wallet does. */
 .peers tr.weak td { color: var(--muted); }
@@ -433,6 +432,9 @@ table.peers.aligned { table-layout: fixed; }
 
 /* Group heading: the name, then the count and the kinds as chips. */
 .kinds.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+/* Under the name in every group, also where a short list would fit beside it
+   (Manual). Folded, the count alone stands beside the name. */
+.group-card:not(.folded) .group-head > .kinds.chips { flex-basis: 100%; }
 .chips .chip { font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; line-height: 1.5; }
 .chips .chip i { font-style: normal; color: var(--text); font-weight: 600; margin-right: 3px; }
 .kinds.chips .kind-pick { cursor: pointer; font: inherit; font-size: 12px; }
@@ -440,7 +442,10 @@ table.peers.aligned { table-layout: fixed; }
 .kinds.chips .kind-pick.on { color: var(--text); border-color: var(--accent); }
 /* The pools under "Pool node": a second line of chips, one step in. */
 /* One level under the kinds: named, and lighter than the kind chips above. */
-.kinds.chips.pool-picks { margin: 8px 20px 0; align-items: center; }
+.kinds.chips.pool-picks { margin: 8px 20px 0 44px; align-items: center; }
+/* One level down sits further right, and on one line until "+ n more" is tapped. */
+.kinds.chips.pool-picks.one-line { flex-wrap: nowrap; overflow: hidden; }
+.kinds.chips.pool-picks.one-line > * { flex: none; }
 .pool-picks .picks-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .kinds.chips.pool-picks .kind-pick { background: transparent; font-size: 11.5px; padding: 1px 8px; }
 .ua .pool-name { color: var(--text); }
@@ -475,7 +480,6 @@ a.addr-txt:hover { color: var(--accent); }
 .peers .kind .ico { font-size: 11px; opacity: .85; }
 .peers small.ua { max-width: 280px; margin-top: 2px; font-family: inherit; word-break: normal; color: var(--muted); }
 /* The software a peer names tells peers apart: as bright as the operator. */
-.peers .ua-name { color: var(--text); }
 .peers .net { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; margin-right: 4px; }
 /* The kind of outbound connection wears the outbound colour, as in Bitcoin Lab.
    On a line of its own: only outbound peers have one, and beside the other
@@ -502,10 +506,7 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-peer small.sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Phone cards: the kind pill takes the place of the ping, beside the place,
-   so a card is one row shorter. The pill stays short there - "never first"
-   moves to the grey line - and that line starts under the place, not under
-   the flag. */
-.never-sub, .tor-sub { display: none; }
+   so a card is one row shorter. */
 .cards.cards table tr td.k-ping { display: none; }
 .cards.cards table tr td.k-kind { display: contents; }
 /* The pill lies over the place line only: country and address below it keep
@@ -514,8 +515,6 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-peer .who b { padding-right: 132px; max-width: none; }
 .cards.cards table tr td.k-kind > .kind { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; margin-left: 0; max-width: 150px; position: relative; z-index: 1; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
-.cards.cards .kind .never-txt { display: none; }
-.cards.cards .never-sub, .cards.cards .tor-sub { display: inline; }
 .cards.cards table tr { --card-indent: 39px; }
 .cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }
 
@@ -539,6 +538,9 @@ button.chip.syncing { cursor: pointer; }
 .pd-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; font-size: 13px; line-height: 1.45; }
 .pd-block h4 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
 .pd-about { margin: 0 0 6px; color: var(--text); }
+/* Claims, Probably, Also: the tag on the left, the text wrapping beside it,
+   in the same column as the reasons of the flags below. */
+.pd-about.tagged { display: grid; grid-template-columns: 92px 1fr; align-items: baseline; }
 .pd-tag { display: inline-block; min-width: 62px; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
 .pd-tag.probably { color: var(--accent); }
 /* The word on the left, its reason beside it: a second line starts under the
@@ -546,12 +548,16 @@ button.chip.syncing { cursor: pointer; }
    (a longer word moves only its own reason). */
 .pd-flag-row { display: grid; grid-template-columns: minmax(92px, max-content) 1fr; align-items: baseline; margin: 0 0 7px; color: var(--muted); }
 .pd-flag-row .pd-flag { justify-self: start; }
+/* Under "never first" when Bitcoin Lab is not installed: where to find out more. */
+.pd-flag-row .pd-more { grid-column: 2; margin-top: 3px; }
+.pd-flag-row .pd-more a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.pd-flag-row .pd-more a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .pd-flag { display: inline-block; margin-right: 6px; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--border); background: #161d26; color: var(--text); font-size: 12px; white-space: nowrap; }
 .pd-flag.sync { color: #7fe3d6; border-color: rgba(31,191,171,.45); background: rgba(31,191,171,.10); }
 .pd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 .pd-stat { display: flex; flex-direction: column; min-width: 0; padding: 8px 10px; border-radius: 8px; background: #141b23; border: 1px solid var(--border); }
 .pd-label { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .05em; }
-.pd-big { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
+.pd-big { font-size: 17px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; overflow-wrap: break-word; line-height: 1.25; }
 .pd-small { font-size: 12px; color: var(--muted); }
 .pd-traffic { display: flex; flex-direction: column; gap: 6px; }
 .pd-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #141b23; gap: 2px; }
@@ -582,3 +588,109 @@ button.chip.syncing { cursor: pointer; }
 .pd-lab:hover { border-color: var(--accent); }
 td .about.short { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 td .about.clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Three tiles are too narrow on a phone for "Outbound": two, the link below. */
+@media (max-width: 600px) {
+  .pd-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pd-tiles .pd-link:nth-child(3) { grid-column: span 2; }
+}
+
+/* --- Feel (28.10.2026) --- */
+/* Small links get a finger-sized target without looking any bigger. */
+.sibling-link, .group-card > .more { position: relative; }
+.sibling-link::after, .group-card > .more::after { content: ""; position: absolute; inset: -12px -8px; }
+/* Chips change state softly. */
+.chip { transition: border-color .12s ease, color .12s ease, background-color .12s ease; }
+/* A panel opened by a tap fades in; one redrawn by a refresh does not. */
+.detail-row.opening .pd { animation: pd-in .18s ease-out; }
+@keyframes pd-in { from { opacity: 0; transform: translateY(-4px); } }
+/* A peer that has just connected lights up once. */
+tr.arrived > td { animation: arrived 2.4s ease-out; }
+/* As a card the row is one box: it lights up whole. */
+.cards tr.arrived { animation: arrived 2.4s ease-out; }
+.cards tr.arrived > td { animation: none; }
+@keyframes arrived { from { background-color: rgba(247, 147, 26, .16); } }
+/* Scrolling back up on a phone: the sections, a tap away. */
+.jump-bar { position: fixed; z-index: 30; left: 50%; top: 8px; transform: translate(-50%, -64px); display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(17, 24, 32, .92); border: 1px solid var(--border); box-shadow: 0 4px 16px rgba(0, 0, 0, .35); transition: transform .2s ease; max-width: calc(100vw - 16px); }
+.jump-bar.shown { transform: translate(-50%, 0); }
+.jump-bar button { font: inherit; font-size: 13px; color: var(--text); background: none; border: 0; padding: 8px 11px; border-radius: 999px; white-space: nowrap; }
+.jump-bar button:active { background: var(--panel-2); }
+@media (prefers-reduced-motion: reduce) {
+  .chip, .jump-bar { transition: none; }
+  .detail-row.opening .pd, tr.arrived, tr.arrived > td { animation: none; }
+}
+/* With a mouse: the row's place on the map lights up. */
+.marker.hover .sel { stroke: var(--accent); stroke-width: 2; }
+.marker.hover .glow { opacity: 1; }
+/* A row reached with the arrow keys. */
+#tables tr[data-anchor]:focus { outline: none; }
+#tables tr[data-anchor]:focus-visible > td { background: rgba(247, 147, 26, .07); }
+#tables tr[data-anchor]:focus-visible > td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+/* Column headings stay in view over a long table (not as cards). */
+@media (min-width: 601px) {
+  .scroll:not(.cards) { overflow-x: clip; }
+  .peers thead th { position: sticky; top: 0; z-index: 3; background: var(--panel); box-shadow: 0 1px 0 var(--border); }
+}
+/* With a mouse the sections wait in the bottom right corner. */
+.jump-bar.corner { left: auto; right: 16px; top: auto; bottom: 16px; transform: translateY(80px); }
+.jump-bar.corner.shown { transform: none; }
+@media (prefers-reduced-motion: reduce) { .jump-bar.corner { transition: none; } }
+
+/* Before the first answer, grey rows stand where the peers will be: the page
+   does not grow by a screen at once when they arrive, and it reads as
+   loading rather than as empty. */
+.skeleton-card .group-head h2 { color: var(--muted); }
+.sk-row { padding: 14px 20px; border-top: 1px solid var(--border); }
+.sk-row i { display: block; height: 10px; border-radius: 5px; background: var(--border); opacity: .55; animation: skeleton 1.4s ease-in-out infinite; }
+.sk-row i + i { width: 55%; margin-top: 8px; }
+.skeleton-card .sk-row:first-of-type { margin-top: 12px; }
+@keyframes skeleton { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .sk-row i { animation: none; } }
+
+/* The dot in front of the status line: beats on fresh numbers, grey while
+   paused or when the backend did not answer. */
+.live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #3fb950; vertical-align: 1px; }
+.live-dot.stale { background: var(--muted); }
+.live-dot.beat { animation: beat .9s ease-out; }
+@keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(63, 185, 80, .7); } 100% { box-shadow: 0 0 0 7px rgba(63, 185, 80, 0); } }
+@media (prefers-reduced-motion: reduce) { .live-dot.beat { animation: none; } }
+
+/* A phone card: place, address and pill, the same height for every peer.
+   What Core saw is in the panel there (28.10.2026). */
+.cards.cards table tr td.k-kind small.ua { display: none; }
+
+/* Every card folds to its title on a tap and stays so on this device; open
+   unless the reader closed it (28.10.2026). The chevron is Storage's in the
+   Lab: down while open, right while folded. */
+.fold-title { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.fold-title::before {
+  content: ""; flex: none; width: 6px; height: 6px; margin: 0 2px 0 1px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg); transition: transform .15s ease;
+}
+.folded .fold-title::before { transform: rotate(-45deg); }
+.fold-title:hover::before { border-color: var(--text); }
+.fold-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.group-card.folded { padding-bottom: 14px; }
+.group-card.folded > :not(.group-head),
+.group-card.folded .group-head > :not(h2, .chips),
+.group-card.folded .chips > :not(.count) { display: none; }
+.map-head { flex: 1 1 100%; margin: 0; padding: 12px 16px; font-size: 15px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+.map-card.folded > :not(.map-head) { display: none; }
+.map-card.folded .map-head { border-bottom: 0; }
+.block-card.folded.has-route > :not(.block-summary) { display: none; }
+
+/* The open inbound list keeps its name and the way back at the top. */
+.stick { position: sticky; top: 0; z-index: 6; height: 0; }
+.stick > div {
+  position: absolute; left: -1px; right: -1px; top: 0; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px 8px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 0 0 10px 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .35); font-size: 15px; font-weight: 600;
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.stick > div .swatch { margin-right: 8px; }
+.stick > div .btn { margin-left: auto; }
+.stick.on > div { opacity: 1; pointer-events: auto; }
+/* A soft edge under the bar, so a row passing beneath fades out instead of
+   showing half a line. */
+.stick > div::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 20px; background: linear-gradient(var(--panel) 35%, transparent); pointer-events: none; }
