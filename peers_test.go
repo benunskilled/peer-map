@@ -162,6 +162,44 @@ func TestRPCAndConvert(t *testing.T) {
 	}
 }
 
+func TestHighBandwidthDirections(t *testing.T) {
+	for _, c := range []struct {
+		name, fields string
+		to, from     bool
+	}{
+		{"missing on older Core", "", false, false},
+		{"neither", `,"bip152_hb_to":false,"bip152_hb_from":false`, false, false},
+		{"peer sends to us", `,"bip152_hb_to":true,"bip152_hb_from":false`, true, false},
+		{"we send to peer", `,"bip152_hb_to":false,"bip152_hb_from":true`, false, true},
+		{"both", `,"bip152_hb_to":true,"bip152_hb_from":true`, true, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var raw []rawPeer
+			if err := json.Unmarshal([]byte(`[{"id":1,"addr":"192.0.2.1:8333","connection_type":"manual","subver":"/Satoshi:31.1.0/"`+c.fields+`}]`), &raw); err != nil {
+				t.Fatal(err)
+			}
+			peers := convert(raw)
+			if len(peers) != 1 || peers[0].HBTo != c.to || peers[0].HBFrom != c.from {
+				t.Fatalf("directions changed during conversion: %+v", peers)
+			}
+			encoded, err := json.Marshal(peers[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(encoded, &payload); err != nil {
+				t.Fatal(err)
+			}
+			for key, active := range map[string]bool{"hb_to": c.to, "hb_from": c.from} {
+				value, present := payload[key]
+				if present != active || active && value != true {
+					t.Errorf("%s: got %v (present %v), want active %v", key, value, present, active)
+				}
+			}
+		})
+	}
+}
+
 func TestRPCErrorObject(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -517,5 +555,30 @@ func TestMinFee(t *testing.T) {
 		if got != c.want {
 			t.Errorf("%v sent %d: %s, want %s", c.btcPerKvB, c.sent, got, c.want)
 		}
+	}
+}
+
+func TestTrafficByMessage(t *testing.T) {
+	if trafficByMessage(nil) != nil {
+		t.Fatal("missing counters must stay unavailable")
+	}
+	got := trafficByMessage(map[string]int64{"tx": 100, "block": 200, "cmpctblock": 30, "blocktxn": 40, "headers": 50, "addr": 60, "addrv2": 70, "getdata": 80, "inv": 90, "future-command": 10})
+	want := messageTraffic{Transactions: 100, Blocks: 320, Addresses: 130, Other: 180}
+	if *got != want {
+		t.Fatalf("got %+v, want %+v", *got, want)
+	}
+	if got := trafficByMessage(map[string]int64{}); got == nil || *got != (messageTraffic{}) {
+		t.Fatal("empty counters must remain known zeroes")
+	}
+}
+
+func TestTrafficDirections(t *testing.T) {
+	raw := []rawPeer{{ConnectionType: "inbound", BytesSentPerMsg: map[string]int64{"tx": 123}, BytesRecvPerMsg: map[string]int64{"block": 456}}}
+	peers := convertAt(raw, time.Now())
+	if len(peers) != 1 {
+		t.Fatalf("got %d peers", len(peers))
+	}
+	if peers[0].TrafficSent.Transactions != 123 || peers[0].TrafficRecv.Blocks != 456 {
+		t.Fatal("traffic directions were swapped or dropped")
 	}
 }
