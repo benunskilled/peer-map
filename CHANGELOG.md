@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.2.0 – 2026-10-29
+
+A grey line under each label says what sets a peer apart: why it is disguised, what an unknown program does, pruned, another chain, a pool or syncing. Cards fold to their title, the page holds your place while tables refresh, and every kind has a filter level for versions and names. Bitcoin Purity is flagged as another chain, and more clients are recognised.
+
 ## 2.1.0 – 2026-10-27
 
 Tap or click a peer to see everything known about it: what it is, why each flag is there, its connection and traffic. Pool nodes name their pool where the address proves it, and you can pick a single pool under Pool node. Lightning wallets show which lnd they run. Syncing peers are marked and can be filtered, and with a group picked the list says in a line or two why each peer is in it. A reload keeps your place, and the map no longer jumps while loading.
