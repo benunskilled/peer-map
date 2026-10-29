@@ -2,7 +2,7 @@
 
 The Tor Project's bulk exit list, <https://check.torproject.org/torbulkexitlist>:
 the IPv4 addresses Tor exits connect from, one per line. Current list: fetched
-2026-10-27, 1226 addresses.
+2026-10-29, 1227 addresses.
 
 It is bundled rather than fetched at run time, so Peer Map still makes no
 connection of its own to the internet. The price is age: an exit that started
