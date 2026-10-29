@@ -71,20 +71,34 @@ var kindRules = []struct {
 	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
-	// Irium and VDS are forks and altcoins of their own.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:`), false},
+	// Irium and VDS are forks and altcoins of their own. Bitcoin Purity
+	// (github.com/saltduck/bitcoinpurity), a fork of Knots, made BIP110
+	// permanent in a hard fork at block 961637 with a difficulty of its own;
+	// it says "/Satoshi:29.4/Purity:1.1.0/" (FormatSubVersion in
+	// src/clientversion.cpp). On the node this was written for, 21. to
+	// 29.10.2026: 269 sessions, all offering its bit 25 and BIP110's bit 27.
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|/Purity:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	// Pool Detective, MIT's Digital Currency Initiative watching what mining
 	// pools do: its block observer speaks btcd's old wire library and adds
 	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
 	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:`), false},
+	// /trinetra:/, /p2p-probe:/ and /EMPORION:/ have no public source; in
+	// peer-observer's record of the node this was written for (21. to
+	// 29.10.2026) each only did the handshake and left within a second, every
+	// time (39, 3 and 3 sessions). /rske-research:/ and /acsrg-research:/ say
+	// what they are; the second took 81,563 transactions in one session.
+	// /dataforge-observer:/ only listened to what was announced.
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/trinetra:|^/p2p-probe:|^/EMPORION:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
-	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:`), false},
+	// /btc-range-scan/ used to land in "Other". /cryptexplorer:/ has no
+	// public source; on that node it asked for addresses and nothing else,
+	// in all of its five sessions (peer-observer, 21. to 29.10.2026), and so
+	// did /bip110-observer:/, /topology-probe:/ and /BlockSail:/.
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:|^/cryptexplorer:|^/bip110-observer:|^/topology-probe:|^/BlockSail:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -121,8 +135,10 @@ var kindRules = []struct {
 	// 24.10.2026). On the node this was written for, 12 of 238 peers that
 	// day, all inbound, from 12 addresses at six hosting companies.
 	// nakamoto, cloudhead's light client on compact block filters, says
-	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:`), false},
+	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs). /multiseed:/ has no public source;
+	// on that node it stayed 52 minutes asking for headers and loading a bloom
+	// filter, and took compact filter headers (peer-observer, 27.10.2026).
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/multiseed:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -140,8 +156,13 @@ var kindRules = []struct {
 	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
 	// Hemi network's Bitcoin daemon (hemilabs/heminetwork),
 	// illuminodes/mantle, gosuda/bitcoin-rs, epochbtc/satd and
-	// yuvicc/bitcoinkernel-node.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd):|/utreexod:`), true},
+	// yuvicc/bitcoinkernel-node. Three more have no public source but act as
+	// full nodes on the node this was written for (peer-observer, 21. to
+	// 29.10.2026): /Prometheus:/ and /BTC-Nodes:/ were among its own outbound
+	// peers, offering blocks (NETWORK) and relaying transactions for hours;
+	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
+	// name, "/BTC-Nodes:<date>/Sonar/", is caught as a crawler first.
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|Prometheus|BTC-Nodes|Natasha):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -292,6 +313,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project"},
 	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools; offers Libre Relay's service bit and came only through Tor"},
 	{regexp.MustCompile(`(?i)^/Aurum:`), "Aurumcoin, an altcoin built on Bitcoin Core 0.12"},
+	{regexp.MustCompile(`/Purity:`), "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
 	// breadwallet-core sends "/bread:" with its own version, 2.1 since 2019
 	// (BRPeer.h), also in BRD's later WalletKit (blockset-corp/walletkit).
