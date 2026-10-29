@@ -93,6 +93,8 @@
       // What the reader looks at stays put while a card above opens or closes.
       const a = readAnchor();
       show();
+      // Folded, a chip row measured no width and was left whole: fit it now.
+      if (!folded.has(id)) for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
       holdAnchor(a);
       if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
     };
@@ -1088,7 +1090,7 @@
   liveDot.className = "live-dot";
   liveDot.setAttribute("aria-hidden", "true");
   // Off again once it has beaten: the status line is rewritten every second
-  // for its clock, and putting the dot back with the class on beats it anew.
+  // for its tooltip's clock, and putting the dot back with the class on beats it anew.
   liveDot.addEventListener("animationend", () => liveDot.classList.remove("beat"));
   function beat() {
     liveDot.classList.remove("beat");
