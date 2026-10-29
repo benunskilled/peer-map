@@ -2210,9 +2210,8 @@
     sent.style.flexGrow = String(Math.max(p.bytes_sent / total, 0.02));
     got.style.flexGrow = String(Math.max(p.bytes_recv / total, 0.02));
     bar.append(sent, got);
-    const ratio = p.bytes_recv > 0 ? p.bytes_sent / p.bytes_recv : 0;
     traffic.append(el("span", "pd-label", "Traffic"), bar,
-      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it` + (ratio >= 10 ? ` \u00b7 ${Math.round(ratio)}\u00d7 more out than in` : "")));
+      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it`));
     if (p.traffic_sent || p.traffic_recv) {
       const breakdown = el("div", "pd-traffic-types");
       breakdown.setAttribute("role", "table");
