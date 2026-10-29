@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.1.0 – 2026-10-27
+
+Tap or click a peer to see everything known about it: what it is, why each flag is there, its connection and traffic. Pool nodes name their pool where the address proves it, and you can pick a single pool under Pool node. Lightning wallets show which lnd they run. Syncing peers are marked and can be filtered, and with a group picked the list says in a line or two why each peer is in it. A reload keeps your place, and the map no longer jumps while loading.
+
 ## 2.0.4 – 2026-10-25
 
 Peers on another chain are flagged: nodes that set Knots' BIP110 or BLAKE2b bit can never bring you a block. Peers coming through a Tor exit are marked, since their place is the exit's. Peer Map now recognises Wasabi and Ginger behind their borrowed Core names, Libre Relay, Lightning wallets and many more clients. Hover over "no tx" to see why a peer wants no transactions. The three tables line up, and on phones the label sits next to the place.
