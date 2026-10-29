@@ -71,20 +71,34 @@ var kindRules = []struct {
 	{"Pool node", regexp.MustCompile(`(?i)ckpool|^/ckp2p:|^/CKCoinD:|\([^)]*pool[^)]*\)|^/P2Pool:|^/[^:/(]*pool[^:/(]*:`), true},
 	// Clients of other chains that still dial Bitcoin's port.
 	// Bitcoin Classic's "(EB8)" is Bitcoin Cash's block size; SuperBitcoin,
-	// Irium and VDS are forks and altcoins of their own.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:`), false},
+	// Irium and VDS are forks and altcoins of their own. Bitcoin Purity
+	// (github.com/saltduck/bitcoinpurity), a fork of Knots, made BIP110
+	// permanent in a hard fork at block 961637 with a difficulty of its own;
+	// it says "/Satoshi:29.4/Purity:1.1.0/" (FormatSubVersion in
+	// src/clientversion.cpp). On the node this was written for, 21. to
+	// 29.10.2026: 269 sessions, all offering its bit 25 and BIP110's bit 27.
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|/Purity:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	// Pool Detective, MIT's Digital Currency Initiative watching what mining
 	// pools do: its block observer speaks btcd's old wire library and adds
 	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
 	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:`), false},
+	// /trinetra:/, /p2p-probe:/ and /EMPORION:/ have no public source; in
+	// peer-observer's record of the node this was written for (21. to
+	// 29.10.2026) each only did the handshake and left within a second, every
+	// time (39, 3 and 3 sessions). /rske-research:/ and /acsrg-research:/ say
+	// what they are; the second took 81,563 transactions in one session.
+	// /dataforge-observer:/ only listened to what was announced.
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/trinetra:|^/p2p-probe:|^/EMPORION:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
-	// /btc-range-scan/ used to land in "Other".
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:`), false},
+	// /btc-range-scan/ used to land in "Other". /cryptexplorer:/ has no
+	// public source; on that node it asked for addresses and nothing else,
+	// in all of its five sessions (peer-observer, 21. to 29.10.2026), and so
+	// did /bip110-observer:/, /topology-probe:/ and /BlockSail:/.
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:|^/cryptexplorer:|^/bip110-observer:|^/topology-probe:|^/BlockSail:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -121,8 +135,10 @@ var kindRules = []struct {
 	// 24.10.2026). On the node this was written for, 12 of 238 peers that
 	// day, all inbound, from 12 addresses at six hosting companies.
 	// nakamoto, cloudhead's light client on compact block filters, says
-	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs).
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:`), false},
+	// "/nakamoto:0.3.0/" (p2p/src/fsm.rs). /multiseed:/ has no public source;
+	// on that node it stayed 52 minutes asking for headers and loading a bloom
+	// filter, and took compact filter headers (peer-observer, 27.10.2026).
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/multiseed:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},
@@ -139,8 +155,14 @@ var kindRules = []struct {
 	// reardencode/rbitcoin, AmazingAng/rbtc, bitcoinecho/bitcoin-echo,
 	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
 	// Hemi network's Bitcoin daemon (hemilabs/heminetwork),
-	// illuminodes/mantle, and gosuda/bitcoin-rs.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|tbcd|mantle|bitcoin-rs):|/utreexod:`), true},
+	// illuminodes/mantle, gosuda/bitcoin-rs, epochbtc/satd and
+	// yuvicc/bitcoinkernel-node. Three more have no public source but act as
+	// full nodes on the node this was written for (peer-observer, 21. to
+	// 29.10.2026): /Prometheus:/ and /BTC-Nodes:/ were among its own outbound
+	// peers, offering blocks (NETWORK) and relaying transactions for hours;
+	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
+	// name, "/BTC-Nodes:<date>/Sonar/", is caught as a crawler first.
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd|Prometheus|BTC-Nodes|Natasha):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
@@ -263,12 +285,15 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/blockbrew:`), "blockbrew, a Bitcoin full node written in Go (hashhog)"},
 	{regexp.MustCompile(`(?i)^/clearbit:`), "clearbit, a Bitcoin full node written in Zig (hashhog)"},
 	{regexp.MustCompile(`(?i)^/nimrod:`), "nimrod, a Bitcoin full node written in Nim (hashhog)"},
+	{regexp.MustCompile(`(?i)^/hotbuns:`), "hotbuns, a Bitcoin full node written in TypeScript on Bun (hashhog)"},
 	{regexp.MustCompile(`(?i)^/bitcoin-hybrid:`), "ouroboros, a Bitcoin full node written in Rust and Python (hashhog)"},
 	{regexp.MustCompile(`(?i)^/rbitcoin:`), "rbitcoin, a Bitcoin full node written in Rust (reardencode)"},
 	{regexp.MustCompile(`(?i)^/rbtc:`), "rbtc, Bitcoin Core rewritten in Rust"},
 	{regexp.MustCompile(`(?i)^/BitcoinEcho:`), "Bitcoin Echo, a full node in plain C, meant to be frozen as it is"},
 	{regexp.MustCompile(`(?i)^/BitcoinMachineCode:`), "Bitcoin Machine Code, a node written in x86 assembly, entirely AI-generated"},
 	{regexp.MustCompile(`(?i)^/kernel-node:`), "kernel-node, a node built on libbitcoinkernel, Core's validation engine as a library"},
+	{regexp.MustCompile(`(?i)^/bitcoinkernel-node:`), "bitcoinkernel-node, a small full node built on libbitcoinkernel, Core's validation engine as a library"},
+	{regexp.MustCompile(`(?i)^/satd:`), "satd, a Bitcoin full node written in Rust that works like Core"},
 	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network"},
 	{regexp.MustCompile(`(?i)hemi-soak`), "A soak test of the Hemi network's Bitcoin code"},
 	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly"},
@@ -288,6 +313,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project"},
 	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools; offers Libre Relay's service bit and came only through Tor"},
 	{regexp.MustCompile(`(?i)^/Aurum:`), "Aurumcoin, an altcoin built on Bitcoin Core 0.12"},
+	{regexp.MustCompile(`(?i)/Purity:`), "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
 	// breadwallet-core sends "/bread:" with its own version, 2.1 since 2019
 	// (BRPeer.h), also in BRD's later WalletKit (blockset-corp/walletkit).
@@ -433,7 +459,7 @@ func fakeAbout(subver, walletAbout string, services []string) string {
 	case wallet && blocks:
 		guess = "a node or scanner behind an old wallet name - it offers blocks, which no wallet does"
 	case wallet && v2:
-		guess = "a scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
+		guess = "a node or scanner behind an old wallet name - it speaks v2, which no wallet of that age does"
 	case misspeltCore(subver) != "":
 		guess = "not Bitcoin Core - " + misspeltCore(subver)
 		if services != nil && len(services) == 0 {
@@ -528,13 +554,21 @@ var serviceSince = []struct {
 	{"WITNESS", "SegWit", 0, 13},
 }
 
+// Each of those in a word, for the line under the pill (tellOf).
+var serviceShort = map[string]string{
+	"encrypted v2 connections": "v2", "compact block filters": "block filters",
+	"the pruned-node service": "pruning", "SegWit": "SegWit",
+}
+
 var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
 
 // The Bitcore library by name: /bitcore:1.1.0/, nothing after it.
 var bitcoreLibrary = regexp.MustCompile(`^/bitcore:[0-9][0-9.]*/$`)
 
-// Software with no version that ever spoke the v2 transport.
-var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin)`)
+// Software with no version that ever spoke the v2 transport. libbitcoin only
+// before 4: libbitcoin-network took BIP324 in August 2026 (#856), for the 4.0
+// node, which offers P2P_V2.
+var neverV2 = regexp.MustCompile(`(?i)^/(bitcore|bcoin|Classic|Bitcoin ABC|BUCash|bitcoinj|BitCoinJ|breadwallet|MultiBit|libbitcoin:[0-3]\.)`)
 
 // anachronism returns what a peer offers that the software it names never
 // had, as a sentence for "Probably:", or "".
@@ -552,7 +586,7 @@ func anachronism(subver string, services []string) string {
 				if s.major > 0 {
 					since = fmt.Sprint(s.major)
 				}
-				return fmt.Sprintf("a scanner - it offers %s, which Core %s.%s did not have (from Core %s)", s.what, m[1], m[2], since)
+				return fmt.Sprintf("not Bitcoin Core %s.%s - it offers %s, which Core %s.%s did not have (from Core %s)", m[1], m[2], s.what, m[1], m[2], since)
 			}
 		}
 	}
@@ -576,11 +610,11 @@ func anachronism(subver string, services []string) string {
 			}
 		}
 		if len(extra) > 0 {
-			return "a scanner - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
+			return "not what it claims - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
 		}
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
-		return "a scanner - it offers encrypted v2 connections, which that software never had"
+		return "not what it claims - it offers encrypted v2 connections, which that software never had"
 	}
 	return ""
 }
@@ -623,6 +657,9 @@ func protocolMismatch(subver string, version int) string {
 		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, older than any Core since 0.21", version)
 	case !newer && version >= 70016:
 		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %d.%d never did", version, maj, mnr)
+	// Core 32 (tagged 21.10.2026) raised it to 70017 (node/protocol_version.h).
+	case newer && maj <= 31 && version > 70016:
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %s never did", version, coreMajor(maj, mnr))
 	}
 	return ""
 }
@@ -919,11 +956,11 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 		if relayTxes != nil && *relayTxes {
 			// "Hears" only if we announced something to it.
 			if sent["inv"] > 0 {
-				return "Unknown software that only listens: hears new transactions, fetches none"
+				return "Only listens: hears new transactions, fetches none"
 			}
-			return "Unknown software that only listens: asks for nothing"
+			return "Only listens: asks for nothing"
 		}
-		return "Unknown software that only listens: wants no transactions, asks for nothing"
+		return "Only listens: wants no transactions, asks for nothing"
 	}
 	for _, s := range services {
 		if s == "NETWORK" {
@@ -936,23 +973,39 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 	// nobody asked for, others
 	// fetching only headers, /Bitcoin:1.0.0/ asking for addresses each time,
 	// /relay-geo:0.1/ fetching every transaction and announcing none.
+	// A real node always offers a service, so one that offers none cannot be
+	// the node reading below; nil means Core did not say.
+	maybeNode := services == nil || len(services) > 0
+	or := func(node, other string) string {
+		if maybeNode {
+			return node + ", or " + other
+		}
+		return other
+	}
 	switch {
 	// BIP 35: "send me your whole mempool". Seen 22. to 26.10.2026 as /curl:8.5.0/,
 	// twenty times from one address, each right after the handshake.
 	case recv["mempool"] > 0:
-		return "Unknown software that asks for our mempool"
+		return "Asks for our mempool"
 	case recv["tx"] > 0 && recv["inv"] == 0:
-		return "Unknown software that pushes transactions without announcing them"
-	case relayTxes != nil && !*relayTxes && recv["getheaders"] > 0 && recv["getdata"] == 0:
-		return "Unknown software that follows new blocks: asks for headers, wants no transactions"
-	case relayTxes != nil && !*relayTxes && recv["sendheaders"] > 0 && recv["getdata"] == 0:
-		return "Unknown software that follows new blocks: wants headers announced, no transactions"
+		return "Pushes transactions without announcing them"
+	// Headers and no transactions is also what a real node does on a
+	// connection for blocks only (2.2% of 2,553 Core and Knots sessions on
+	// one node, 16. to 28.10.2026), so both readings are given. One that asks
+	// for addresses too runs with blocksonly=1 if it is a node (noTxWhy).
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0 && recv["getaddr"] > 0:
+		return "Asks for headers and addresses and wants no transactions: " + or("a node running blocksonly", "a program that tracks the chain")
+	case relayTxes != nil && !*relayTxes && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
+		return "Asks for headers and wants no transactions: " + or("a block-only connection", "a program that tracks the chain")
 	// Asking for data alone is no sign of listening: a peer that fetches
 	// blocks asks the same way. Only transactions sent to it count.
 	case relayTxes != nil && *relayTxes && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
-		return "Unknown software that listens to transactions: fetches every one it hears of, announces none"
+		// 0.5% of the real nodes above did the same: one that hears of
+		// everything from others first has nothing to announce.
+		return "Fetches transactions from your node and announces none: " + or("a node that hears of them elsewhere first", "a program collecting them")
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
-		return "Unknown software that collects addresses"
+		// 6.2% of the real nodes above did the same: one in sync asks for no headers.
+		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler")
 	}
 	return "Software with a name we don't recognise"
 }
@@ -1118,14 +1171,175 @@ func syncingFrom(inbound bool, sent map[string]int64, synced *int64, tip, connTi
 // asked for headers and addresses like a full node, 43 asked for addresses
 // and nothing else, the rest said nothing or only answered pings.
 func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {
-	const lead = "Introduced itself but left its name empty: "
+	// The pill says it has no name; the sentence says what it did.
 	switch {
-	case recv["getheaders"] > 0 && (recv["getaddr"] > 0 || recv["sendcmpct"] > 0):
-		return lead + "it asks for headers like a full node does"
+	case recv["getheaders"] > 0 && recv["getaddr"] > 0:
+		return "Asks for headers and addresses, like a full node does"
+	case recv["getheaders"] > 0 && recv["sendcmpct"] > 0:
+		return "Asks for headers and compact blocks, like a full node does"
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
-		return lead + "it asks for addresses and nothing else"
+		return "Asks for addresses, not for headers or blocks"
 	case quietAfterHandshake(recv, connTime, now):
-		return lead + "after the handshake it asked for nothing"
+		return "Introduced itself, then asked for nothing"
 	}
-	return lead + "software that keeps quiet about what it is"
+	return "Introduced itself without a name; nothing it did tells what it is"
+}
+
+// disguiseEvidence is every sign that a peer is not what its user agent says,
+// from the same checks that make it Disguised. kind and walletAbout are what
+// the name alone gave.
+func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now time.Time) []string {
+	var out []string
+	if kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames) {
+		_, guess, _ := strings.Cut(fakeAbout(r.Subver, walletAbout, r.ServicesNames), "\nProbably: ")
+		out = append(out, guess)
+	}
+	if kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version) {
+		out = append(out, bitcoinjTooNewAbout)
+	}
+	out = append(out,
+		behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now),
+		anachronism(r.Subver, r.ServicesNames),
+		protocolMismatch(r.Subver, r.Version))
+	if offersNothingAsCore(r.Subver, r.ServicesNames) {
+		out = append(out, offersNothingAbout)
+	}
+	if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
+		out = append(out, skippedHandshakeAbout(r.BytesRecvPerMsg))
+	}
+	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
+}
+
+// tellOf is a disguised peer's first reason in a few words, for the line
+// under its pill (28.10.2026: the pill said Disguised, and only the opened
+// row said why). It reads the reasons this file writes, so each of them has
+// a short form here; TestEveryDisguiseHasATell keeps the two together.
+// LinkingLion's own reason is the pill itself, so its first other evidence
+// is told, or that the address is a listed one.
+func tellOf(about string, lion bool) string {
+	lines := strings.Split(about, "\n")
+	var reasons []string
+	for _, l := range lines {
+		if r, ok := strings.CutPrefix(l, "Probably: "); ok && !(lion && strings.HasPrefix(r, "LinkingLion")) {
+			reasons = append(reasons, r)
+		} else if r, ok := strings.CutPrefix(l, "Also: "); ok {
+			reasons = append(reasons, r)
+		}
+	}
+	claimed := ""
+	if m := tellClaim.FindStringSubmatch(about); m != nil {
+		claimed = m[1]
+	}
+	for _, r := range reasons {
+		if t := shortReason(r, claimed); t != "" {
+			return t
+		}
+	}
+	if lion {
+		return "listed address range"
+	}
+	return ""
+}
+
+var (
+	tellAddrs    = regexp.MustCompile(`asked for addresses (\d+) times`)
+	tellPings    = regexp.MustCompile(`pings every (\d+) second`)
+	tellProtocol = regexp.MustCompile(`speaks protocol (\d+)`)
+	tellLacked   = regexp.MustCompile(`it offers (.+), which Core ([0-9.]+) did not have`)
+	tellClaim    = regexp.MustCompile(`^Claims: Bitcoin (?:Core |Knots \(Core )([0-9.]+)`)
+)
+
+// shortReason is one reason in a few words: what was measured, beside what
+// the peer claims where the two only mean something together.
+func shortReason(r, claimed string) string {
+	if m := tellAddrs.FindStringSubmatch(r); m != nil {
+		return "asks for addresses " + m[1] + "\u00d7"
+	}
+	if m := tellPings.FindStringSubmatch(r); m != nil {
+		return "pings every " + m[1] + " s"
+	}
+	if m := tellLacked.FindStringSubmatch(r); m != nil && serviceShort[m[1]] != "" {
+		return serviceShort[m[1]] + " for Core " + m[2]
+	}
+	if m := tellProtocol.FindStringSubmatch(r); m != nil {
+		if claimed != "" {
+			return "protocol " + m[1] + " for Core " + claimed
+		}
+		return "protocol " + m[1]
+	}
+	for _, t := range []struct{ in, tell string }{
+		{"left out wtxidrelay", "no wtxidrelay"},
+		{"offers no services", "offers no services"},
+		{"lacks NETWORK_LIMITED", "no NETWORK_LIMITED"},
+		{"asked for nothing", "asks for nothing"},
+		{"newer protocol than this wallet", "newer protocol than the wallet"},
+		{"offers blocks, which no wallet does", "offers blocks"},
+		{"speaks v2, which no wallet", "offers v2"},
+		{"v2 connections, which that software never had", "offers v2"},
+		{"which the Bitcore library never does", "more services than Bitcore"},
+		{"Sat0shi with a zero", "misspelt name"},
+		{"Core calls itself /Satoshi:", "misspelt name"},
+		{"Core writes its name between slashes", "misspelt name"},
+		{"poses as Libre Relay", "Libre Relay bit, no matching release"},
+	} {
+		if strings.Contains(r, t.in) {
+			return t.tell
+		}
+	}
+	return ""
+}
+
+// behaviourTell is, for a peer whose name says nothing (Other, No user
+// agent), what otherAbout and noAgentAbout saw it do, in a few words for the
+// line under its pill. Only what a real node does not do, or what says it
+// acts like one: where real nodes do the same (headers and no transactions,
+// addresses only, transactions fetched and none announced) it is "", and the
+// line keeps what Core saw. TestEveryBehaviourHasATell reads those two
+// functions.
+func behaviourTell(about string) string {
+	for _, t := range []struct{ in, tell string }{
+		{"hears new transactions, fetches none", "fetches nothing"},
+		{"asks for nothing", "asks for nothing"},
+		{"asked for nothing", "asks for nothing"},
+		{"a full node under a name its operator chose", "offers blocks"},
+		{"Asks for our mempool", "asks for our mempool"},
+		{"Pushes transactions without announcing them", "sends tx unannounced"},
+		{"Asks for headers and addresses, like a full node", "headers + addresses"},
+		{"Asks for headers and compact blocks, like a full node", "headers + compact blocks"},
+	} {
+		if strings.Contains(about, t.in) {
+			return t.tell
+		}
+	}
+	return ""
+}
+
+// withAlso adds each reason the about does not give yet as an "Also:" line,
+// the evidence without its verdict ("not Bitcoin Core - it lacks ..." says
+// "it lacks ..."): the verdict is the Probably line's.
+func withAlso(about string, reasons []string) string {
+	for _, why := range reasons {
+		if why == "" {
+			continue
+		}
+		if _, evidence, ok := strings.Cut(why, " - "); ok {
+			why = evidence
+		}
+		if strings.Contains(about, why) {
+			continue
+		}
+		if !strings.HasPrefix(why, "it ") {
+			why = "it " + why
+		}
+		about += "\nAlso: " + why
+	}
+	return about
+}
+
+// coreMajor is the release number people say: 0.21 for 0.x, 31 after.
+func coreMajor(maj, mnr int) string {
+	if maj == 0 {
+		return fmt.Sprintf("0.%d", mnr)
+	}
+	return fmt.Sprint(maj)
 }
