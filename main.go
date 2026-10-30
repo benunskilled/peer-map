@@ -370,8 +370,12 @@ func main() {
 	log.Printf("peer-map %s listening on :%s, %s, geo table %d regions, %d/%d ranges (v4/v6), network table %d operators, %d/%d ranges (v4/v6), Core polled at most every %s and only while the dashboard is open",
 		Version, cfg.port, mode, regions, v4, v6, networks, a4, a6, interval)
 
+	ln, err := listenConfig().Listen(context.Background(), "tcp", srv.Addr)
+	if err != nil {
+		log.Fatalf("peer-map: %v", err)
+	}
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("peer-map: %v", err)
 		}
 	}()
@@ -381,4 +385,14 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	srv.Shutdown(ctx)
+}
+
+// listenConfig is how the dashboard's port is opened. Go listeners accept
+// Multipath TCP by default on Linux (since Go 1.24); the dashboard only ever
+// gets plain connections from Umbrel's app proxy, so it is switched off and
+// the kernel's MPTCP code is never reached through this app.
+func listenConfig() *net.ListenConfig {
+	lc := &net.ListenConfig{}
+	lc.SetMultipathTCP(false)
+	return lc
 }

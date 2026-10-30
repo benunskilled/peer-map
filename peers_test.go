@@ -582,3 +582,9 @@ func TestTrafficDirections(t *testing.T) {
 		t.Fatal("traffic directions were swapped or dropped")
 	}
 }
+
+func TestListenerWithoutMultipathTCP(t *testing.T) {
+	if listenConfig().MultipathTCP() {
+		t.Fatal("the dashboard listener must not accept Multipath TCP")
+	}
+}
