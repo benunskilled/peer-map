@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.3.0 – 2026-10-30
+
+Peer Map no longer accepts Multipath TCP connections. ⚡ and 📡 show which peers may send you new blocks unasked and which ones your node sends them to. Ping shows the lowest ping, and a peer's detail splits its traffic by message type.
+
 ## 2.2.0 – 2026-10-29
 
 A grey line under each label says what sets a peer apart: why it is disguised, what an unknown program does, pruned, another chain, a pool or syncing. Cards fold to their title, the page holds your place while tables refresh, and every kind has a filter level for versions and names. Bitcoin Purity is flagged as another chain, and more clients are recognised.

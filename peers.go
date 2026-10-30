@@ -26,6 +26,8 @@ type rawPeer struct {
 	MinPing        *float64 `json:"minping"`
 	ConnTime       int64    `json:"conntime"`
 	Transport      string   `json:"transport_protocol_type"`
+	HBTo           bool     `json:"bip152_hb_to"`
+	HBFrom         bool     `json:"bip152_hb_from"`
 	BytesSent      int64    `json:"bytessent"`
 	BytesRecv      int64    `json:"bytesrecv"`
 	// What the peer offers and whether Core knows its chain. Pointers and a
@@ -182,11 +184,44 @@ type Peer struct {
 	// the line itself than the last ping, which also carries whatever was
 	// queued on either side at that moment - so it is the one a block's last
 	// hop is estimated from.
-	MinPingMs *float64 `json:"min_ping_ms,omitempty"`
-	ConnTime  int64    `json:"conntime"`
-	Transport string   `json:"transport,omitempty"`
-	BytesSent int64    `json:"bytes_sent"`
-	BytesRecv int64    `json:"bytes_recv"`
+	MinPingMs   *float64        `json:"min_ping_ms,omitempty"`
+	ConnTime    int64           `json:"conntime"`
+	Transport   string          `json:"transport,omitempty"`
+	HBTo        bool            `json:"hb_to,omitempty"`   // this peer may send us compact blocks without asking
+	HBFrom      bool            `json:"hb_from,omitempty"` // we may send this peer compact blocks without asking
+	BytesSent   int64           `json:"bytes_sent"`
+	BytesRecv   int64           `json:"bytes_recv"`
+	TrafficSent *messageTraffic `json:"traffic_sent,omitempty"`
+	TrafficRecv *messageTraffic `json:"traffic_recv,omitempty"`
+}
+
+// messageTraffic groups byte counters, not counts of transactions or blocks.
+// A nil map means the RPC did not supply this direction's counters.
+type messageTraffic struct {
+	Transactions int64 `json:"transactions"`
+	Blocks       int64 `json:"blocks"`
+	Addresses    int64 `json:"addresses"`
+	Other        int64 `json:"other"`
+}
+
+func trafficByMessage(messages map[string]int64) *messageTraffic {
+	if messages == nil {
+		return nil
+	}
+	traffic := &messageTraffic{}
+	for command, size := range messages {
+		switch command {
+		case "tx":
+			traffic.Transactions += size
+		case "block", "cmpctblock", "blocktxn", "headers":
+			traffic.Blocks += size
+		case "addr", "addrv2":
+			traffic.Addresses += size
+		default:
+			traffic.Other += size
+		}
+	}
+	return traffic
 }
 
 // group sorts a connection into one of the three buckets the map shows.
@@ -331,8 +366,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		p := Peer{
 			ID: r.ID, Addr: r.Addr, Network: r.Network, Group: g, Type: r.ConnectionType,
 			Subver: r.Subver, Kind: kind, About: aboutOf(r.Subver), NoRelay: !relays,
-			ConnTime: r.ConnTime, Transport: r.Transport,
+			ConnTime: r.ConnTime, Transport: r.Transport, HBTo: r.HBTo, HBFrom: r.HBFrom,
 			BytesSent: r.BytesSent, BytesRecv: r.BytesRecv,
+			TrafficSent: trafficByMessage(r.BytesSentPerMsg), TrafficRecv: trafficByMessage(r.BytesRecvPerMsg),
 			Services: r.ServicesNames, Version: r.Version,
 		}
 		// An empty list is the peer saying it offers nothing; a missing field
