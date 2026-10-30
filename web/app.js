@@ -11,6 +11,9 @@
   const INBOUND_LIMIT = 10;
   // A peer reaching the node through Tor shows the exit's place and operator; the peer itself stays hidden behind it.
   const TOR_EXIT_TITLE = "Tor exit: location and operator are the exit's, not the peer's";
+  // Same directions and symbols as Bitcoin Lab; Core reports both independently.
+  const HB_TITLE = "One of Core's three high-bandwidth peers: it may send a new block without being asked first, which gives it a head start of at least one ping.";
+  const HB_FROM_TITLE = "This peer has picked your node as one of its three high-bandwidth peers: your node sends it new blocks without being asked first.";
   const LABEL = { manual: "Manual", inbound: "Inbound", outbound: "Outbound" };
   const NS = "http://www.w3.org/2000/svg";
   const REGION_ZOOM = 2.5;                 // from this zoom factor on, markers split into regions
@@ -1958,6 +1961,21 @@
       // a wallet does.
       key: "kind", label: "Kind", val: (p) => p.kind || "",
       cell: (td, p) => {
+        const head = document.createElement("span");
+        head.className = "kind-head";
+        const marks = document.createElement("span");
+        marks.className = "hb-marks";
+        head.appendChild(marks);
+        for (const [active, symbol, title] of [[p.hb_to, "⚡", HB_TITLE], [p.hb_from, "📡", HB_FROM_TITLE]]) {
+          if (!active) continue;
+          const mark = document.createElement("span");
+          mark.className = "hb";
+          mark.textContent = symbol;
+          mark.title = title;
+          mark.setAttribute("role", "img");
+          mark.setAttribute("aria-label", title);
+          marks.appendChild(mark);
+        }
         const pill = document.createElement("span");
         // Green for every peer that can deliver a block first, grey for those
         // that never can, red for a disguise or LinkingLion even when it could.
@@ -1980,7 +1998,8 @@
         }
         pill.append(label);
         fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
-        td.appendChild(pill);
+        head.appendChild(pill);
+        td.appendChild(head);
         // The grey line under the pill, on a wide screen only, is for what
         // the pill cannot say: why a peer is Disguised, or what an unknown or
         // nameless one does (p.tell); which pool a pool node is; that a node
@@ -2062,10 +2081,10 @@
       },
     },
     {
-      key: "ping", label: "Ping", cls: "num", val: (p) => (p.ping_ms == null ? Infinity : p.ping_ms),
+      key: "ping", label: "Ping", cls: "num", val: (p) => (p.min_ping_ms == null ? Infinity : p.min_ping_ms),
       cell: (td, p) => {
-        if (p.ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
-        td.textContent = fmtPing(p.ping_ms);
+        if (p.min_ping_ms == null) { td.textContent = "–"; td.classList.add("dim"); return; }
+        td.textContent = fmtPing(p.min_ping_ms);
       },
     },
     { key: "conntime", label: "Connected", cls: "num", val: (p) => p.conntime, show: (p) => ago(Date.now() / 1000 - p.conntime) },
@@ -2169,7 +2188,7 @@
     // The line: how it is connected, how fast, how long, how much each way.
     const line = block("Connection");
     const tiles = el("div", "pd-tiles");
-    if (p.ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.ping_ms), p.min_ping_ms != null ? "lowest " + fmtPing(p.min_ping_ms) : ""));
+    if (p.min_ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.min_ping_ms)));
     if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
     // The group is the big word; how the link runs goes under it, so a phone
     // never has to break "Outbound" in two.
@@ -2191,9 +2210,41 @@
     sent.style.flexGrow = String(Math.max(p.bytes_sent / total, 0.02));
     got.style.flexGrow = String(Math.max(p.bytes_recv / total, 0.02));
     bar.append(sent, got);
-    const ratio = p.bytes_recv > 0 ? p.bytes_sent / p.bytes_recv : 0;
     traffic.append(el("span", "pd-label", "Traffic"), bar,
-      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it` + (ratio >= 10 ? ` \u00b7 ${Math.round(ratio)}\u00d7 more out than in` : "")));
+      el("span", "pd-small", `\u2191 ${bytesText(p.bytes_sent)} sent to it \u00b7 \u2193 ${bytesText(p.bytes_recv)} from it`));
+    if (p.traffic_sent || p.traffic_recv) {
+      const breakdown = el("div", "pd-traffic-types");
+      breakdown.setAttribute("role", "table");
+      breakdown.setAttribute("aria-label", "Traffic by message type, since connection began");
+      const headers = el("div", "pd-traffic-group");
+      const header = el("div", "pd-traffic-row");
+      header.setAttribute("role", "row");
+      for (const label of ["Type", "To peer ↑", "From peer ↓"]) {
+        const th = el("span", "pd-traffic-heading", label);
+        th.setAttribute("role", "columnheader");
+        header.appendChild(th);
+      }
+      headers.setAttribute("role", "rowgroup");
+      headers.appendChild(header);
+      breakdown.appendChild(headers);
+      const body = el("div", "pd-traffic-group");
+      for (const [key, label] of [["transactions", "Transactions"], ["blocks", "Blocks / headers"], ["addresses", "Addresses"], ["other", "Other messages"]]) {
+        const row = el("div", "pd-traffic-row");
+        row.setAttribute("role", "row");
+        const name = el("span", "", label);
+        name.setAttribute("role", "rowheader");
+        row.appendChild(name);
+        for (const counters of [p.traffic_sent, p.traffic_recv]) {
+          const value = el("span", "", counters && counters[key] != null ? bytesText(counters[key]) : "–");
+          value.setAttribute("role", "cell");
+          row.appendChild(value);
+        }
+        body.appendChild(row);
+      }
+      body.setAttribute("role", "rowgroup");
+      breakdown.appendChild(body);
+      traffic.append(breakdown, el("span", "pd-small", "Bytes since this connection began."));
+    }
     line.appendChild(traffic);
 
     // What it announced and where it sits.
@@ -2541,6 +2592,13 @@
     const cards = level === DROP_LEVELS && tight();
     for (const w of wraps) w.classList.toggle("cards", cards);
     if (!cards) alignColumns(wraps);
+    // A phone puts the kind beside the place. Reserve its actual width,
+    // including either or both relay marks, instead of a fixed pill-sized gap.
+    for (const w of wraps) for (const row of w.querySelectorAll("tr[data-anchor]")) {
+      const head = row.querySelector(".kind-head");
+      if (cards && head) row.style.setProperty("--kind-space", Math.ceil(head.getBoundingClientRect().width) + 12 + "px");
+      else row.style.removeProperty("--kind-space");
+    }
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
   const kindCut = (wraps) => wraps.some((w) =>

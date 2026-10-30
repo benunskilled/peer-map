@@ -6,6 +6,36 @@ import (
 	"time"
 )
 
+func TestClientsVerifiedOn29October(t *testing.T) {
+	for _, c := range []struct {
+		subver string
+		kind   string
+		relays bool
+		about  string
+	}{
+		{"/BitcoinRocks:31.1.1/", "Node (BitcoinRocks)", true, "RocksDB"},
+		{"/bip110-observer:0.1/", "Crawler", false, "BIP-110 Observer"},
+		{"/EMPORION:0.3/", "Light client", false, "OpenTimestamps"},
+		{"/SYMMARTYS:0.3/", "Light client", false, "formerly EMPORION"},
+		// Operator comments must not turn a Core node into a light client.
+		{"/Satoshi:31.1.0(EMPORION:0.3)/", "Node (Core)", true, ""},
+		{"/Satoshi:31.1.0(SYMMARTYS:0.3)/", "Node (Core)", true, ""},
+		// Similar names are not evidence for a match.
+		{"/EMPORION-test:0.3/", "Other", true, ""},
+		{"/BitcoinRocksTest:31.1.1/", "Other", true, ""},
+	} {
+		if got := kindOf(c.subver); got != c.kind {
+			t.Errorf("%s: kind %q, want %q", c.subver, got, c.kind)
+		}
+		if got := relaysBlocks(c.subver); got != c.relays {
+			t.Errorf("%s: relays %v, want %v", c.subver, got, c.relays)
+		}
+		if got := aboutOf(c.subver); !strings.Contains(got, c.about) || c.about == "" && got != "" {
+			t.Errorf("%s: about %q, want %q", c.subver, got, c.about)
+		}
+	}
+}
+
 func TestKindOf(t *testing.T) {
 	for subver, want := range map[string]string{
 		"/Satoshi:31.1.0/":                         "Node (Core)",
