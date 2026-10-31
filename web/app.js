@@ -2636,7 +2636,10 @@
   function sharedTooWide(wraps) {
     const { tables, widths } = sharedWidths(wraps);
     let sum = 0;
-    for (const [k, v] of widths) sum += k === "k-kind" ? Math.min(v, KIND_MIN) : v;
+    // alignColumns never gives Kind less than KIND_MIN, so that is what it
+    // counts here too: a short kind (a filter showing only the reason line)
+    // passed as fitting and then pushed the table past the card's edge.
+    for (const [k, v] of widths) sum += k === "k-kind" ? KIND_MIN : v;
     return tables.some((t) => sum > t.parentElement.clientWidth + 1);
   }
   // Kind gets what it needs - cut, and whole on hover, only when there is
