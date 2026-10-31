@@ -412,8 +412,10 @@ var aboutRules = []struct {
 	// Bitcoin Lab's record of the node this was written for, 13.9. to
 	// 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
 	// transactions, gone after 18 seconds at the median; the same handshake
-	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr).
-	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler, asks for addresses"},
+	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr). A
+	// session that stays, like Bitnodes' own, asks for nothing: getpeerinfo
+	// on 31.10.2026, one of 22 hours, no getaddr.
+	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler"},
 	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
 	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
 	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
