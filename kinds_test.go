@@ -17,6 +17,7 @@ func TestClientsVerifiedOn29October(t *testing.T) {
 		{"/bip110-observer:0.1/", "Crawler", false, "BIP-110 Observer"},
 		{"/EMPORION:0.3/", "Light client", false, "OpenTimestamps"},
 		{"/SYMMARTYS:0.3/", "Light client", false, "formerly EMPORION"},
+		{"/FavillaKEY:0.1/", "Other", true, "Favilla KEY"},
 		// Operator comments must not turn a Core node into a light client.
 		{"/Satoshi:31.1.0(EMPORION:0.3)/", "Node (Core)", true, ""},
 		{"/Satoshi:31.1.0(SYMMARTYS:0.3)/", "Node (Core)", true, ""},
