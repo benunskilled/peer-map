@@ -19,6 +19,9 @@ type poolNode struct {
 }
 
 var poolNodes = map[netip.Addr]poolNode{
+	// 31.10.2026: forward and reverse DNS agree (uwsolo.ckpool.org), an
+	// official Solo CK stratum endpoint.
+	netip.MustParseAddr("147.135.104.8"): {"Solo CK", "is uwsolo.ckpool.org, an official Solo CK stratum endpoint"},
 	// AtlasPool runs ckpool at points of presence on Amazon. The tag names its
 	// own site, not where the server is: the one in London says FRA.
 	netip.MustParseAddr("3.11.221.101"):  {"AtlasPool", "hands out AtlasPool's mining jobs (AtlasPool/FRA)"},
