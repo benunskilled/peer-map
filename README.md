@@ -6,7 +6,7 @@ Your node talks to strangers all day. Each one says what software it runs, but i
 
 The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. Open port 8333 and more strangers come knocking.
 
-![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=3)
+![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=4)
 
 ## What gives them away
 
@@ -34,7 +34,7 @@ Locations are roughly correct. A peer coming through a Tor exit is pinned where 
 
 Install [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) next to it and every new block gets its own story: which pool mined it and which of your peers brought it to you first. That peer lights up on the map, and its address stays green in the tables from then on.
 
-Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all the way to your mining job: your peer, Core, the block template, your pool. You see how much of the time each step takes.
+Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all the way to your mining job: your peer, Core, the block template, your pool. You see roughly where the time goes. When the block was found is unknown, and the hop from your peer is estimated from its ping.
 
 ![A block from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
