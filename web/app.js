@@ -2111,10 +2111,12 @@
       panel.appendChild(b);
       return b;
     };
-    const stat = (label, big, small) => {
-      const s = el("div", "pd-stat");
-      s.append(el("span", "pd-label", label), el("span", "pd-big", big));
-      if (small) s.appendChild(el("span", "pd-small", small));
+    // One line of the connection: name on the left, value on the right, in
+    // the size of the traffic table under it. These were tiles in 17px, the
+    // largest type in the panel, and at 960px too narrow for "Inbound".
+    const fact = (label, value) => {
+      const s = el("div", "pd-fact");
+      s.append(el("span", "", label), el("span", "", value));
       return s;
     };
 
@@ -2187,17 +2189,13 @@
 
     // The line: how it is connected, how fast, how long, how much each way.
     const line = block("Connection");
-    const tiles = el("div", "pd-tiles");
-    if (p.min_ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.min_ping_ms)));
-    if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
-    // The group is the big word; how the link runs goes under it, so a phone
-    // never has to break "Outbound" in two.
-    const link = stat("Link", LABEL[p.group],
-      [typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type), netLabel(p.network), p.transport].filter(Boolean).join(" \u00b7 "));
-    link.classList.add("pd-link");
-    tiles.appendChild(link);
+    const facts = el("div", "pd-facts");
+    if (p.min_ping_ms != null) facts.appendChild(fact("Ping", fmtPing(p.min_ping_ms)));
+    if (p.conntime) facts.appendChild(fact("Connected", ago(Date.now() / 1000 - p.conntime)));
+    facts.appendChild(fact("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type),
+      netLabel(p.network), p.transport].filter(Boolean).join(" \u00b7 ")));
 
-    line.appendChild(tiles);
+    line.appendChild(facts);
     if (p.tor_exit) {
       const tor = el("p", "pd-flag-row");
       tor.append(el("span", "pd-flag", "Tor exit"), " " + TOR_EXIT_TITLE.replace(/^Tor exit: /, "Reached through a Tor exit: "));
