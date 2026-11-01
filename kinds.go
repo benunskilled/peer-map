@@ -353,6 +353,14 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool"},
 	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder"},
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions"},
+	// Relay networks with a name of their own: bloXroute's gateway builds
+	// "bloXroute Gateway <version>" (bxgateway, 2022); Matt Corallo's
+	// RelayNode adapters send /RelayNetworkClient:42/ and
+	// /RelayNetworkServer:42/ (2013-2017); Falcon was seen as
+	// /Cornell-Falcon-Network:0.1.0/ (bips discussion, March 2017).
+	{regexp.MustCompile(`(?i)^bloXroute Gateway`), "bloXroute Gateway, a relay network's gateway: passes on blocks and transactions"},
+	{regexp.MustCompile(`^/RelayNetwork(Client|Server):`), "Matt Corallo's old Relay Network, which ran until 2017"},
+	{regexp.MustCompile(`^/Cornell-Falcon-Network:`), "Falcon, Cornell's block relay network from 2016"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
