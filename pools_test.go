@@ -54,3 +54,23 @@ func TestUndescribedKindsGetALine(t *testing.T) {
 		}
 	}
 }
+
+// A known block relay keeps its pill and says whose it is.
+func TestRelayNode(t *testing.T) {
+	p := convert([]rawPeer{{ID: 1, Addr: "64.20.34.46:40860", ConnectionType: "inbound", Inbound: true, Version: 70016}})[0]
+	if p.Kind != noAgentKind || p.About != "M45Core's block relay" || p.Tell != "M45Core block relay" || p.PoolProof != "This address is M45Core.com, BTCFlux's block relay" {
+		t.Errorf("got %q %q %q %q", p.Kind, p.About, p.Tell, p.PoolProof)
+	}
+}
+
+// No address is both a pool's and a relay's, and none is IPv6.
+func TestPoolListsIPv4(t *testing.T) {
+	for a := range poolNodes {
+		if !a.Is4() {
+			t.Errorf("%s: IPv6", a)
+		}
+		if _, ok := relayNodes[a]; ok {
+			t.Errorf("%s: pool and relay", a)
+		}
+	}
+}

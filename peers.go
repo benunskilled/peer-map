@@ -150,7 +150,7 @@ type Peer struct {
 	App string `json:"app,omitempty"`
 	// The mining pool a pool node belongs to, where that is known (pools.go).
 	Pool string `json:"pool,omitempty"`
-	// How the address was proven the pool's: for the panel, not the list.
+	// How the address was proven the pool's, or a block relay's: for the panel, not the list.
 	PoolProof string `json:"pool_proof,omitempty"`
 	Subver    string `json:"subver"`
 	Kind      string `json:"kind"`            // what the user agent claims; see kinds.go
@@ -481,6 +481,11 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			case !byAddr && p.Kind == "Pool node":
 				p.Pool = n.pool
 			}
+		}
+		// A known block relay keeps its pill; the line under it says whose.
+		if n, ok := relayOf(r.Addr); ok && (p.Kind == noAgentKind || strings.HasPrefix(p.Kind, "Node")) {
+			p.About, p.Tell = n.pool+"'s block relay", n.pool+" block relay"
+			p.PoolProof = "This address " + n.proof
 		}
 		if p.NoTxRelay {
 			p.NoTxWhy = noTxWhy(r, p.Kind)
