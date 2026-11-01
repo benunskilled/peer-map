@@ -26,6 +26,10 @@ var poolNodes = map[netip.Addr]poolNode{
 	// page lists it as the Europe stratum host (port 3465). Its blocks carry
 	// /Mining-Dutch/, e.g. 964,388.
 	netip.MustParseAddr("51.178.76.133"): {"Mining-Dutch", "is europe.mining-dutch.nl, Mining-Dutch's BTC stratum host"},
+	// 01.11.2026: btc.zsolo.bid resolves here, and zSolo's own BTC page lists it
+	// as the BTC stratum host (ports 6057, 6060; archived 21.03.2026). It joined
+	// this node as /Satoshi:29.2.0/ on 30.10.2026. A solo pool; no block known yet.
+	netip.MustParseAddr("92.119.126.14"): {"zSolo", "is btc.zsolo.bid, zSolo's BTC stratum host"},
 	// AtlasPool runs ckpool at points of presence on Amazon. The tag names its
 	// own site, not where the server is: the one in London says FRA.
 	netip.MustParseAddr("3.11.221.101"):  {"AtlasPool", "hands out AtlasPool's mining jobs (AtlasPool/FRA)"},
