@@ -636,12 +636,12 @@ func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
 	r := core
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
 	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind ||
-		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; since 0.21 Core sends both to every peer on protocol 70016 or later, as this one is" {
+		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; since 0.21 Core sends both to every peer on protocol 70016 or later" {
 		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
 	}
 	// With sendaddrv2 sent, only wtxidrelay is named.
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
-	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; since 0.21 Core sends it to every peer on protocol 70016 or later, as this one is" {
+	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; since 0.21 Core sends it to every peer on protocol 70016 or later" {
 		t.Errorf("only wtxidrelay missing: got %q", got.About)
 	}
 	// Knots is Core underneath and sends it too.
