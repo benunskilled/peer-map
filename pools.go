@@ -144,6 +144,19 @@ func relayOf(addr string) (poolNode, bool) {
 	return poolNode{}, false
 }
 
+// ViaBTC's own relay software, bitpeer, introduces itself as an old Bitcoin
+// Core: /Satoshi:0.19.0.1/, protocol 70015, and of all services only
+// WITNESS. 0xB10C traced it to ViaBTC's code and its block broadcasts
+// (b10c.me, March 2024). A real Core 0.19 offers NETWORK_LIMITED at least,
+// so it does not match. On one node three of them, all on Amazon in
+// Europe, came daily from 16.10.2026, sent blocks and no transactions, and
+// were never first in 3,192 blocks.
+const viaBitpeerAbout = "Claims: Bitcoin Core 0.19.0.1\nProbably: ViaBTC's own relay software (bitpeer) – it says Bitcoin Core 0.19.0.1, but offers only WITNESS"
+
+func isViaBitpeer(subver string, version int, services []string) bool {
+	return subver == "/Satoshi:0.19.0.1/" && version == 70015 && len(services) == 1 && services[0] == "WITNESS"
+}
+
 // A pool the user agent names itself, where no address says more.
 var poolLabels = []struct {
 	re   *regexp.Regexp

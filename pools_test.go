@@ -74,3 +74,23 @@ func TestPoolListsIPv4(t *testing.T) {
 		}
 	}
 }
+
+// ViaBTC's bitpeer: the exact fingerprint 0xB10C found, and only that.
+func TestViaBitpeer(t *testing.T) {
+	for _, c := range []struct {
+		subver   string
+		version  int
+		services []string
+		pool     string
+	}{
+		{"/Satoshi:0.19.0.1/", 70015, []string{"WITNESS"}, "ViaBTC"},
+		{"/Satoshi:0.19.0.1/", 70015, []string{"WITNESS", "NETWORK_LIMITED"}, ""},
+		{"/Satoshi:0.19.0.1/", 70016, []string{"WITNESS"}, ""},
+		{"/Satoshi:0.19.1/", 70015, []string{"WITNESS"}, ""},
+	} {
+		p := convert([]rawPeer{{ID: 1, Addr: "54.228.82.138:40000", ConnectionType: "inbound", Inbound: true, Subver: c.subver, Version: c.version, ServicesNames: c.services}})[0]
+		if p.Pool != c.pool || (c.pool != "" && (p.Kind != "Pool node" || p.PoolProof != "Found by 0xB10C, b10c.me" || !strings.Contains(p.About, "bitpeer"))) {
+			t.Errorf("%s %d %v: got %q %q %q", c.subver, c.version, c.services, p.Kind, p.Pool, p.About)
+		}
+	}
+}
