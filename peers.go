@@ -396,6 +396,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			p.Kind, p.About = fakeWalletKind, "Claims: "+claim+"\nProbably: "+bitcoinjTooNewAbout+bitcoinjWhy(r, now)
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
+		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
+			p.Kind, p.Pool, p.About = "Pool node", "ViaBTC", viaBitpeerAbout
+			p.PoolProof = "Found by 0xB10C, b10c.me"
 		case libreKind != "":
 			p.Kind, p.About = libreKind, libreAbout
 		case borrowedKind != "" &&
