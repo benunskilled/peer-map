@@ -36,7 +36,7 @@ Install [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) next to it an
 
 Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all the way to your mining job: your peer, Core, the block template, your pool. You see roughly where the time goes. When the block was found is unknown, and the hop from your peer is estimated from its ping.
 
-**Why.** I built this after my solo pool came in about a second behind the public pools in the stratum race. Changing my max peers changed nothing. Breaking the race down showed where the time actually went, and on my node it was not only the peers: it was my old computer turning a full block into new mining work. Raising `blockmintxfee` to 1 sat/vB was the biggest and easiest win, about 0.75 s on my node, at the cost of leaving low-fee transactions out.
+**Why.** I built this after my solo pool came in about a second behind the public pools in the stratum race. Changing my max peers changed nothing. Breaking the race down showed where the time actually went, and on my node it was not only the peers: it was mostly my old computer turning a full block into new mining work. Raising `blockmintxfee` to 1 sat/vB was the biggest and easiest win, about 0.75 s on my node, at the cost of leaving low-fee transactions out.
 
 ![A block from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
