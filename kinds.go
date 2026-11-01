@@ -700,9 +700,9 @@ func skipsWtxidrelay(subver string, version int, recv map[string]int64, anySent 
 // under the same condition as wtxidrelay, so it is named when it is missing too.
 func skippedHandshakeAbout(recv map[string]int64) string {
 	if recv["sendaddrv2"] == 0 {
-		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; since 0.21 Core sends both to every peer on protocol 70016 or later, as this one is"
+		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; since 0.21 Core sends both to every peer on protocol 70016 or later"
 	}
-	return "not Bitcoin Core - it left out wtxidrelay when connecting; since 0.21 Core sends it to every peer on protocol 70016 or later, as this one is"
+	return "not Bitcoin Core - it left out wtxidrelay when connecting; since 0.21 Core sends it to every peer on protocol 70016 or later"
 }
 
 // offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no
