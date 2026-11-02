@@ -739,6 +739,8 @@
       const who = /Probably: (.+)'s network research/.exec(p.about || "");
       if (who) return who[1];
       if (/^\/btcwire:[^/]*\/Satoshi:/.test(p.subver || "")) return "Pool Detective";
+      // "/dsn.tm.kit.edu/bitcoin:0.9.99/" ends in "bitcoin".
+      if (/^\/dsn\.[a-z]+\.kit\.edu\//i.test(p.subver || "")) return "KIT";
     }
     // Wasabi and Ginger borrow Core's names: the about says which it is.
     const w = /(Wasabi|Ginger)/.exec(p.about || "");
