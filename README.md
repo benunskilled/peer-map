@@ -4,7 +4,7 @@
 
 Your node talks to strangers all day. Each one says what software it runs, but is it telling the truth? Peer Map takes a closer look: what the peer offers, whether it wants your transactions, how often it pings or asks for addresses, which chain it is on. A normal node, a wallet, a crawler, or a spy in disguise? Find out.
 
-The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. Open port 8333 and more strangers come knocking.
+The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. No open port needed, but open 8333 and more strangers come knocking.
 
 ![Peer Map dashboard](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/overview.png?v=4)
 
@@ -12,7 +12,7 @@ The map shows where your peers are, who hosts them and whether they are really s
 
 A name is easy to fake. Behaviour is harder. Peer Map, for example, catches an ancient "Bitcoin Core" offering encryption that Core only got years later, a "Sat0shi" written with a zero, and a "Bitcoin Core" that keeps asking for your addresses because it is collecting them. It also spots a wallet speaking a protocol its app never knew.
 
-Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawlers, university scanners and disguised peers. Hover over a label to see why the peer got it. Peers that can never bring you a block are marked, so you know who is just taking up a seat.
+Every peer gets a label, from Core and Knots nodes to pool nodes, wallets, crawlers, university scanners and disguised peers. Tap a peer to see why it got its label. Peers that can never bring you a block are marked, so you know who is just taking up a seat.
 
 Some disguised peers even have a name. [LinkingLion](https://b10c.me/observations/06-linkinglion/), which may link transactions to the IP addresses they came from, gets its own red pill.
 
@@ -36,6 +36,8 @@ Install [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) next to it an
 
 Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all the way to your mining job: your peer, Core, the block template, your pool. You see roughly where the time goes. When the block was found is unknown, and the hop from your peer is estimated from its ping.
 
+**Why.** I built this after my solo pool came in about a second behind the public pools in the stratum race. Changing my max peers changed nothing. Breaking the race down showed where the time actually went, and on my node it was not only the peers: it was mostly my old computer turning a full block into new mining work. Raising `blockmintxfee` to 1 sat/vB was the biggest and easiest win, about 0.75 s on my node, at the cost of leaving low-fee transactions out. What's left now happens before Core. That part is the peers.
+
 ![A block from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
 *A block on my node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c).*
@@ -46,7 +48,11 @@ No peer address goes to any outside service. The map and the location data are b
 
 ## Install on Umbrel
 
-Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store) and install **Peer Map**. It requires the official **Bitcoin Node** app. Tested with Bitcoin Core 31.1. Open it from Umbrel or at `<your-umbrel>:8791`.
+1. Add the [Bitcoin Peer Lab community store](https://github.com/benunskilled/bitcoin-lab-community-store).
+2. Install **Peer Map**. It requires the official **Bitcoin Node** app.
+3. Open it from Umbrel or at `<your-umbrel>:8791`.
+
+Tested with Bitcoin Core 32.1.
 
 [Bitcoin Lab](https://github.com/benunskilled/bitcoin-lab) is in the same store. Both apps work on their own, but together they tell you even more.
 

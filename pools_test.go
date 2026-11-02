@@ -54,3 +54,56 @@ func TestUndescribedKindsGetALine(t *testing.T) {
 		}
 	}
 }
+
+// A known block relay keeps its pill and says whose it is.
+func TestRelayNode(t *testing.T) {
+	p := convert([]rawPeer{{ID: 1, Addr: "64.20.34.46:40860", ConnectionType: "inbound", Inbound: true, Version: 70016}})[0]
+	if p.Kind != noAgentKind || p.About != "M45Core's block relay" || p.Tell != "M45Core block relay" || p.PoolProof != "This address is M45Core.com, BTCFlux's block relay" {
+		t.Errorf("got %q %q %q %q", p.Kind, p.About, p.Tell, p.PoolProof)
+	}
+}
+
+// No address is both a pool's and a relay's, and none is IPv6.
+func TestPoolListsIPv4(t *testing.T) {
+	for a := range poolNodes {
+		if !a.Is4() {
+			t.Errorf("%s: IPv6", a)
+		}
+		if _, ok := relayNodes[a]; ok {
+			t.Errorf("%s: pool and relay", a)
+		}
+	}
+}
+
+// ViaBTC's bitpeer: the exact fingerprint 0xB10C found, and only that.
+func TestViaBitpeer(t *testing.T) {
+	for _, c := range []struct {
+		subver   string
+		version  int
+		services []string
+		pool     string
+	}{
+		{"/Satoshi:0.19.0.1/", 70015, []string{"WITNESS"}, "ViaBTC"},
+		{"/Satoshi:0.19.0.1/", 70015, []string{"WITNESS", "NETWORK_LIMITED"}, ""},
+		{"/Satoshi:0.19.0.1/", 70016, []string{"WITNESS"}, ""},
+		{"/Satoshi:0.19.1/", 70015, []string{"WITNESS"}, ""},
+	} {
+		p := convert([]rawPeer{{ID: 1, Addr: "54.228.82.138:40000", ConnectionType: "inbound", Inbound: true, Subver: c.subver, Version: c.version, ServicesNames: c.services}})[0]
+		if p.Pool != c.pool || (c.pool != "" && (p.Kind != "Pool node" || p.PoolProof != "Found by 0xB10C, b10c.me" || !strings.Contains(p.About, "bitpeer"))) {
+			t.Errorf("%s %d %v: got %q %q %q", c.subver, c.version, c.services, p.Kind, p.Pool, p.About)
+		}
+	}
+}
+
+// Relay networks that send a name of their own get a line, not a guess.
+func TestRelayClients(t *testing.T) {
+	for ua, want := range map[string]string{
+		"bloXroute Gateway 2.108.2":      "bloXroute Gateway",
+		"/RelayNetworkClient:42/":        "Matt Corallo's old Relay Network",
+		"/Cornell-Falcon-Network:0.1.0/": "Falcon",
+	} {
+		if got := aboutOf(ua); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: got %q", ua, got)
+		}
+	}
+}

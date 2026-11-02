@@ -2111,10 +2111,12 @@
       panel.appendChild(b);
       return b;
     };
-    const stat = (label, big, small) => {
-      const s = el("div", "pd-stat");
-      s.append(el("span", "pd-label", label), el("span", "pd-big", big));
-      if (small) s.appendChild(el("span", "pd-small", small));
+    // One line of the connection: name on the left, value on the right, in
+    // the size of the traffic table under it. These were tiles in 17px, the
+    // largest type in the panel, and at 960px too narrow for "Inbound".
+    const fact = (label, value) => {
+      const s = el("div", "pd-fact");
+      s.append(el("span", "", label), el("span", "", value));
       return s;
     };
 
@@ -2187,17 +2189,13 @@
 
     // The line: how it is connected, how fast, how long, how much each way.
     const line = block("Connection");
-    const tiles = el("div", "pd-tiles");
-    if (p.min_ping_ms != null) tiles.appendChild(stat("Ping", fmtPing(p.min_ping_ms)));
-    if (p.conntime) tiles.appendChild(stat("Connected", ago(Date.now() / 1000 - p.conntime)));
-    // The group is the big word; how the link runs goes under it, so a phone
-    // never has to break "Outbound" in two.
-    const link = stat("Link", LABEL[p.group],
-      [typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type), netLabel(p.network), p.transport].filter(Boolean).join(" \u00b7 "));
-    link.classList.add("pd-link");
-    tiles.appendChild(link);
+    const facts = el("div", "pd-facts");
+    if (p.min_ping_ms != null) facts.appendChild(fact("Ping", fmtPing(p.min_ping_ms)));
+    if (p.conntime) facts.appendChild(fact("Connected", ago(Date.now() / 1000 - p.conntime)));
+    facts.appendChild(fact("Link", [LABEL[p.group], typeLabel(p.type).toLowerCase() === p.group ? "" : typeLabel(p.type),
+      netLabel(p.network), p.transport].filter(Boolean).join(" \u00b7 ")));
 
-    line.appendChild(tiles);
+    line.appendChild(facts);
     if (p.tor_exit) {
       const tor = el("p", "pd-flag-row");
       tor.append(el("span", "pd-flag", "Tor exit"), " " + TOR_EXIT_TITLE.replace(/^Tor exit: /, "Reached through a Tor exit: "));
@@ -2583,15 +2581,21 @@
       for (const w of wraps) w.dataset.drops = String(level);
       if (level === DROP_LEVELS) break;
       if (tight()) continue;
-      if (level < KIND_LEVEL) {
-        alignColumns(wraps);
-        if (kindCut(wraps)) continue;
-      }
+      // The sum above is a forecast. What the laid-out table really needs
+      // decides: a forecast a few pixels short let Crawler and Core 22.x
+      // run 2-3px past the card at 960px.
+      alignColumns(wraps);
+      if (overflows(wraps)) continue;
+      if (level < KIND_LEVEL && kindCut(wraps)) continue;
       break;
     }
-    const cards = level === DROP_LEVELS && tight();
+    let cards = level === DROP_LEVELS && tight();
+    if (!cards) {
+      alignColumns(wraps);
+      cards = level === DROP_LEVELS && overflows(wraps);
+      if (cards) unalign();
+    }
     for (const w of wraps) w.classList.toggle("cards", cards);
-    if (!cards) alignColumns(wraps);
     // A phone puts the kind beside the place. Reserve its actual width,
     // including either or both relay marks, instead of a fixed pill-sized gap.
     for (const w of wraps) for (const row of w.querySelectorAll("tr[data-anchor]")) {
@@ -2601,6 +2605,7 @@
     }
     if (window.scrollY !== y) window.scrollTo(0, y);
   }
+  const overflows = (wraps) => wraps.some((w) => w.clientWidth && w.scrollWidth > w.clientWidth + 1);
   const kindCut = (wraps) => wraps.some((w) =>
     [...w.querySelectorAll("td.k-kind small.ua")].some((e) => e.offsetWidth && e.scrollWidth > e.clientWidth + 1));
 
@@ -2636,7 +2641,11 @@
   function sharedTooWide(wraps) {
     const { tables, widths } = sharedWidths(wraps);
     let sum = 0;
-    for (const [k, v] of widths) sum += k === "k-kind" ? Math.min(v, KIND_MIN) : v;
+    // alignColumns never gives Kind less than KIND_MIN, so that is what it
+    // counts here too: a short kind (a filter showing only the reason line)
+    // passed as fitting and then pushed the table past the card's edge.
+    // The others are rounded up the way alignColumns rounds them.
+    for (const [k, v] of widths) sum += k === "k-kind" ? KIND_MIN : Math.ceil(v);
     return tables.some((t) => sum > t.parentElement.clientWidth + 1);
   }
   // Kind gets what it needs - cut, and whole on hover, only when there is
