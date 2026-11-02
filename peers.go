@@ -384,7 +384,18 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		p.NoRelay = p.NoRelay || p.NoServices
 		borrowedKind, borrowedAbout := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
 		libreKind, libreAbout := libreRelay(r.Subver, r.ServicesNames)
+		researcher, host, isResearch := researchHostOf(r.Addr)
 		switch {
+		case isResearch:
+			p.Kind, p.About = "Research scanner", "Probably: "+researcher+"'s network research"
+			if r.Subver != "" {
+				claim := claimOf(r.Subver)
+				if a := aboutOf(r.Subver); a != "" {
+					claim, _, _ = strings.Cut(a, ",")
+				}
+				p.About = "Claims: " + claim + "\n" + p.About
+			}
+			p.PoolProof = "This address is " + host + ", listed by 0xB10C"
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
 		case p.Kind == "Wallet" && bitcoinjTooNew(r.Subver, r.Version):

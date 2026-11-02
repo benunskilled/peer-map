@@ -553,6 +553,26 @@ func isLinkingLion(addr string) bool {
 	return false
 }
 
+// University scanners that borrow a wallet's name instead of saying what they
+// are. Both are among the research hosts in 0xB10C's peer-observer web UI
+// (isLikelySpy, 2026-04-23), and the reverse DNS of each points back to its
+// university. 147.229.8.240 came 13 times to the node this was written for
+// between 16.10. and 02.11.2026, as /bitcoinj:0.16.2/Bitcoin Wallet:9.26/
+// and /bitcoinj:0.16.5/Bitcoin Wallet:10.26/, offering nothing.
+var researchHosts = map[netip.Addr]struct{ who, host string }{
+	netip.MustParseAddr("147.229.8.240"): {"Brno University of Technology", "anton1.fit.vutbr.cz"},
+	netip.MustParseAddr("161.53.40.241"): {"University of Rijeka", "pollux.riteh.hr"},
+}
+
+func researchHostOf(addr string) (who, host string, ok bool) {
+	a, err := netip.ParseAddr(hostOf(addr))
+	if err != nil {
+		return "", "", false
+	}
+	h, ok := researchHosts[a.Unmap()]
+	return h.who, h.host, ok
+}
+
 // The credit is not repeated on every card: the hover tooltip and the Disguised
 // explanation above the list carry it (LION_CREDIT in web/app.js).
 const linkingLionAbout = "LinkingLion – connects to many nodes and may link transactions to their IP addresses"
@@ -1231,7 +1251,28 @@ func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now ti
 	if skipsWtxidrelay(r.Subver, r.Version, r.BytesRecvPerMsg, anyWtxid) {
 		out = append(out, skippedHandshakeAbout(r.BytesRecvPerMsg))
 	}
+	if givesOwnAddress(r) {
+		out = append(out, ownAddressAbout)
+	}
 	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
+}
+
+// A peer's version message says at which address it reached us. 0xB10C saw
+// clients posing as Core 25 write their own address there instead (thread on
+// clients ignoring fRelay, Delving Bitcoin, update of 19.10.2026). Of 224
+// inbound peers on the node this was written for, none did (02.11.2026), so
+// it only backs a disguise found otherwise. Localhost is not counted:
+// CKPool's ckp2p sends 127.0.0.1 too.
+const ownAddressAbout = "it says it reached us at its own address"
+
+func givesOwnAddress(r rawPeer) bool {
+	if !r.Inbound || r.AddrLocal == "" {
+		return false
+	}
+	us, err1 := netip.ParseAddr(hostOf(r.AddrLocal))
+	them, err2 := netip.ParseAddr(hostOf(r.Addr))
+	return err1 == nil && err2 == nil && us.Unmap() == them.Unmap() &&
+		us.Unmap().IsGlobalUnicast() && !us.Unmap().IsPrivate()
 }
 
 // tellOf is a disguised peer's first reason in a few words, for the line
@@ -1305,6 +1346,7 @@ func shortReason(r, claimed string) string {
 		{"Core calls itself /Satoshi:", "misspelt name"},
 		{"Core writes its name between slashes", "misspelt name"},
 		{"poses as Libre Relay", "Libre Relay bit, no matching release"},
+		{"reached us at its own address", "gives its own address as ours"},
 	} {
 		if strings.Contains(r, t.in) {
 			return t.tell
