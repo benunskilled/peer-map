@@ -2,7 +2,6 @@ package main
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -27,12 +26,10 @@ func libreRelay(subver string, services []string) (string, string) {
 	if !slices.Contains(services, libreRelayService) {
 		return "", ""
 	}
-	m := claimedCore.FindStringSubmatch(subver)
-	if m == nil {
+	maj, mnr, ok := claimedNumbers(subver)
+	if !ok {
 		return "", ""
 	}
-	maj, _ := strconv.Atoi(m[1])
-	mnr, _ := strconv.Atoi(m[2])
 	garbageman := "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"
 	switch {
 	case strings.Contains(subver, "Knots:"):

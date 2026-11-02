@@ -60,7 +60,7 @@ func stayedLong(connTime int64, now time.Time) string {
 // while, since one that has just arrived has not had the time. recv is
 // getpeerinfo's bytesrecv_per_msg; nil means the node did not report it.
 func askedNothing(recv map[string]int64, connTime int64, now time.Time) string {
-	if recv == nil || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+	if recv == nil || !connectedFor(connTime, now, behaviourMinAge) {
 		return ""
 	}
 	for _, m := range []string{"getheaders", "getblocks", "getdata", "filterload", "tx", "mempool"} {
@@ -138,7 +138,7 @@ var gingerAgents = map[string]bool{
 // others under that name spoke 70016.
 func p2pCrawlerSays(subver string, version int, services []string, relayTxes *bool) bool {
 	return subver == "/Satoshi:23.0.0/" && version == 70015 && services != nil && len(services) == 0 &&
-		relayTxes != nil && !*relayTxes
+		refusesTx(relayTxes)
 }
 
 // behindCoreName is the kind and about for Wasabi, Ginger and Wasabi's peer

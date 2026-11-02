@@ -33,11 +33,10 @@ var linkingLion = []netip.Prefix{
 }
 
 func isLinkingLion(addr string) bool {
-	a, err := netip.ParseAddr(hostOf(addr))
-	if err != nil {
+	a, ok := ipOf(addr)
+	if !ok {
 		return false
 	}
-	a = a.Unmap()
 	for _, p := range linkingLion {
 		if p.Contains(a) {
 			return true
@@ -58,11 +57,11 @@ var researchHosts = map[netip.Addr]struct{ who, host string }{
 }
 
 func researchHostOf(addr string) (who, host string, ok bool) {
-	a, err := netip.ParseAddr(hostOf(addr))
-	if err != nil {
+	a, ok := ipOf(addr)
+	if !ok {
 		return "", "", false
 	}
-	h, ok := researchHosts[a.Unmap()]
+	h, ok := researchHosts[a]
 	return h.who, h.host, ok
 }
 
