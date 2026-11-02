@@ -1287,7 +1287,7 @@ func neverAsksForTx(subver string, relayTxes *bool, sent map[string]int64, connT
 		now.Unix()-connTime < 3600 || sent["inv"] < 1e6 || sent["tx"] > 0 {
 		return ""
 	}
-	return fmt.Sprintf("it never asked for a transaction, though we announced %d MB of them", sent["inv"]/1e6)
+	return fmt.Sprintf("we announced %d MB of transactions and it asked for none; Core asks for every one it lacks", sent["inv"]/1e6)
 }
 
 // KIT's DSN group measures the Bitcoin network (dsn.kastel.kit.edu/bitcoin).
@@ -1415,7 +1415,7 @@ func withAlso(about string, reasons []string) string {
 		if strings.Contains(about, why) {
 			continue
 		}
-		if !strings.HasPrefix(why, "it ") {
+		if !strings.HasPrefix(why, "it ") && !strings.HasPrefix(why, "we ") {
 			why = "it " + why
 		}
 		about += "\nAlso: " + why
