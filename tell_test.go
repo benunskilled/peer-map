@@ -67,7 +67,7 @@ func TestShortReasons(t *testing.T) {
 // except the two that say nothing was seen. Read from the source, so a new
 // sentence without a short form fails here.
 func TestEveryBehaviourHasATell(t *testing.T) {
-	src, err := os.ReadFile("kinds.go")
+	src, err := os.ReadFile("about.go")
 	if err != nil {
 		t.Fatal(err)
 	}
