@@ -1254,6 +1254,7 @@ func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now ti
 	if givesOwnAddress(r) {
 		out = append(out, ownAddressAbout)
 	}
+	out = append(out, neverAsksForTx(r.Subver, r.RelayTxes, r.BytesSentPerMsg, r.ConnTime, now))
 	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
 }
 
@@ -1274,6 +1275,26 @@ func givesOwnAddress(r rawPeer) bool {
 	return err1 == nil && err2 == nil && us.Unmap() == them.Unmap() &&
 		us.Unmap().IsGlobalUnicast() && !us.Unmap().IsPrivate()
 }
+
+// A peer that wants transactions hears of every new one, and Core asks for
+// the ones it lacks. Of 99 Core and Knots peers on the node this was written
+// for, each told of at least 1 MB of transactions in an hour or more, every
+// one asked for some (02.11.2026); one posing as Core 28.1, at KIT, was told
+// of 13 MB in 31 hours and asked for none: it only listens when a transaction
+// arrives. It backs a disguise found otherwise.
+func neverAsksForTx(subver string, relayTxes *bool, sent map[string]int64, connTime int64, now time.Time) string {
+	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes || connTime <= 0 ||
+		now.Unix()-connTime < 3600 || sent["inv"] < 1e6 || sent["tx"] > 0 {
+		return ""
+	}
+	return fmt.Sprintf("it never asked for a transaction, though we announced %d MB of them", sent["inv"]/1e6)
+}
+
+// KIT's DSN group measures the Bitcoin network (dsn.kastel.kit.edu/bitcoin).
+// Said only of a peer found disguised by its own behaviour, and only that it
+// runs there - not that it is one of the group's nodes.
+const kitASN = 34878
+const kitAbout = "it runs at KIT, whose research group measures the Bitcoin network"
 
 // tellOf is a disguised peer's first reason in a few words, for the line
 // under its pill (28.10.2026: the pill said Disguised, and only the opened
