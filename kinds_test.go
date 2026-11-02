@@ -1241,3 +1241,47 @@ func TestProtocol70017(t *testing.T) {
 		t.Errorf("31.99 dev build: %q", got)
 	}
 }
+
+// A university scanner under a wallet's name is named by its address.
+func TestResearchHosts(t *testing.T) {
+	got := convert([]rawPeer{
+		{ID: 1, Addr: "147.229.8.240:49422", ConnectionType: "inbound", Inbound: true, Subver: "/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", Version: 70017, ServicesNames: []string{}},
+		{ID: 2, Addr: "147.229.8.241:49422", ConnectionType: "inbound", Inbound: true, Subver: "/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", Version: 70017, ServicesNames: []string{}},
+	})
+	if got[0].Kind != "Research scanner" || !strings.Contains(got[0].About, "Brno") || !strings.Contains(got[0].PoolProof, "anton1.fit.vutbr.cz") {
+		t.Fatalf("Brno: %q %q %q", got[0].Kind, got[0].About, got[0].PoolProof)
+	}
+	if got[1].Kind == "Research scanner" {
+		t.Fatalf("neighbour: %q", got[1].Kind)
+	}
+}
+
+// Its own address where ours belongs backs a disguise; localhost and our
+// real address do not.
+func TestGivesOwnAddress(t *testing.T) {
+	for _, c := range []struct {
+		addr, local string
+		want        bool
+	}{
+		{"35.242.187.91:40000", "35.242.187.91:8333", true},
+		{"35.242.187.91:40000", "203.0.113.7:8333", false},
+		{"35.242.187.91:40000", "127.0.0.1:8333", false},
+		{"10.21.21.10:40000", "10.21.21.10:8333", false},
+		{"35.242.187.91:40000", "", false},
+	} {
+		if got := givesOwnAddress(rawPeer{Addr: c.addr, AddrLocal: c.local, Inbound: true}); got != c.want {
+			t.Errorf("%s / %s: got %v", c.addr, c.local, got)
+		}
+	}
+	// A wallet offering blocks is Disguised already; the address comes on top.
+	p := convert([]rawPeer{{ID: 1, Addr: "35.242.187.91:40000", AddrLocal: "35.242.187.91:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/bitcoinj:0.14.5/Bitcoin Wallet:5.33/", Version: 70015, ServicesNames: []string{"NETWORK"}}})[0]
+	if p.Kind != fakeWalletKind || !strings.Contains(p.About, "Also: "+ownAddressAbout) || p.Tell != "offers blocks" {
+		t.Fatalf("got %q %q %q", p.Kind, p.About, p.Tell)
+	}
+	// Alone it decides nothing.
+	if p := convert([]rawPeer{{ID: 1, Addr: "35.242.187.91:40000", AddrLocal: "35.242.187.91:8333", ConnectionType: "inbound", Inbound: true,
+		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}}})[0]; p.Kind == fakeWalletKind {
+		t.Fatalf("own address alone made it %q", p.Kind)
+	}
+}
