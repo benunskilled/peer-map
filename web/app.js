@@ -734,6 +734,12 @@
       if (/lnd 0\.21/.test(p.about || "")) return "lnd 0.21+";
       if (/^Older lnd/.test(p.about || "")) return "older lnd";
     }
+    // A scanner may pose as a wallet or as Core: its chip names who runs it.
+    if (p.kind === "Research scanner") {
+      const who = /Probably: (.+)'s network research/.exec(p.about || "");
+      if (who) return who[1];
+      if (/^\/btcwire:[^/]*\/Satoshi:/.test(p.subver || "")) return "Pool Detective";
+    }
     // Wasabi and Ginger borrow Core's names: the about says which it is.
     const w = /(Wasabi|Ginger)/.exec(p.about || "");
     return w && p.kind === "Wallet" ? w[1] : uaName(p);
@@ -1245,14 +1251,17 @@
     const hot = new Set(bs.map((b) => b.cc));
     for (const el of $("countries").children) el.classList.toggle("hot", hot.has(el.dataset.cc));
 
-    // Largest first, so small markers are drawn on top and stay clickable -
-    // and the one that delivered the block last of all, so a star is never
-    // hidden under a neighbouring country.
-    for (const b of [...bs].sort((x, y) => Number(Boolean(x.delivered)) - Number(Boolean(y.delivered)))) {
+    // Inbound-only places first, in the background, then outbound and
+    // manual on top; within each, largest first, so small markers are drawn
+    // on top and stay clickable. The one that delivered the block last of
+    // all, so a star is never hidden under a neighbouring country.
+    const order = (b) => (b.delivered ? 3 : RANK[leadGroup(b)]);
+    for (const b of [...bs].sort((x, y) => order(x) - order(y))) {
       const r = radius(b.total);
       const g = document.createElementNS(NS, "g");
       const selected = state.place && state.place.key === b.key;
-      g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : ""));
+      g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : "") +
+        (leadGroup(b) === "inbound" ? " back" : ""));
       g.dataset.x = b.pt[0];
       g.dataset.y = b.pt[1];
       g.dataset.key = b.key;
@@ -1333,7 +1342,12 @@
     placeMarkers();
   }
 
-  const leadGroup = (b) => (b.manual ? "manual" : b.outbound > b.inbound ? "outbound" : "inbound");
+  // Yours first, then the ones this node chose: a place with one outbound
+  // peer among thirty inbound ones still shows as outbound. A node with an
+  // open port has far more inbound peers, and by majority the map would be
+  // all inbound.
+  const leadGroup = (b) => (b.manual ? "manual" : b.outbound ? "outbound" : "inbound");
+  const RANK = { inbound: 0, outbound: 1, manual: 2 };
 
   // This node itself, from the region its peers see it in (the server reads
   // getpeerinfo's addrlocal and sends only the region, never the address).
