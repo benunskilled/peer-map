@@ -714,9 +714,14 @@
   // name, nodes by version, everything else by the software it names.
   const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool", NO_NAME = "no name";
   const uaName = (p) => {
-    const parts = (p.subver || "").split("/").filter(Boolean);
-    const name = (parts[parts.length - 1] || "").split(/[:(]/)[0].trim();
-    return name === "Satoshi" ? "Core" : name || NO_NAME;
+    const parts = (p.subver || "").split("/").map((s) => s.trim()).filter(Boolean);
+    // "nebula/2.4.1", "Yuki / 0.0.1": the last part may be only a version.
+    let i = parts.length - 1;
+    while (i > 0 && /^v?\d[\w.+-]*$/.test(parts[i])) i--;
+    const name = (parts[i] || "").split(/[:(]/)[0].trim();
+    // "Bither1.6.2", "vds_0.9.53", "BTC RPC Proxy v0.8.1": one chip per program.
+    const bare = name.replace(/(?:[\s_-]+v?|(?<=[A-Za-z]))\d+(\.\d+)+$/, "") || name;
+    return bare === "Satoshi" ? "Core" : bare === "Schildbach Bitcoin Wallet" ? "Bitcoin Wallet" : bare || NO_NAME;
   };
   const subOf = (p) => {
     if (p.kind === POOL_KIND) return p.pool || UNKNOWN_POOL;
@@ -742,6 +747,9 @@
       // "/dsn.tm.kit.edu/bitcoin:0.9.99/" ends in "bitcoin".
       if (/^\/dsn\.[a-z]+\.kit\.edu\//i.test(p.subver || "")) return "KIT";
     }
+    // Names that hide who it is, or one program under many names.
+    if (p.kind === "Crawler" && /p2p-crawler/.test(p.about || "")) return "p2p-crawler";
+    if (/client for RESET/.test(p.about || "")) return "RESET";
     // Wasabi and Ginger borrow Core's names: the about says which it is.
     const w = /(Wasabi|Ginger)/.exec(p.about || "");
     return w && p.kind === "Wallet" ? w[1] : uaName(p);
