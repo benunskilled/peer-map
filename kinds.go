@@ -287,6 +287,9 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/EMPORION:`), "EMPORION, a Bitcoin header client for verifying OpenTimestamps proofs; later renamed SYMMARTYS"},
 	{regexp.MustCompile(`(?i)^/SYMMARTYS:`), "SYMMARTYS, formerly EMPORION: follows Bitcoin headers to verify OpenTimestamps proofs"},
 	{regexp.MustCompile(`(?i)^/bip110-observer:`), "BIP-110 Observer, a crawler that collects peer user agents and advertised services"},
+	// Only the name points to favillakey.io; the site documents no P2P
+	// connections, so the kind stays Other.
+	{regexp.MustCompile(`^/FavillaKEY:`), "Named like Favilla KEY, a Nostr and Bitcoin signing device (favillakey.io); what it connects for is not documented"},
 	{regexp.MustCompile(`^/Ghost:`), "Bitcoin Ghost, a fork of Core v30 that filters data-carrying transactions; its operators can join a decentralised mining pool"},
 	{regexp.MustCompile(`(?i)^/CamlCoin:`), "CamlCoin, a Bitcoin full node written in OCaml (hashhog)"},
 	{regexp.MustCompile(`(?i)^/rustoshi:`), "rustoshi, a Bitcoin full node written in Rust (hashhog)"},
@@ -350,6 +353,14 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool"},
 	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder"},
 	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions"},
+	// Relay networks with a name of their own: bloXroute's gateway builds
+	// "bloXroute Gateway <version>" (bxgateway, 2022); Matt Corallo's
+	// RelayNode adapters send /RelayNetworkClient:42/ and
+	// /RelayNetworkServer:42/ (2013-2017); Falcon was seen as
+	// /Cornell-Falcon-Network:0.1.0/ (bips discussion, March 2017).
+	{regexp.MustCompile(`(?i)^bloXroute Gateway`), "bloXroute Gateway, a relay network's gateway: passes on blocks and transactions"},
+	{regexp.MustCompile(`^/RelayNetwork(Client|Server):`), "Matt Corallo's old Relay Network, which ran until 2017"},
+	{regexp.MustCompile(`^/Cornell-Falcon-Network:`), "Falcon, Cornell's block relay network from 2016"},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)"},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server"},
 	// Core's private broadcast (v31): it opens a connection over Tor or I2P,
@@ -409,8 +420,10 @@ var aboutRules = []struct {
 	// Bitcoin Lab's record of the node this was written for, 13.9. to
 	// 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
 	// transactions, gone after 18 seconds at the median; the same handshake
-	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr).
-	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler, asks for addresses"},
+	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr). A
+	// session that stays, like Bitnodes' own, asks for nothing: getpeerinfo
+	// on 31.10.2026, one of 22 hours, no getaddr.
+	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler"},
 	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
 	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
 	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
@@ -695,9 +708,9 @@ func skipsWtxidrelay(subver string, version int, recv map[string]int64, anySent 
 // under the same condition as wtxidrelay, so it is named when it is missing too.
 func skippedHandshakeAbout(recv map[string]int64) string {
 	if recv["sendaddrv2"] == 0 {
-		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21"
+		return "not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting, which it should have sent"
 	}
-	return "not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21"
+	return "not Bitcoin Core - it left out wtxidrelay when connecting, which it should have sent"
 }
 
 // offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no

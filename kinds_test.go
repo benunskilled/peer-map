@@ -17,6 +17,7 @@ func TestClientsVerifiedOn29October(t *testing.T) {
 		{"/bip110-observer:0.1/", "Crawler", false, "BIP-110 Observer"},
 		{"/EMPORION:0.3/", "Light client", false, "OpenTimestamps"},
 		{"/SYMMARTYS:0.3/", "Light client", false, "formerly EMPORION"},
+		{"/FavillaKEY:0.1/", "Other", true, "Favilla KEY"},
 		// Operator comments must not turn a Core node into a light client.
 		{"/Satoshi:31.1.0(EMPORION:0.3)/", "Node (Core)", true, ""},
 		{"/Satoshi:31.1.0(SYMMARTYS:0.3)/", "Node (Core)", true, ""},
@@ -635,12 +636,12 @@ func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
 	r := core
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
 	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind ||
-		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting; Core has sent both on every connection since 0.21" {
+		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting, which it should have sent" {
 		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
 	}
 	// With sendaddrv2 sent, only wtxidrelay is named.
 	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
-	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting; Core has sent it on every connection since 0.21" {
+	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting, which it should have sent" {
 		t.Errorf("only wtxidrelay missing: got %q", got.About)
 	}
 	// Knots is Core underneath and sends it too.

@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.4.0 – 2026-11-02
+
+Pool nodes now name their pool for 39 pools, up from 7. ViaBTC's relay software, found by 0xB10C, reads as a pool node instead of Disguised, and known block relays say so under their label. Tables no longer run past their card.
+
 ## 2.3.0 – 2026-10-30
 
 Peer Map no longer accepts Multipath TCP connections. ⚡ and 📡 show which peers may send you new blocks unasked and which ones your node sends them to. Ping shows the lowest ping, and a peer's detail splits its traffic by message type.
