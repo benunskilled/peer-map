@@ -195,13 +195,20 @@ var claimedCore = regexp.MustCompile(`^/Satoshi:([0-9]+)\.([0-9]+)`)
 // 0.x up to 0.21, then 22 and later. "/Satoshi:1.14.5(2x)/" (btc1) and other
 // numbers Core never used return ok == false and are left alone.
 func coreRelease(subver string) (maj, mnr int, ok bool) {
+	maj, mnr, ok = claimedNumbers(subver)
+	return maj, mnr, ok && (maj == 0 || maj >= 22)
+}
+
+// claimedNumbers is the major and minor number after "/Satoshi:", whether or
+// not Core ever had that version.
+func claimedNumbers(subver string) (maj, mnr int, ok bool) {
 	m := claimedCore.FindStringSubmatch(subver)
 	if m == nil {
 		return 0, 0, false
 	}
 	maj, _ = strconv.Atoi(m[1])
 	mnr, _ = strconv.Atoi(m[2])
-	return maj, mnr, maj == 0 || maj >= 22
+	return maj, mnr, true
 }
 
 func coreAtLeast(subver string, major, minor int) bool {

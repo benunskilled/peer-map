@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"net/netip"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -60,16 +58,14 @@ func anachronism(subver string, services []string) string {
 	for _, s := range services {
 		has[s] = true
 	}
-	if m := claimedCore.FindStringSubmatch(subver); m != nil {
-		maj, _ := strconv.Atoi(m[1])
-		mnr, _ := strconv.Atoi(m[2])
+	if maj, mnr, ok := claimedNumbers(subver); ok {
 		for _, s := range serviceSince {
 			if has[s.name] && (maj < s.major || maj == s.major && mnr < s.minor) {
 				since := fmt.Sprintf("%d.%d", s.major, s.minor)
 				if s.major > 0 {
 					since = fmt.Sprint(s.major)
 				}
-				return fmt.Sprintf("not Bitcoin Core %s.%s - it offers %s, which Core %s.%s did not have (from Core %s)", m[1], m[2], s.what, m[1], m[2], since)
+				return fmt.Sprintf("not Bitcoin Core %d.%d - it offers %s, which Core %d.%d did not have (from Core %s)", maj, mnr, s.what, maj, mnr, since)
 			}
 		}
 	}
@@ -212,7 +208,7 @@ var handshakeOnly = map[string]bool{
 // getpeerinfo's bytesrecv_per_msg; nil means the node did not report it. On one
 // node, in 4,500 sessions of Core and Knots of ten minutes or more, none did.
 func quietAfterHandshake(recv map[string]int64, connTime int64, now time.Time) bool {
-	if recv == nil || recv["verack"] == 0 || connTime <= 0 || now.Unix()-connTime < behaviourMinAge {
+	if recv == nil || recv["verack"] == 0 || !connectedFor(connTime, now, behaviourMinAge) {
 		return false
 	}
 	for m, n := range recv {
@@ -233,7 +229,7 @@ func quietAfterHandshake(recv map[string]int64, connTime int64, now time.Time) b
 func quietCoreAbout(subver string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
 	// Something must have been offered to it: on a node that relays nothing (blocksonly)
 	// even a real Core has nothing to ask about.
-	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes ||
+	if !claimedCore.MatchString(subver) || !wantsTx(relayTxes) ||
 		(sent["inv"] == 0 && sent["tx"] == 0) || !quietAfterHandshake(recv, connTime, now) {
 		return ""
 	}
@@ -249,10 +245,10 @@ func behaviourAbout(subver, transport string, recv map[string]int64, connTime in
 	if n := msgCount(recv["getaddr"], 0, transport, false); n >= getaddrTooMany {
 		return fmt.Sprintf("a crawler - it asked for addresses %d times, Core asks once", n)
 	}
-	age := now.Unix() - connTime
-	if connTime <= 0 || age < behaviourMinAge {
+	if !connectedFor(connTime, now, behaviourMinAge) {
 		return ""
 	}
+	age := now.Unix() - connTime
 	if n := msgCount(recv["ping"], 8, transport, true); n > 0 && age/n < pingFastSeconds {
 		every := age / n
 		unit := "seconds"
@@ -305,10 +301,9 @@ func givesOwnAddress(r rawPeer) bool {
 	if !r.Inbound || r.AddrLocal == "" {
 		return false
 	}
-	us, err1 := netip.ParseAddr(hostOf(r.AddrLocal))
-	them, err2 := netip.ParseAddr(hostOf(r.Addr))
-	return err1 == nil && err2 == nil && us.Unmap() == them.Unmap() &&
-		us.Unmap().IsGlobalUnicast() && !us.Unmap().IsPrivate()
+	us, ok1 := ipOf(r.AddrLocal)
+	them, ok2 := ipOf(r.Addr)
+	return ok1 && ok2 && us == them && us.IsGlobalUnicast() && !us.IsPrivate()
 }
 
 // A peer that wants transactions hears of every new one, and Core asks for
@@ -318,8 +313,8 @@ func givesOwnAddress(r rawPeer) bool {
 // of 13 MB in 31 hours and asked for none: it only listens when a transaction
 // arrives. It backs a disguise found otherwise.
 func neverAsksForTx(subver string, relayTxes *bool, sent map[string]int64, connTime int64, now time.Time) string {
-	if !claimedCore.MatchString(subver) || relayTxes == nil || !*relayTxes || connTime <= 0 ||
-		now.Unix()-connTime < 3600 || sent["inv"] < 1e6 || sent["tx"] > 0 {
+	if !claimedCore.MatchString(subver) || !wantsTx(relayTxes) || !connectedFor(connTime, now, 3600) ||
+		sent["inv"] < 1e6 || sent["tx"] > 0 {
 		return ""
 	}
 	return fmt.Sprintf("we announced %d MB of transactions and it asked for none; Core asks for every one it lacks", sent["inv"]/1e6)

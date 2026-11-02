@@ -96,11 +96,10 @@ func homeOf(raw []rawPeer) *Home {
 			if p.Inbound != inbound || p.AddrLocal == "" {
 				continue
 			}
-			a, err := netip.ParseAddr(hostOf(p.AddrLocal))
-			if err != nil {
+			a, ok := ipOf(p.AddrLocal)
+			if !ok {
 				continue
 			}
-			a = a.Unmap()
 			if !a.IsGlobalUnicast() || a.IsPrivate() {
 				continue
 			}
@@ -261,6 +260,24 @@ func hostOf(addr string) string {
 	return addr // bare IPv6 without port, or no port at all
 }
 
+// Core reports whether a peer wants transactions announced (relaytxes) once
+// the handshake is done; before that it says nothing, which is neither.
+func wantsTx(relayTxes *bool) bool   { return relayTxes != nil && *relayTxes }
+func refusesTx(relayTxes *bool) bool { return relayTxes != nil && !*relayTxes }
+
+// connectedFor says the peer has been connected at least secs seconds; a
+// connection time of zero or less means Core did not say.
+func connectedFor(connTime int64, now time.Time, secs int64) bool {
+	return connTime > 0 && now.Unix()-connTime >= secs
+}
+
+// ipOf is the IP in a getpeerinfo address, IPv4 as IPv4 even when written
+// as IPv6 (::ffff:1.2.3.4); ok=false for Tor, I2P and anything else.
+func ipOf(addr string) (netip.Addr, bool) {
+	a, err := netip.ParseAddr(hostOf(addr))
+	return a.Unmap(), err == nil
+}
+
 // locate returns where a peer is, or ok=false when the address is not a
 // public IP (Tor, I2P, CJDNS, or a private address such as the 10.21.0.1 that
 // docker-proxy puts in front of inbound IPv6 on umbrelOS).
@@ -272,11 +289,10 @@ func locate(p rawPeer) (geo.Location, bool) {
 	case "onion", "i2p", "cjdns", "not_publicly_routable":
 		return geo.Location{}, false
 	}
-	a, err := netip.ParseAddr(hostOf(p.Addr))
-	if err != nil {
+	a, ok := ipOf(p.Addr)
+	if !ok {
 		return geo.Location{}, false
 	}
-	a = a.Unmap()
 	if !a.IsGlobalUnicast() || a.IsPrivate() {
 		return geo.Location{}, false
 	}
@@ -294,8 +310,8 @@ func operator(p rawPeer) (asn.Info, bool) {
 	case "onion", "i2p", "cjdns", "not_publicly_routable":
 		return asn.Info{}, false
 	}
-	a, err := netip.ParseAddr(hostOf(p.Addr))
-	if err != nil {
+	a, ok := ipOf(p.Addr)
+	if !ok {
 		return asn.Info{}, false
 	}
 	return asn.Lookup(a)
@@ -335,8 +351,8 @@ func envOr(name, def string) string {
 // isPrivate: an address inside a private network, such as the one umbrelOS
 // runs its apps in.
 func isPrivate(addr string) bool {
-	a, err := netip.ParseAddr(hostOf(addr))
-	return err == nil && a.Unmap().IsPrivate()
+	a, ok := ipOf(addr)
+	return ok && a.IsPrivate()
 }
 
 func convert(raw []rawPeer) []Peer { return convertAt(raw, time.Now()) }
@@ -377,7 +393,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// relay and no chain either: a peer still in its handshake has not said
 		// anything yet.
 		p.NoServices = r.Version > 0 && r.ServicesNames != nil && len(r.ServicesNames) == 0
-		p.NoTxRelay = r.Version > 0 && r.RelayTxes != nil && !*r.RelayTxes
+		p.NoTxRelay = r.Version > 0 && refusesTx(r.RelayTxes)
 		p.ChainUnknown = r.Version > 0 && r.SyncedHeaders != nil && *r.SyncedHeaders < 0
 		// Offering nothing means no blocks to pass on, whatever the name says.
 		// Bitcoin Lab strikes the same peers.
@@ -410,8 +426,6 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
 			p.Kind, p.Pool, p.About = "Pool node", "ViaBTC", viaBitpeerAbout
 			p.PoolProof = "Found by 0xB10C, b10c.me"
-		case isVirtuCrawler(r.Subver, r.Version, r.ServicesNames, r.RelayTxes):
-			p.Kind, p.About = "Crawler", virtuCrawlerAbout
 		case libreKind != "":
 			p.Kind, p.About = libreKind, libreAbout
 		case borrowedKind != "" &&
