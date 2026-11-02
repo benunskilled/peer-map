@@ -1300,7 +1300,7 @@ func TestNeverAsksForTx(t *testing.T) {
 		since        int64
 		want         string
 	}{
-		{"listens only", "/Satoshi:28.1.0/", &yes, listens, day, "it never asked for a transaction, though we announced 13 MB of them"},
+		{"listens only", "/Satoshi:28.1.0/", &yes, listens, day, "we announced 13 MB of transactions and it asked for none; Core asks for every one it lacks"},
 		{"asked for some", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 13_085_000, "tx": 900}, day, ""},
 		{"wants none", "/Satoshi:28.1.0/", &no, listens, day, ""},
 		{"little announced", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 638}, day, ""},
@@ -1325,5 +1325,13 @@ func TestKITLine(t *testing.T) {
 		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, mockASN: kit}
 	if p := convert([]rawPeer{core})[0]; strings.Contains(p.About, kitAbout) {
 		t.Fatalf("plain node at KIT got %q", p.About)
+	}
+}
+
+func TestAlsoKeepsWe(t *testing.T) {
+	line := neverAsksForTx("/Satoshi:28.1.0/", func() *bool { b := true; return &b }(),
+		map[string]int64{"inv": 13_085_000}, 1_800_000_000-31*3600, time.Unix(1_800_000_000, 0))
+	if got := withAlso("Claims: Bitcoin Core 28.1.0", []string{line}); got != "Claims: Bitcoin Core 28.1.0\nAlso: "+line {
+		t.Fatalf("got %q", got)
 	}
 }
