@@ -530,6 +530,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
+			if p.Kind == fakeWalletKind && net.Number == kitASN {
+				p.About = withAlso(p.About, []string{kitAbout})
+			}
 		}
 		if p.Network == "ipv4" || p.Network == "ipv6" {
 			p.TorExit = torexit.Is(hostOf(r.Addr))

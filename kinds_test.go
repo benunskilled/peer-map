@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/benunskilled/peer-map/asn"
 )
 
 func TestClientsVerifiedOn29October(t *testing.T) {
@@ -1283,5 +1285,45 @@ func TestGivesOwnAddress(t *testing.T) {
 	if p := convert([]rawPeer{{ID: 1, Addr: "35.242.187.91:40000", AddrLocal: "35.242.187.91:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}}})[0]; p.Kind == fakeWalletKind {
 		t.Fatalf("own address alone made it %q", p.Kind)
+	}
+}
+
+func TestNeverAsksForTx(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	yes, no := true, false
+	day := now.Unix() - 31*3600
+	listens := map[string]int64{"inv": 13_085_000, "headers": 3_000_000}
+	for _, c := range []struct {
+		name, subver string
+		relay        *bool
+		sent         map[string]int64
+		since        int64
+		want         string
+	}{
+		{"listens only", "/Satoshi:28.1.0/", &yes, listens, day, "it never asked for a transaction, though we announced 13 MB of them"},
+		{"asked for some", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 13_085_000, "tx": 900}, day, ""},
+		{"wants none", "/Satoshi:28.1.0/", &no, listens, day, ""},
+		{"little announced", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 638}, day, ""},
+		{"under an hour", "/Satoshi:28.1.0/", &yes, listens, now.Unix() - 1800, ""},
+		{"not posing as Core", "/bitcoinj:0.16.5/", &yes, listens, day, ""},
+	} {
+		if got := neverAsksForTx(c.subver, c.relay, c.sent, c.since, now); got != c.want {
+			t.Errorf("%s: got %q", c.name, got)
+		}
+	}
+}
+
+func TestKITLine(t *testing.T) {
+	kit := &asn.Info{Number: kitASN, Name: "Karlsruhe Institute of Technology"}
+	wallet := rawPeer{ID: 1, Addr: "129.13.1.1:40000", ConnectionType: "inbound", Inbound: true,
+		Subver: "/bitcoinj:0.14.5/Bitcoin Wallet:5.33/", Version: 70015, ServicesNames: []string{"NETWORK"}, mockASN: kit}
+	if p := convert([]rawPeer{wallet})[0]; p.Kind != fakeWalletKind || !strings.Contains(p.About, "\nAlso: "+kitAbout) {
+		t.Fatalf("disguised at KIT: got %q %q", p.Kind, p.About)
+	}
+	// A plain node there is just a node.
+	core := rawPeer{ID: 2, Addr: "129.13.1.2:40000", ConnectionType: "inbound", Inbound: true,
+		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, mockASN: kit}
+	if p := convert([]rawPeer{core})[0]; strings.Contains(p.About, kitAbout) {
+		t.Fatalf("plain node at KIT got %q", p.About)
 	}
 }
