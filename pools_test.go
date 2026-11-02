@@ -107,3 +107,24 @@ func TestRelayClients(t *testing.T) {
 		}
 	}
 }
+
+// virtu's crawler: its default version message, and only that.
+func TestVirtuCrawler(t *testing.T) {
+	no, yes := false, true
+	for _, c := range []struct {
+		version  int
+		services []string
+		relay    *bool
+		crawler  bool
+	}{
+		{70015, []string{}, &no, true},
+		{70016, []string{}, &no, false},
+		{70015, []string{}, &yes, false},
+		{70015, []string{"NETWORK"}, &no, false},
+	} {
+		p := convert([]rawPeer{{ID: 1, Addr: "180.76.167.206:40000", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:23.0.0/", Version: c.version, ServicesNames: c.services, RelayTxes: c.relay}})[0]
+		if c.crawler != (p.Kind == "Crawler") || (c.crawler && !strings.Contains(p.About, "virtu's p2p-crawler")) {
+			t.Errorf("%d %v %v: got %q %q", c.version, c.services, *c.relay, p.Kind, p.About)
+		}
+	}
+}

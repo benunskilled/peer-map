@@ -157,6 +157,18 @@ func isViaBitpeer(subver string, version int, services []string) bool {
 	return subver == "/Satoshi:0.19.0.1/" && version == 70015 && len(services) == 1 && services[0] == "WITNESS"
 }
 
+// virtu's crawler (github.com/virtu/p2p-crawler, src/p2p_crawler/protocol.py)
+// introduces itself as /Satoshi:23.0.0/ with protocol 70015, no services and
+// no transaction relay. A real Core 23 sends 70016 and offers services. On one
+// node 20 sessions from 15 addresses matched it exactly between 16.10. and
+// 02.11.2026; all asked for addresses and left within four minutes.
+const virtuCrawlerAbout = "Claims: Bitcoin Core 23.0\nProbably: virtu's p2p-crawler, which introduces itself exactly like this"
+
+func isVirtuCrawler(subver string, version int, services []string, relayTxes *bool) bool {
+	return subver == "/Satoshi:23.0.0/" && version == 70015 && services != nil && len(services) == 0 &&
+		relayTxes != nil && !*relayTxes
+}
+
 // A pool the user agent names itself, where no address says more.
 var poolLabels = []struct {
 	re   *regexp.Regexp

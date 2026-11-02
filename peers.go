@@ -410,6 +410,8 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
 			p.Kind, p.Pool, p.About = "Pool node", "ViaBTC", viaBitpeerAbout
 			p.PoolProof = "Found by 0xB10C, b10c.me"
+		case isVirtuCrawler(r.Subver, r.Version, r.ServicesNames, r.RelayTxes):
+			p.Kind, p.About = "Crawler", virtuCrawlerAbout
 		case libreKind != "":
 			p.Kind, p.About = libreKind, libreAbout
 		case borrowedKind != "" &&
