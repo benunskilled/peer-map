@@ -342,7 +342,7 @@ func TestClientsFoundOn27October(t *testing.T) {
 	if got, _ := classify("BTC RPC Proxy v0.8.1"); got != "Other" {
 		t.Errorf("BTC RPC Proxy: kind %q, want Other", got)
 	}
-	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Probably not a node") {
+	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "RPC proxy") {
 		t.Errorf("BTC RPC Proxy: about %q", got)
 	}
 }
@@ -386,9 +386,9 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
 		"vds_0.9.53":                  "VDS",
 		"/iriumd:1.0/":                "Irium",
-		"/Prometheus:30.4.1/":         "A full node with no public source",
-		"/BTC-Nodes:2026/":            "A full node with no public source",
-		"/Natasha:1.0/":               "A full node with no public source",
+		"/Prometheus:30.4.1/":         "No public source for this name",
+		"/BTC-Nodes:2026/":            "No public source for this name",
+		"/Natasha:1.0/":               "No public source for this name",
 		"/cf-package-relay:0.3.0/":    "Named after package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {

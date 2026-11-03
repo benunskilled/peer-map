@@ -21,8 +21,8 @@ var aboutRules = []struct {
 	// 26-27.10.2026: one address, five sessions in 40 minutes under protocol
 	// 70001 with no services, saying our node is 127.0.0.1:8332. Two ended after
 	// the version message; three took 7 to 16 MB of blocks each. Not found
-	// anywhere, so only what it did.
-	{regexp.MustCompile(`^BTC RPC Proxy `), "Probably not a node: seen taking blocks under the oldest protocol, with no services and 127.0.0.1:8332 as our address"},
+	// anywhere, so the text says only what it names itself.
+	{regexp.MustCompile(`^BTC RPC Proxy `), "Names itself an RPC proxy for Bitcoin; no public source"},
 	{regexp.MustCompile(`(?i)/Bisq:`), "Bisq, a decentralised exchange; its wallet runs on bitcoinj"},
 	{regexp.MustCompile(`^/P2Pool:`), "P2Pool, a peer-to-peer mining pool: miners share the work without a pool operator"},
 	{regexp.MustCompile(`^/BitcoinRocks:`), "BitcoinRocks, an experimental fork of Core using RocksDB and compressed block storage"},
@@ -53,13 +53,13 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network"},
 	{regexp.MustCompile(`(?i)hemi-soak`), "A soak test of the Hemi network's Bitcoin code"},
 	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly"},
-	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly; its census dials every reachable node daily under the same name"},
+	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly"},
 	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet on Android and others)"},
 	{regexp.MustCompile(`^/WalletKit:`), "Unstoppable Wallet on iPhone"},
 	{regexp.MustCompile(`(?i)^/Ladybug:`), "Ladybug, a wallet built on bitcoinj"},
 	{regexp.MustCompile(`(?i)^/hodlwallet:`), "HODL Wallet, a phone wallet"},
 	{regexp.MustCompile(`^Yuki /`), "Yuki, a light client by Impervious built on Kyoto"},
-	{regexp.MustCompile(`^/VerifiedX:`), "A VerifiedX validator: a sidechain that holds bitcoin and follows the chain for it. Asks for headers about every 10 seconds, sometimes a block, takes no transactions"},
+	{regexp.MustCompile(`^/VerifiedX:`), "A VerifiedX validator: a sidechain that holds bitcoin and follows Bitcoin's chain for it"},
 	{regexp.MustCompile(`(?i)^/LionSeed:`), "LionSeed, a DNS seeder that lists only the nodes of one fork"},
 	{regexp.MustCompile(`(?i)^/gnoban:`), "gnoban, a tool that scores nodes and bans the ones its operator does not want"},
 	{regexp.MustCompile(`^libbtc `), "libbtc, a small C library for Bitcoin wallets and tools"},
@@ -67,7 +67,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/sashimi:`), "sashimi, small Unix tools for Bitcoin by josibake"},
 	{regexp.MustCompile(`(?i)^/bridge:`), "Probably castor, Floresta's Utreexo bridge node"},
 	{regexp.MustCompile(`(?i)^/rust-sha2-p2p-client/`), "gnostr-bitcoin, a terminal monitor of the Bitcoin network from the gnostr project"},
-	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools; offers Libre Relay's service bit and came only through Tor"},
+	{regexp.MustCompile(`(?i)^/Gnostr:`), "Names gnostr, the git+nostr tools"},
 	{regexp.MustCompile(`(?i)^/Aurum:`), "Aurumcoin, an altcoin built on Bitcoin Core 0.12"},
 	{regexp.MustCompile(`(?i)/Purity:`), "Bitcoin Purity, a fork of Knots that made BIP110 permanent in a hard fork at block 961637"},
 	{regexp.MustCompile(`Bitcoin Wallet:`), "Bitcoin Wallet by Schildbach, an Android app"},
@@ -114,7 +114,7 @@ var aboutRules = []struct {
 	// m4ycon on bnoc (#198): it sweeps the P2A anchors of a fleet that minted
 	// rune 1:0 in chains of transactions; on the node this was written for it
 	// pushed unannounced 66-byte transactions, the size of such a sweep.
-	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet, pushing the transactions unannounced"},
+	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet"},
 	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
@@ -165,12 +165,12 @@ var aboutRules = []struct {
 	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr). A
 	// session that stays, like Bitnodes' own, asks for nothing: getpeerinfo
 	// on 31.10.2026, one of 22 hours, no getaddr.
-	{regexp.MustCompile(`^/your-fork:`), "Probably a crawler: same handshake as Bitnodes' crawler"},
+	{regexp.MustCompile(`^/your-fork:`), "Names itself your-fork; no public source"},
 	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
 	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
 	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
 	{regexp.MustCompile(`^/p2p-observer:`), "p2p-observer, 0xB10C's tool that connects to nodes to watch the network"},
-	{regexp.MustCompile(`^/p2p-extractor:`), "peer-observer's p2p extractor: your node was told to connect to it, and it records what your node sends"},
+	{regexp.MustCompile(`^/p2p-extractor:`), "peer-observer's p2p extractor: nodes are told to connect to it, and it records what they send"},
 	{regexp.MustCompile(`^/AgenticBitcoin:`), "AgenticBitcoin, Bitcoin rewritten in Rust by AI agents"},
 	{regexp.MustCompile(`^/SatoshiSharp:`), "SatoshiSharp, parts of Bitcoin written in C#"},
 	{regexp.MustCompile(`^NBXplorer-`), "NBXplorer, the indexer behind BTCPay Server"},
@@ -211,7 +211,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own"},
 	{regexp.MustCompile(`(?i)vds[_ ]`), "VDS, an altcoin with a chain of its own"},
 	// No public source; see Node (other) in kinds.go.
-	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "A full node with no public source"},
+	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "No public source for this name"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 
