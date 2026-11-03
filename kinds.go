@@ -96,7 +96,7 @@ var kindRules = []struct {
 	// in all of its five sessions (peer-observer, 21. to 29.10.2026), and so
 	// did /topology-probe:/ and /BlockSail:/. BIP-110 Observer collects peer
 	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/bip324-probe:|^/your-fork:|^/cryptexplorer:|^/bip110-observer:|^/topology-probe:|^/BlockSail:`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/your-fork:|^/cryptexplorer:|^/bip110-observer:|^/topology-probe:|^/BlockSail:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.

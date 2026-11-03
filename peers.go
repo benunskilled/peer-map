@@ -544,9 +544,6 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
-			if p.Kind == fakeWalletKind && net.Number == kitASN {
-				p.About = withAlso(p.About, []string{kitAbout})
-			}
 		}
 		if p.Network == "ipv4" || p.Network == "ipv6" {
 			p.TorExit = torexit.Is(hostOf(r.Addr))
@@ -590,7 +587,7 @@ func noTxWhy(r rawPeer, kind string) string {
 	if r.Inbound && (strings.HasPrefix(kind, "Node (") || kind == "Pool node") && claimedCore.MatchString(r.Subver) &&
 		recv["verack"] > 0 && recv["wtxidrelay"] > 0 {
 		if recv["getaddr"] > 0 {
-			return "Its node runs with blocksonly=1: no transactions at all"
+			return "Its node probably runs with blocksonly=1: it wants no transactions from other nodes"
 		}
 		return "Its node opened this connection for blocks only"
 	}
