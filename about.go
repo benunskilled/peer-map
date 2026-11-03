@@ -159,13 +159,12 @@ var aboutRules = []struct {
 	// node connects to itself when told to (addnode).
 	// src/sync/stages/pull/peer.rs in maestro-org/maestro-symphony;
 	// src/crawl.rs in achow101/dnsseedrs; Satscraft/bip324-probe.
-	// Bitcoin Lab's record of the node this was written for, 13.9. to
-	// 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
+	// /your-fork:/ has no sentence of its own (see kinds.go). Bitcoin Lab's
+	// record of the node this was written for, 13.9. to 25.10.2026: 241 sessions from 187 addresses, offering nothing, no
 	// transactions, gone after 18 seconds at the median; the same handshake
 	// as Bitnodes' crawler (version, sendaddrv2, verack, then getaddr). A
 	// session that stays, like Bitnodes' own, asks for nothing: getpeerinfo
 	// on 31.10.2026, one of 22 hours, no getaddr.
-	{regexp.MustCompile(`^/your-fork:`), "Names itself your-fork; no public source"},
 	{regexp.MustCompile(`^/symphony:`), "Maestro Symphony, a Bitcoin indexer and API server"},
 	{regexp.MustCompile(`^/crawlrs:`), "dnsseedrs, a DNS seeder by Ava Chow, a Bitcoin Core maintainer"},
 	{regexp.MustCompile(`^/bip324-probe:`), "bip324-probe, a tool that checks whether nodes offer encrypted v2 connections"},
@@ -210,8 +209,6 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)SuperBitcoin`), "Super Bitcoin, a fork of Bitcoin from December 2017 with a chain of its own"},
 	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own"},
 	{regexp.MustCompile(`(?i)vds[_ ]`), "VDS, an altcoin with a chain of its own"},
-	// No public source; see Node (other) in kinds.go.
-	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "No public source for this name"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 

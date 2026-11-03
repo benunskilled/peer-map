@@ -268,7 +268,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/bip324-probe:0.1.0/":                   "Crawler",
 		"/crawlrs:0.2.0/":                        "Crawler",
 		"/symphony:0.0.1/":                       "Indexer",
-		"/your-fork:0.1/":                        "Crawler",
+		"/your-fork:0.1/":                        "Other",
 		"VDS 0.9.9.1":                            "Other chain",
 		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Light client",
 		"/btcwire:0.5.0/utreexod:0.5.0/":         "Node (other)",
@@ -386,13 +386,24 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
 		"vds_0.9.53":                  "VDS",
 		"/iriumd:1.0/":                "Irium",
-		"/Prometheus:30.4.1/":         "No public source for this name",
-		"/BTC-Nodes:2026/":            "No public source for this name",
-		"/Natasha:1.0/":               "No public source for this name",
 		"/cf-package-relay:0.3.0/":    "Named after package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", subver, got, want)
+		}
+	}
+}
+
+// Names with no public source are not given a kind from what one node saw
+// them do, nor a fixed sentence: the session decides what is said.
+func TestNoKindFromOneNode(t *testing.T) {
+	for _, ua := range []string{"/trinetra:0.1/", "/p2p-probe:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/",
+		"/topology-probe:0.1/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/BTC-Nodes:2026/", "/Natasha:1.0/"} {
+		if got := kindOf(ua); got != "Other" {
+			t.Errorf("%s: kind %q, want Other", ua, got)
+		}
+		if got := aboutOf(ua); got != "" {
+			t.Errorf("%s: fixed sentence %q", ua, got)
 		}
 	}
 }
