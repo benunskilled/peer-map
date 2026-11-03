@@ -93,7 +93,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets", "electrs address index", ""},
 	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool", "ckcoind (ckpool fork)", ""},
 	{regexp.MustCompile(`(?i)bluematt-tokio-client`), "dnsseed-rust, the crawler behind a DNS seeder", "dnsseed-rust crawler", ""},
-	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions", "ckpool's block relay", ""},
+	{regexp.MustCompile(`(?i)ckp2p`), "ckp2p, ckpool's block relay: passes on blocks only, never transactions", "ckp2p block relay", ""},
 	// Relay networks with a name of their own: bloXroute's gateway builds
 	// "bloXroute Gateway <version>" (bxgateway, 2022); Matt Corallo's
 	// RelayNode adapters send /RelayNetworkClient:42/ and
