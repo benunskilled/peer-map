@@ -274,9 +274,9 @@ func claimOf(subver string) string {
 	return strings.Replace(first, ":", " ", 1)
 }
 
-// otherAbout is the line for a name none of the rules know, so no peer is left
+// sessionLine is the line for a name none of the rules know, so no peer is left
 // without one. Said as what we know, not as what it is: others may know it.
-func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+func sessionLine(services []string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) (line string, saysNoTx bool) {
 	// A peer that has been connected for a while and asked for nothing is no
 	// full node, whatever services it lists. Seen 21. to 26.10.2026: /your-fork:0.1/
 	// and /alt-bitnodes:0.1/ staying for hours, hearing of transactions
@@ -285,15 +285,15 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 		if wantsTx(relayTxes) {
 			// "Hears" only if we announced something to it.
 			if sent["inv"] > 0 {
-				return "Only listens: hears new transactions, fetches none"
+				return "Only listens: hears new transactions, fetches none", false
 			}
-			return "Only listens: asks for nothing"
+			return "Only listens: asks for nothing", false
 		}
-		return "Only listens: wants no transactions, asks for nothing"
+		return "Only listens: wants no transactions, asks for nothing", true
 	}
 	for _, s := range services {
 		if s == "NETWORK" {
-			return operatorNamedAbout
+			return operatorNamedAbout, false
 		}
 	}
 	// What it did, where Core counted it: a name nobody knows still says
@@ -315,28 +315,34 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 	// BIP 35: "send me your whole mempool". Seen 22. to 26.10.2026 as /curl:8.5.0/,
 	// twenty times from one address, each right after the handshake.
 	case recv["mempool"] > 0:
-		return "Asks for our mempool"
+		return "Asks for our mempool", false
 	case recv["tx"] > 0 && recv["inv"] == 0:
-		return "Pushes transactions without announcing them"
+		return "Pushes transactions without announcing them", false
 	// Headers and no transactions is also what a real node does on a
 	// connection for blocks only (2.2% of 2,553 Core and Knots sessions on
 	// one node, 16. to 28.10.2026), so both readings are given. One that asks
 	// for addresses too runs with blocksonly=1 if it is a node (noTxWhy).
 	case refusesTx(relayTxes) && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0 && recv["getaddr"] > 0:
-		return "Asks for headers and addresses and wants no transactions: " + or("a node running blocksonly", "a program that tracks the chain")
+		return "Asks for headers and addresses and wants no transactions: " + or("a node running blocksonly", "a program that tracks the chain"), true
 	case refusesTx(relayTxes) && (recv["getheaders"] > 0 || recv["sendheaders"] > 0) && recv["getdata"] == 0:
-		return "Asks for headers and wants no transactions: " + or("a block-only connection", "a program that tracks the chain")
+		return "Asks for headers and wants no transactions: " + or("a block-only connection", "a program that tracks the chain"), true
 	// Asking for data alone is no sign of listening: a peer that fetches
 	// blocks asks the same way. Only transactions sent to it count.
 	case wantsTx(relayTxes) && recv["getdata"] > 0 && sent["tx"] > 0 && recv["inv"] == 0 && recv["tx"] == 0:
 		// 0.5% of the real nodes above did the same: one that hears of
 		// everything from others first has nothing to announce.
-		return "Fetches transactions from your node and announces none: " + or("a node that hears of them elsewhere first", "a program collecting them")
+		return "Fetches transactions from your node and announces none: " + or("a node that hears of them elsewhere first", "a program collecting them"), false
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
 		// 6.2% of the real nodes above did the same: one in sync asks for no headers.
-		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler")
+		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler"), false
 	}
-	return unknownAbout
+	return unknownAbout, false
+}
+
+// otherAbout is sessionLine's sentence alone.
+func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64, connTime int64, now time.Time) string {
+	line, _ := sessionLine(services, relayTxes, recv, sent, connTime, now)
+	return line
 }
 
 // The two lines of otherAbout that say nothing the peer did: a guess from

@@ -200,3 +200,25 @@ func TestObservedPart(t *testing.T) {
 		}
 	}
 }
+
+// The server, not the wording, tells the page that the line above already
+// says the peer wants no transactions.
+func TestNoTxSaid(t *testing.T) {
+	no, yes := false, true
+	headers := map[string]int64{"getheaders": 2000}
+	for _, c := range []struct {
+		ua    string
+		relay *bool
+		want  bool
+	}{
+		{"/reset-header-relay:0.1/", &no, true}, // fixed sentence, session line under it
+		{"/some-tool:0.1/", &no, true},          // the session line is the about
+		{"/some-tool:0.1/", &yes, false},        // it wants transactions
+	} {
+		p := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: c.ua, Version: 70016,
+			ServicesNames: []string{}, RelayTxes: c.relay, BytesRecvPerMsg: headers}}, time.Now())[0]
+		if p.NoTxSaid != c.want || c.want && !strings.Contains(strings.ToLower(p.About), "wants no transactions") {
+			t.Errorf("%s relay %v: no_tx_said %v, about %q", c.ua, *c.relay, p.NoTxSaid, p.About)
+		}
+	}
+}

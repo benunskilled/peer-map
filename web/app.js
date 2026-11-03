@@ -2123,6 +2123,7 @@
   // open across a refresh.
   const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
+  const NO_TX_WHY = "Wants no transactions from your node";
   const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
   function peerDetail(p) {
     const el = (tag, cls, text) => {
@@ -2165,12 +2166,17 @@
     }
     if (p.pool_proof) what.appendChild(el("p", "pd-about", p.pool_proof));
     const flags = [];
+    // Each fact once: "never first" already says the peer offers no services or
+    // is on a chain of its own, so those flags are folded into it, and "no tx"
+    // stays out when the server says the line above already tells it.
     if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
-    if (p.no_relay) flags.push(["never first", neverNote(p)]);
-    if (p.no_services) flags.push(["no services", NO_SERVICES_WHY]);
-    if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
+    if (p.fork) flags.push([p.fork, p.fork_why + (p.no_relay ? " - it can never deliver one of your blocks first." : "")]);
+    else if (p.no_relay) flags.push(["never first", neverNote(p)]);
+    if (p.no_services && !p.no_relay) flags.push(["no services", NO_SERVICES_WHY]);
+    // A reason of its own (blocks-only connection, blocksonly=1) still stands.
+    const plainNoTx = !p.no_tx_why || p.no_tx_why === NO_TX_WHY;
+    if (p.no_tx_relay && !(p.no_tx_said && plainNoTx)) flags.push(["no tx", p.no_tx_why || NO_TX_WHY]);
     if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
-    if (p.fork) flags.push([p.fork, p.fork_why]);
     if (isPruned(p)) flags.push(["pruned", PRUNED_WHY, "", true]);
     // The fee rate below which it wants no transactions announced. A peer that
     // takes none at all sends the highest there is: "no tx" says that already.
@@ -2182,7 +2188,7 @@
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
       // Without Bitcoin Lab next door nothing in the map says what "first"
       // is: where someone wonders, one line says where to find out.
-      if (word === "never first" && !state.data.sibling) {
+      if (p.no_relay && (word === "never first" || word === p.fork) && !state.data.sibling) {
         const more = el("span", "pd-more", "Which of your peers bring you new blocks first: ");
         const a = el("a", "", "Bitcoin Lab \u2197");
         a.href = LAB_PAGE;
