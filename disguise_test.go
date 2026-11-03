@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/benunskilled/peer-map/asn"
 )
 
 // Core versions offering what they never had: the kind says Fake, and why.
@@ -23,6 +21,10 @@ func TestAnachronism(t *testing.T) {
 		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "pruned-node service, which Core 0.15"},
 		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Disguised", "compact block filters"},
 		{"/Satoshi:25.1.0/Knots:20231115/", v2, "Disguised", "Claims: Bitcoin Knots (Core 25.1.0)"},
+		{"/Satoshi:0.20.1/Knots:20200815/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Knots)", ""},
+		{"/Satoshi:0.20.99/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
+		{"/Satoshi:25.99.0/", v2, "Node (Core)", ""},
+		{"/Satoshi:0.14.99/", v2, "Disguised", "Core 0.14 did not have"},
 		{"/bcoin:v1.0.0-beta.14/", v2, "Disguised", "Claims: bcoin v1.0.0-beta.14"},
 		{"/Classic:1.3.4(EB8)/", v2, "Disguised", "never had"},
 		{"/Satoshi:31.1.0/", v2, "Node (Core)", ""},
@@ -52,7 +54,7 @@ func TestAnachronism(t *testing.T) {
 func TestCoreOfferingNothing(t *testing.T) {
 	no := []string{}
 	got := convert([]rawPeer{{Addr: "198.51.100.7:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: no}})
-	if len(got) != 1 || got[0].Kind != fakeWalletKind || got[0].About != "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED" {
+	if len(got) != 1 || got[0].Kind != fakeWalletKind || got[0].About != "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it offers no services at all; every Core since 0.16 offers NETWORK_LIMITED" {
 		t.Fatalf("Core offering nothing: %+v", got)
 	}
 	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS", "NETWORK_LIMITED"}, {"NETWORK_LIMITED", "WITNESS"}} {
@@ -61,6 +63,11 @@ func TestCoreOfferingNothing(t *testing.T) {
 			t.Errorf("services %v: kind %q, want Node (Core)", svc, got[0].Kind)
 		}
 	}
+	// before 0.16 a pruned Core without bloom filters offered nothing
+	got = convert([]rawPeer{{Addr: "198.51.100.10:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:0.12.1/", ServicesNames: no}})
+	if got[0].Kind != "Node (Core)" {
+		t.Errorf("Core 0.12 offering nothing: %q", got[0].Kind)
+	}
 	// a wallet offering nothing stays a wallet
 	got = convert([]rawPeer{{Addr: "198.51.100.9:40000", Inbound: true, ConnectionType: "inbound", Subver: "/bitcoinj:0.16.2/Bitcoin Wallet:9.0/", ServicesNames: no}})
 	if got[0].Kind != "Wallet" {
@@ -68,8 +75,8 @@ func TestCoreOfferingNothing(t *testing.T) {
 	}
 }
 
-// Every Core release sends one protocol version: 70016 from 0.21 (70017 in
-// development builds), 70015 or less before.
+// Every Core release sends one protocol version: 70017 from 32, 70016 from
+// 0.21, 70015 or less before.
 func TestProtocolMismatch(t *testing.T) {
 	core := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
 	cases := []struct {
@@ -84,6 +91,8 @@ func TestProtocolMismatch(t *testing.T) {
 		{"/Satoshi:25.1.0/Knots:20231115/", 70015, "Disguised", "Claims: Bitcoin Knots"},
 		{"/Satoshi:31.1.0/", 70016, "Node (Core)", ""},
 		{"/Satoshi:31.99.0/", 70017, "Node (Core)", ""},
+		{"/Satoshi:32.0.0/", 70016, "Disguised", "protocol 70016, older than Core 32"},
+		{"/Satoshi:32.0.0/", 70017, "Node (Core)", ""},
 		{"/Satoshi:0.21.0/", 70016, "Node (Core)", ""},
 		{"/Satoshi:0.20.1/", 70015, "Node (Core)", ""},
 		{"/Satoshi:0.20.99/", 70016, "Node (Core)", ""}, // a 0.21 development build
@@ -309,7 +318,7 @@ func TestBitcoreLibraryOffersOnlyNetwork(t *testing.T) {
 		says     string
 	}{
 		{"/bitcore:1.1.0/", []string{"NETWORK"}, "Other", ""},
-		{"/bitcore:1.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Disguised", "it offers WITNESS, NETWORK_LIMITED, P2P_V2, which the Bitcore library never does"},
+		{"/bitcore:1.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Disguised", "it offers WITNESS, NETWORK_LIMITED, P2P_V2, which the Bitcore library does not offer by default"},
 		{"/bitcore:1.1.0/", []string{"NETWORK", "BLOOM", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "it offers BLOOM, WITNESS, NETWORK_LIMITED"},
 		{"/bitcore:8.25.12/", []string{"NETWORK"}, "Other", ""},
 	}
@@ -376,53 +385,5 @@ func TestGivesOwnAddress(t *testing.T) {
 	if p := convert([]rawPeer{{ID: 1, Addr: "35.242.187.91:40000", AddrLocal: "35.242.187.91:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}}})[0]; p.Kind == fakeWalletKind {
 		t.Fatalf("own address alone made it %q", p.Kind)
-	}
-}
-
-func TestNeverAsksForTx(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	yes, no := true, false
-	day := now.Unix() - 31*3600
-	listens := map[string]int64{"inv": 13_085_000, "headers": 3_000_000}
-	for _, c := range []struct {
-		name, subver string
-		relay        *bool
-		sent         map[string]int64
-		since        int64
-		want         string
-	}{
-		{"listens only", "/Satoshi:28.1.0/", &yes, listens, day, "we announced 13 MB of transactions and it asked for none; Core asks for every one it lacks"},
-		{"asked for some", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 13_085_000, "tx": 900}, day, ""},
-		{"wants none", "/Satoshi:28.1.0/", &no, listens, day, ""},
-		{"little announced", "/Satoshi:28.1.0/", &yes, map[string]int64{"inv": 638}, day, ""},
-		{"under an hour", "/Satoshi:28.1.0/", &yes, listens, now.Unix() - 1800, ""},
-		{"not posing as Core", "/bitcoinj:0.16.5/", &yes, listens, day, ""},
-	} {
-		if got := neverAsksForTx(c.subver, c.relay, c.sent, c.since, now); got != c.want {
-			t.Errorf("%s: got %q", c.name, got)
-		}
-	}
-}
-
-func TestKITLine(t *testing.T) {
-	kit := &asn.Info{Number: kitASN, Name: "Karlsruhe Institute of Technology"}
-	wallet := rawPeer{ID: 1, Addr: "129.13.1.1:40000", ConnectionType: "inbound", Inbound: true,
-		Subver: "/bitcoinj:0.14.5/Bitcoin Wallet:5.33/", Version: 70015, ServicesNames: []string{"NETWORK"}, mockASN: kit}
-	if p := convert([]rawPeer{wallet})[0]; p.Kind != fakeWalletKind || !strings.Contains(p.About, "\nAlso: "+kitAbout) {
-		t.Fatalf("disguised at KIT: got %q %q", p.Kind, p.About)
-	}
-	// A plain node there is just a node.
-	core := rawPeer{ID: 2, Addr: "129.13.1.2:40000", ConnectionType: "inbound", Inbound: true,
-		Subver: "/Satoshi:31.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, mockASN: kit}
-	if p := convert([]rawPeer{core})[0]; strings.Contains(p.About, kitAbout) {
-		t.Fatalf("plain node at KIT got %q", p.About)
-	}
-}
-
-func TestAlsoKeepsWe(t *testing.T) {
-	line := neverAsksForTx("/Satoshi:28.1.0/", func() *bool { b := true; return &b }(),
-		map[string]int64{"inv": 13_085_000}, 1_800_000_000-31*3600, time.Unix(1_800_000_000, 0))
-	if got := withAlso("Claims: Bitcoin Core 28.1.0", []string{line}); got != "Claims: Bitcoin Core 28.1.0\nAlso: "+line {
-		t.Fatalf("got %q", got)
 	}
 }

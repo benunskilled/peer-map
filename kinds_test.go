@@ -264,6 +264,7 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/WalletKit:0.1.0/":                      "Wallet",
 		"/btcwire:0.4.1/Satoshi:0.19/":           "Research scanner",
 		"/p2p-observer:0.1.0/":                   "Crawler",
+		"/p2p-extractor:0.1.0/":                  "Crawler",
 		"/bip324-probe:0.1.0/":                   "Crawler",
 		"/crawlrs:0.2.0/":                        "Crawler",
 		"/symphony:0.0.1/":                       "Indexer",

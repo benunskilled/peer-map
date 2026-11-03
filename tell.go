@@ -71,7 +71,7 @@ func shortReason(r, claimed string) string {
 		{"offers blocks, which no wallet does", "offers blocks"},
 		{"speaks v2, which no wallet", "offers v2"},
 		{"v2 connections, which that software never had", "offers v2"},
-		{"which the Bitcore library never does", "more services than Bitcore"},
+		{"which the Bitcore library does not offer", "more services than Bitcore"},
 		{"Sat0shi with a zero", "misspelt name"},
 		{"Core calls itself /Satoshi:", "misspelt name"},
 		{"Core writes its name between slashes", "misspelt name"},

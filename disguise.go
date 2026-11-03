@@ -24,7 +24,8 @@ const fakeWalletKind = "Disguised"
 
 // What Bitcoin Core started to offer, and in which version. A peer calling
 // itself an older Core (or a Knots built on it) that offers one of these
-// is not that version. On one node 23,567 sessions came as Core 0.7 to 0.18
+// is not that version - except compact block filters on Knots, which served
+// them before Core 0.21 did. On one node 23,567 sessions came as Core 0.7 to 0.18
 // offering P2P_V2 - from Core 26, 2023 - each gone after about 25 seconds.
 var serviceSince = []struct {
 	name, what string
@@ -58,9 +59,14 @@ func anachronism(subver string, services []string) string {
 	for _, s := range services {
 		has[s] = true
 	}
+	knots := strings.Contains(subver, "Knots:")
 	if maj, mnr, ok := claimedNumbers(subver); ok {
+		dmaj, dmnr := devRelease(subver, maj, mnr)
 		for _, s := range serviceSince {
-			if has[s.name] && (maj < s.major || maj == s.major && mnr < s.minor) {
+			if knots && s.name == "COMPACT_FILTERS" {
+				continue
+			}
+			if has[s.name] && (dmaj < s.major || dmaj == s.major && dmnr < s.minor) {
 				since := fmt.Sprintf("%d.%d", s.major, s.minor)
 				if s.major > 0 {
 					since = fmt.Sprint(s.major)
@@ -89,7 +95,7 @@ func anachronism(subver string, services []string) string {
 			}
 		}
 		if len(extra) > 0 {
-			return "not what it claims - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library never does"
+			return "not what it claims - it offers " + strings.Join(extra, ", ") + ", which the Bitcore library does not offer by default"
 		}
 	}
 	if has["P2P_V2"] && neverV2.MatchString(subver) {
@@ -98,8 +104,22 @@ func anachronism(subver string, services []string) string {
 	return ""
 }
 
+// devRelease counts a development build as the release under way: 0.20.99
+// as 0.21, 31.99 as 32, so a feature merged before the release is not held
+// against it.
+func devRelease(subver string, maj, mnr int) (int, int) {
+	switch {
+	case !devBuild.MatchString(subver):
+	case maj == 0:
+		mnr++
+	case mnr == 99:
+		maj, mnr = maj+1, 0
+	}
+	return maj, mnr
+}
+
 // protocolMismatch is a peer whose protocol version does not match the Core
-// release it names: Core 0.21 to 31 send 70016 (later ones 70017 or more),
+// release it names: Core 0.21 to 31 send 70016, 32 and later 70017 or more,
 // every release before sends 70015 or less. Development builds (x.99) are
 // left alone: "0.20.99" was already 0.21 under way. On one node, in four
 // days: 12,100 LinkingLion sessions naming Core 0.8 to 0.20 with 70016, a
@@ -118,6 +138,9 @@ func protocolMismatch(subver string, version int) string {
 	// Core 32 (tagged 21.10.2026) raised it to 70017 (node/protocol_version.h).
 	case newer && maj <= 31 && version > 70016:
 		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, which Core %s never did", version, coreMajor(maj, mnr))
+	// All 346 sessions naming Core 32 on one node, 21.10. to 02.11.2026, spoke 70017.
+	case maj >= 32 && version < 70017:
+		return fmt.Sprintf("not Bitcoin Core - it speaks protocol %d, older than Core %d", version, maj)
 	}
 	return ""
 }
@@ -147,19 +170,19 @@ func skippedHandshakeAbout(recv map[string]int64) string {
 	return "not Bitcoin Core - it left out wtxidrelay when connecting, which it should have sent"
 }
 
-// offersNothingAsCore is a peer naming Bitcoin Core (or Knots) that offers no
-// service at all. Core always offers at least WITNESS and NETWORK or
-// NETWORK_LIMITED, so the name is borrowed. On the node this was written for:
+// offersNothingAsCore is a peer naming Bitcoin Core 0.16 or later (or Knots)
+// that offers no service at all. Those always offer NETWORK_LIMITED, pruned
+// or not, so the name is borrowed. An older pruned Core could offer nothing. On the node this was written for:
 // 6,954 sessions in four weeks, 27% of everything that said "/Satoshi:", from
 // 620 addresses, 73% of them on Amazon's network, and not one ever delivered
 // a block first. A nil list - Core did not say - is not this.
 func offersNothingAsCore(subver string, services []string) bool {
-	return services != nil && len(services) == 0 && claimedCore.MatchString(subver)
+	return services != nil && len(services) == 0 && coreAtLeast(subver, 0, 16)
 }
 
 // offersNothingAbout names the services Core always offers, rather than
 // guessing what the peer is.
-const offersNothingAbout = "not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED"
+const offersNothingAbout = "not Bitcoin Core - it offers no services at all; every Core since 0.16 offers NETWORK_LIMITED"
 
 // What a peer does, not what it says. Core pings every two minutes
 // (PING_INTERVAL in net_processing.cpp) and asks a peer for addresses once per
@@ -285,7 +308,6 @@ func disguiseEvidence(r rawPeer, kind, walletAbout string, anyWtxid bool, now ti
 	if givesOwnAddress(r) {
 		out = append(out, ownAddressAbout)
 	}
-	out = append(out, neverAsksForTx(r.Subver, r.RelayTxes, r.BytesSentPerMsg, r.ConnTime, now))
 	return append(out, quietCoreAbout(r.Subver, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now))
 }
 
@@ -306,26 +328,6 @@ func givesOwnAddress(r rawPeer) bool {
 	return ok1 && ok2 && us == them && us.IsGlobalUnicast() && !us.IsPrivate()
 }
 
-// A peer that wants transactions hears of every new one, and Core asks for
-// the ones it lacks. Of 99 Core and Knots peers on the node this was written
-// for, each told of at least 1 MB of transactions in an hour or more, every
-// one asked for some (02.11.2026); one posing as Core 28.1, at KIT, was told
-// of 13 MB in 31 hours and asked for none: it only listens when a transaction
-// arrives. It backs a disguise found otherwise.
-func neverAsksForTx(subver string, relayTxes *bool, sent map[string]int64, connTime int64, now time.Time) string {
-	if !claimedCore.MatchString(subver) || !wantsTx(relayTxes) || !connectedFor(connTime, now, 3600) ||
-		sent["inv"] < 1e6 || sent["tx"] > 0 {
-		return ""
-	}
-	return fmt.Sprintf("we announced %d MB of transactions and it asked for none; Core asks for every one it lacks", sent["inv"]/1e6)
-}
-
-// KIT's DSN group measures the Bitcoin network (dsn.kastel.kit.edu/bitcoin).
-// Said only of a peer found disguised by its own behaviour, and only that it
-// runs there - not that it is one of the group's nodes.
-const kitASN = 34878
-const kitAbout = "it runs at KIT, whose research group measures the Bitcoin network"
-
 // withAlso adds each reason the about does not give yet as an "Also:" line,
 // the evidence without its verdict ("not Bitcoin Core - it lacks ..." says
 // "it lacks ..."): the verdict is the Probably line's.
@@ -340,7 +342,7 @@ func withAlso(about string, reasons []string) string {
 		if strings.Contains(about, why) {
 			continue
 		}
-		if !strings.HasPrefix(why, "it ") && !strings.HasPrefix(why, "we ") {
+		if !strings.HasPrefix(why, "it ") {
 			why = "it " + why
 		}
 		about += "\nAlso: " + why
