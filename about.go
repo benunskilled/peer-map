@@ -117,6 +117,17 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)^/p2aburn:`), "p2aburn, a bot that sweeps P2A anchors (outputs anyone may spend) behind a Runes minting fleet"},
 	{regexp.MustCompile(`(?i)python-bitcoinlib`), "python-bitcoinlib, a Python library scripts use to talk to nodes"},
 	{regexp.MustCompile(`(?i)pyblock`), "PyBLOCK, a node dashboard"},
+	// Projects whose name matches; none of them publishes the exact string.
+	// Urbit reaches Bitcoin through its %btc-provider (github.com/urbit/urbit);
+	// Symbiosis Finance runs a Bitcoin bridge (symbiosis.finance/bridge-btc);
+	// DexCash Network is a blockchain of its own (dexcash.org). curl is the
+	// download tool and does not speak Bitcoin's protocol, so a peer naming it
+	// borrows the name.
+	{regexp.MustCompile(`^urbit$`), "Probably Urbit's Bitcoin software (%btc-provider)"},
+	{regexp.MustCompile(`/Symbiosis Bitcoin Bridge:`), "Probably the Bitcoin bridge of Symbiosis Finance, built on btcd's Go library"},
+	{regexp.MustCompile(`^/curl:`), "Names curl, the download tool; curl itself does not speak Bitcoin's protocol"},
+	{regexp.MustCompile(`^/dexcash-nodes:`), "Named like DexCash Network, a blockchain of its own"},
+	{regexp.MustCompile(`(?i)^/alt-bitnodes:`), "Named after Bitnodes, the public node map"},
 	{regexp.MustCompile(`(?i)bitnodes`), "Bitnodes, a public map of reachable nodes"},
 	// Seen from one netcup address, offering nothing and gone after a second;
 	// the name fits a node map, but nothing public says whose.
@@ -282,7 +293,7 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 	}
 	for _, s := range services {
 		if s == "NETWORK" {
-			return "Probably a full node under a name its operator chose"
+			return operatorNamedAbout
 		}
 	}
 	// What it did, where Core counted it: a name nobody knows still says
@@ -325,8 +336,15 @@ func otherAbout(services []string, relayTxes *bool, recv, sent map[string]int64,
 		// 6.2% of the real nodes above did the same: one in sync asks for no headers.
 		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler")
 	}
-	return "Software with a name we don't recognise"
+	return unknownAbout
 }
+
+// The two lines of otherAbout that say nothing the peer did: a guess from
+// its services, and no guess at all.
+const (
+	operatorNamedAbout = "Probably a full node under a name its operator chose"
+	unknownAbout       = "Software with a name we don't recognise"
+)
 
 func aboutOf(subver string) string {
 	for _, r := range aboutRules {

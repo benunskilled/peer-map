@@ -74,7 +74,7 @@ var kindRules = []struct {
 	// it says "/Satoshi:29.4/Purity:1.1.0/" (FormatSubVersion in
 	// src/clientversion.cpp). On the node this was written for, 21. to
 	// 29.10.2026: 269 sessions, all offering its bit 25 and BIP110's bit 27.
-	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|/Purity:`), false},
+	{"Other chain", regexp.MustCompile(`(?i)Bitcoin ABC|BUCash|Bitcoin SV|BCHUnlimited|Bitcoin XT|Classic:|\(EB[0-9]|SuperBitcoin|iriumd|vds[_ ]|^/Aurum:|/Purity:|^/dexcash-nodes:`), false},
 	// Network scanners, in two flavours: the ones run as a service and the
 	// ones run by universities. Both announce themselves honestly.
 	// Pool Detective, MIT's Digital Currency Initiative watching what mining
@@ -96,7 +96,7 @@ var kindRules = []struct {
 	// and stay "Other", although on that node they asked for addresses and
 	// nothing else (peer-observer, 21. to 29.10.2026). BIP-110 Observer collects peer
 	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/bip110-observer:`), false},
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bip110-observer:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -139,7 +139,7 @@ var kindRules = []struct {
 	// EMPORION, renamed SYMMARTYS, fetches headers to verify OpenTimestamps
 	// proofs (bitcoin_headers.py in alexar76/emporion, under the old and new
 	// package names). Both versions send their own name with version 0.3.
-	{"Light client", regexp.MustCompile(`(?i)BIP-157|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:`), false},
+	{"Light client", regexp.MustCompile(`(?i)BIP-157|^/bip157-fetch:|kyoto|^Yuki /|^/VerifiedX:|^/nakamoto:|^/bitcoin-s:|^Stacks/|/CaribouSPV:|^/EMPORION:|^/SYMMARTYS:`), false},
 	// A small Utreexo node. Named so it is not lost in "Other", and counted as
 	// relaying like any node - Bitcoin Lab has no rule for it either.
 	{"Node (Floresta)", regexp.MustCompile(`(?i)floresta`), true},

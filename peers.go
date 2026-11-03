@@ -462,9 +462,21 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			}
 		}
 		// A pool node or crawler no rule describes (/pydroid-pool:3/,
-		// /p2p-watcher:0.1.0/) gets the same line, rather than none.
-		if (p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler") && p.About == "" {
-			p.About = otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
+		// /p2p-watcher:0.1.0/) gets the same line, rather than none. Where a
+		// rule does describe it, the rule says what the name stands for and
+		// this line what the peer did, so the second is added, not dropped.
+		switch p.Kind {
+		case "Other", "Pool node", "Crawler", "Light client", "Other chain":
+			seen := otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
+			observed := seen != unknownAbout && seen != operatorNamedAbout
+			always := p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler"
+			switch {
+			case p.About == "" && (observed || always):
+				p.About = seen
+			// "Claims:" and "Probably:" already say what the peer did.
+			case p.About != "" && observed && !strings.HasPrefix(p.About, "Claims: "):
+				p.About += "\nIn this session: " + seen
+			}
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
