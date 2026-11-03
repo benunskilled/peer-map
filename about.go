@@ -199,7 +199,8 @@ var aboutRules = []struct {
 	// No public source. On the node this was written for, 28.10. to
 	// 01.11.2026: 23 sessions from 16 addresses, all in Cloudflare's network
 	// (AS13335), none sending BIP 331's sendpackages, gone after 11 s (median).
-	{regexp.MustCompile(`^/cf-package-relay:`), "Named for package relay, but never offered it; comes from Cloudflare's network and leaves after seconds"},
+	// Only the name is said: what one node saw is no rule for all of them.
+	{regexp.MustCompile(`^/cf-package-relay:`), "Named after package relay, which passes related transactions on together (BIP 331)"},
 	// Bitcoin Cash clients carry its block size as "(EB8.0)" too, so they
 	// come before Classic.
 	{regexp.MustCompile(`(?i)Bitcoin ABC`), "Bitcoin ABC, a Bitcoin Cash client, eCash's node since 2020"},
@@ -210,7 +211,7 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own"},
 	{regexp.MustCompile(`(?i)vds[_ ]`), "VDS, an altcoin with a chain of its own"},
 	// No public source; see Node (other) in kinds.go.
-	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "A full node with no public source: offers blocks and relays transactions like one"},
+	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "A full node with no public source"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 

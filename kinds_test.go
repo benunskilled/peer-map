@@ -389,7 +389,7 @@ func TestOtherChainAbouts(t *testing.T) {
 		"/Prometheus:30.4.1/":         "A full node with no public source",
 		"/BTC-Nodes:2026/":            "A full node with no public source",
 		"/Natasha:1.0/":               "A full node with no public source",
-		"/cf-package-relay:0.3.0/":    "Named for package relay",
+		"/cf-package-relay:0.3.0/":    "Named after package relay",
 	} {
 		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: about %q, want %q", subver, got, want)
