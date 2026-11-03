@@ -167,6 +167,7 @@ type Peer struct {
 	NoServices   bool   `json:"no_services,omitempty"`   // advertises NODE_NONE
 	NoTxRelay    bool   `json:"no_tx_relay,omitempty"`   // version said: send me no transactions
 	NoTxWhy      string `json:"no_tx_why,omitempty"`     // why, where it can be told
+	NoTxSaid     bool   `json:"no_tx_said,omitempty"`    // the about already says it wants no transactions
 	ChainUnknown bool   `json:"chain_unknown,omitempty"` // Core has never seen a header from it
 	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
 	ForkWhy      string `json:"fork_why,omitempty"`
@@ -467,15 +468,17 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// this line what the peer did, so the second is added, not dropped.
 		switch p.Kind {
 		case "Other", "Pool node", "Crawler", "Light client", "Other chain":
-			seen := otherAbout(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
+			seen, noTx := sessionLine(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 			observed := seen != unknownAbout && seen != operatorNamedAbout
 			always := p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler"
 			switch {
 			case p.About == "" && (observed || always):
 				p.About = seen
+				p.NoTxSaid = noTx
 			// "Claims:" and "Probably:" already say what the peer did.
 			case p.About != "" && observed && !strings.HasPrefix(p.About, "Claims: "):
 				p.About += "\nIn this session: " + observedPart(seen)
+				p.NoTxSaid = noTx
 			}
 		}
 		// Core reports version 0 until the peer's version message arrives:
