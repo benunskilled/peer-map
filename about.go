@@ -196,6 +196,21 @@ var aboutRules = []struct {
 	{regexp.MustCompile(`(?i)gocoin`), "Gocoin, a full node and wallet written in Go"},
 	// gosuda/bitcoin-rs, crates/primitives/src/version.rs: "/bitcoin-rs:<version>/".
 	{regexp.MustCompile(`^/bitcoin-rs:`), "bitcoin-rs, a full node written in Rust, independent of Core"},
+	// No public source. On the node this was written for, 28.10. to
+	// 01.11.2026: 23 sessions from 16 addresses, all in Cloudflare's network
+	// (AS13335), none sending BIP 331's sendpackages, gone after 11 s (median).
+	{regexp.MustCompile(`^/cf-package-relay:`), "Named for package relay, but never offered it; comes from Cloudflare's network and leaves after seconds"},
+	// Bitcoin Cash clients carry its block size as "(EB8.0)" too, so they
+	// come before Classic.
+	{regexp.MustCompile(`(?i)Bitcoin ABC`), "Bitcoin ABC, a Bitcoin Cash client, eCash's node since 2020"},
+	{regexp.MustCompile(`(?i)BUCash|BCHUnlimited`), "Bitcoin Unlimited, a Bitcoin Cash client"},
+	{regexp.MustCompile(`(?i)Bitcoin SV`), "Bitcoin SV, the node of BSV, which split from Bitcoin Cash in 2018"},
+	{regexp.MustCompile(`(?i)Bitcoin XT`), "Bitcoin XT, a fork of Core for bigger blocks that went on to Bitcoin Cash"},
+	{regexp.MustCompile(`(?i)SuperBitcoin`), "Super Bitcoin, a fork of Bitcoin from December 2017 with a chain of its own"},
+	{regexp.MustCompile(`(?i)iriumd`), "Irium, an altcoin with a chain of its own"},
+	{regexp.MustCompile(`(?i)vds[_ ]`), "VDS, an altcoin with a chain of its own"},
+	// No public source; see Node (other) in kinds.go.
+	{regexp.MustCompile(`(?i)^/(Prometheus|BTC-Nodes|Natasha):`), "A full node with no public source: offers blocks and relays transactions like one"},
 	{regexp.MustCompile(`(?i)Classic:|\(EB[0-9]`), "Bitcoin Classic: a Bitcoin Cash client"},
 }
 

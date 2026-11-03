@@ -9,6 +9,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"embed"
 	"encoding/json"
@@ -22,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -306,8 +308,71 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 		// relative URL on the page, and an injected form could post off-site.
 		// The dashboard has neither a <base> nor a form, so both are 'none'.
 		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'")
-		mux.ServeHTTP(w, r)
+		gzipped(mux).ServeHTTP(w, r)
 	})
+}
+
+// gzipped packs text answers for a browser that takes gzip. The peer list is
+// about 270 kB of JSON and comes again every poll; packed it is a fifth of
+// that, which counts on a phone away from home. A range request is left
+// alone: its offsets would point into the packed bytes.
+func gzipped(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding")
+		if r.Method != http.MethodGet || r.Header.Get("Range") != "" || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		g := &gzipWriter{ResponseWriter: w}
+		next.ServeHTTP(g, r)
+		if g.gz != nil {
+			g.gz.Close()
+		}
+	})
+}
+
+// gzipWriter decides on the status and type the handler set: only a 200 with
+// text in it is packed, so a 304 stays empty and a PNG is not packed twice.
+type gzipWriter struct {
+	http.ResponseWriter
+	gz      *gzip.Writer
+	started bool
+}
+
+func (g *gzipWriter) WriteHeader(code int) {
+	if g.started {
+		return
+	}
+	g.started = true
+	h := g.Header()
+	if code == http.StatusOK && h.Get("Content-Encoding") == "" && packable(h.Get("Content-Type")) {
+		h.Del("Content-Length")
+		h.Set("Content-Encoding", "gzip")
+		g.gz = gzip.NewWriter(g.ResponseWriter)
+	}
+	g.ResponseWriter.WriteHeader(code)
+}
+
+func (g *gzipWriter) Write(b []byte) (int, error) {
+	if !g.started {
+		if g.Header().Get("Content-Type") == "" {
+			g.Header().Set("Content-Type", http.DetectContentType(b))
+		}
+		g.WriteHeader(http.StatusOK)
+	}
+	if g.gz != nil {
+		return g.gz.Write(b)
+	}
+	return g.ResponseWriter.Write(b)
+}
+
+func packable(contentType string) bool {
+	for _, t := range []string{"text/", "application/json", "application/javascript", "text/javascript", "image/svg+xml"} {
+		if strings.HasPrefix(contentType, t) {
+			return true
+		}
+	}
+	return false
 }
 
 func healthcheck() int {

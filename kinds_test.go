@@ -372,3 +372,27 @@ func TestLibbitcoinV2(t *testing.T) {
 		t.Error("3.8.0 with P2P_V2 not flagged")
 	}
 }
+
+// Bitcoin Cash clients carry "(EB8.0)" like Classic but are not Classic, and
+// every other chain, and the names without a public source, still get a sentence.
+func TestOtherChainAbouts(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/Bitcoin ABC:0.16.1(EB8.0)/": "Bitcoin ABC",
+		"/BUCash:1.9.0(EB32; AD12)/":  "Bitcoin Unlimited",
+		"/BCHUnlimited:1.0/":          "Bitcoin Unlimited",
+		"/Bitcoin SV:1.0.16/":         "Bitcoin SV",
+		"/Bitcoin XT:0.11.0/":         "Bitcoin XT",
+		"/Classic:1.3.8(EB8)/":        "Bitcoin Classic",
+		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
+		"vds_0.9.53":                  "VDS",
+		"/iriumd:1.0/":                "Irium",
+		"/Prometheus:30.4.1/":         "A full node with no public source",
+		"/BTC-Nodes:2026/":            "A full node with no public source",
+		"/Natasha:1.0/":               "A full node with no public source",
+		"/cf-package-relay:0.3.0/":    "Named for package relay",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: about %q, want %q", subver, got, want)
+		}
+	}
+}
