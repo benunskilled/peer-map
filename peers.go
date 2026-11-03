@@ -539,13 +539,14 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
 			switch {
 			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
-				what, short := "own Bitcoin node", "node"
+				what, short := "own Bitcoin node", "Own Bitcoin node"
 				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
-					what, short = "block relay (ckp2p)", "block relay"
+					what, short = "block relay (ckp2p)", "Block relay"
 				}
 				p.Kind, p.Pool = "Pool node", n.pool
 				p.About, p.PoolProof = n.pool+"'s "+what, "This address "+n.proof
-				p.Label, labelled = n.pool+"'s "+short, p.About
+				// The pool's name has a line of its own in the list.
+				p.Label, labelled = short, p.About
 			case !byAddr && p.Kind == "Pool node":
 				p.Pool = n.pool
 			}

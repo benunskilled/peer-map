@@ -293,3 +293,19 @@ func TestSessionLinesHaveShortForms(t *testing.T) {
 		t.Errorf("found %d short forms, want 11 - did a line lose its short form?", n)
 	}
 }
+
+// A pool node shows its pool on a line of its own: the label does not say
+// the name again.
+func TestPoolLabelLeavesTheNameToItsLine(t *testing.T) {
+	yes := true
+	for addr, n := range poolNodes {
+		if !addr.Is4() {
+			continue
+		}
+		p := convertAt([]rawPeer{{Addr: addr.String() + ":8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.0.0/",
+			Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, RelayTxes: &yes}}, time.Now())[0]
+		if p.Pool != n.pool || p.Label != "Own Bitcoin node" {
+			t.Errorf("%s: pool %q, label %q", addr, p.Pool, p.Label)
+		}
+	}
+}
