@@ -475,7 +475,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				p.About = seen
 			// "Claims:" and "Probably:" already say what the peer did.
 			case p.About != "" && observed && !strings.HasPrefix(p.About, "Claims: "):
-				p.About += "\nIn this session: " + seen
+				p.About += "\nIn this session: " + observedPart(seen)
 			}
 		}
 		// Core reports version 0 until the peer's version message arrives:
