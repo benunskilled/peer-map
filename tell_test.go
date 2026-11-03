@@ -85,7 +85,7 @@ func TestEveryBehaviourHasATell(t *testing.T) {
 		"Asks for addresses, not for headers or blocks":                     true,
 	}
 	n := 0
-	for _, fn := range []string{"func sessionLine(", "func noAgentAbout("} {
+	for _, fn := range []string{"func sessionLine(", "func noAgentLine("} {
 		body := string(src[strings.Index(string(src), fn):])
 		body = body[:strings.Index(body, "\n}\n")]
 		for _, m := range regexp.MustCompile(`return "([^"]+)"`).FindAllStringSubmatch(body, -1) {

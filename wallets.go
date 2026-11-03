@@ -143,31 +143,31 @@ func p2pCrawlerSays(subver string, version int, services []string, relayTxes *bo
 
 // behindCoreName is the kind and about for Wasabi, Ginger and Wasabi's peer
 // search, or "", "". recv is bytesrecv_per_msg. NBitcoin speaks 70016.
-func behindCoreName(subver string, version int, services []string, relayTxes *bool, recv map[string]int64) (string, string) {
+func behindCoreName(subver string, version int, services []string, relayTxes *bool, recv map[string]int64) (kind, about, name, label string) {
 	if p2pCrawlerSays(subver, version, services, relayTxes) {
-		return "Crawler", "Claims: " + claimOf(subver) + "\nProbably: p2p-crawler, virtu's research crawler - its fixed version message: protocol 70015, no services, no transactions"
+		return "Crawler", "Claims: " + claimOf(subver) + "\nProbably: p2p-crawler, virtu's research crawler - its fixed version message: protocol 70015, no services, no transactions", "p2p-crawler", "Probably p2p-crawler"
 	}
 	if services == nil || len(services) > 0 || relayTxes == nil || version < 70016 {
-		return "", ""
+		return "", "", "", ""
 	}
 	// Anything beyond NBitcoin's handshake is other software.
 	if recv["wtxidrelay"] > 0 || recv["sendcmpct"] > 0 {
-		return "", ""
+		return "", "", "", ""
 	}
 	claim := "Claims: " + claimOf(subver) + "\nProbably: "
 	if !*relayTxes {
 		if wasabiAgents[subver] && recv["sendaddrv2"] > 0 {
-			return "Crawler", claim + fmt.Sprintf("Wasabi Wallet's peer search - one of its %d borrowed Core names, offers nothing, asks only for addresses", len(wasabiAgents))
+			return "Crawler", claim + fmt.Sprintf("Wasabi Wallet's peer search - one of its %d borrowed Core names, offers nothing, asks only for addresses", len(wasabiAgents)), "", "Probably Wasabi's search"
 		}
-		return "", ""
+		return "", "", "", ""
 	}
 	switch {
 	case wasabiAgents[subver] && gingerAgents[subver]:
-		return "Wallet", claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions"
+		return "Wallet", claim + "Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions", "Wasabi", "Probably Wasabi or Ginger"
 	case wasabiAgents[subver]:
-		return "Wallet", claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents))
+		return "Wallet", claim + fmt.Sprintf("Wasabi Wallet or a fork - one of its %d borrowed Core names, offers nothing, wants transactions", len(wasabiAgents)), "Wasabi", "Probably Wasabi Wallet"
 	case gingerAgents[subver]:
-		return "Wallet", claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents))
+		return "Wallet", claim + fmt.Sprintf("Ginger Wallet (or an old Wasabi) - one of its %d borrowed Core names, offers nothing, wants transactions", len(gingerAgents)), "Ginger", "Probably Ginger Wallet"
 	}
-	return "", ""
+	return "", "", "", ""
 }

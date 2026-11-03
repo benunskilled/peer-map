@@ -735,24 +735,9 @@
       if (/bitcoinj|breadwallet|\/bread:|multibit|bither|wallet/i.test(p.subver || "")) return "as wallet";
       return /^\/?Satoshi/i.test(p.subver || "") ? "as Core" : "as " + uaName(p);
     }
-    if (p.kind === "Lightning wallet") {
-      if (/lnd 0\.21/.test(p.about || "")) return "lnd 0.21+";
-      if (/^Older lnd/.test(p.about || "")) return "older lnd";
-    }
-    // A scanner may pose as a wallet or as Core: its chip names who runs it.
-    if (p.kind === "Research scanner") {
-      const who = /Probably: (.+)'s network research/.exec(p.about || "");
-      if (who) return who[1];
-      if (/^\/btcwire:[^/]*\/Satoshi:/.test(p.subver || "")) return "Pool Detective";
-      // "/dsn.tm.kit.edu/bitcoin:0.9.99/" ends in "bitcoin".
-      if (/^\/dsn\.[a-z]+\.kit\.edu\//i.test(p.subver || "")) return "KIT";
-    }
-    // Names that hide who it is, or one program under many names.
-    if (p.kind === "Crawler" && /p2p-crawler/.test(p.about || "")) return "p2p-crawler";
-    if (/client for RESET/.test(p.about || "")) return "RESET";
-    // Wasabi and Ginger borrow Core's names: the about says which it is.
-    const w = /(Wasabi|Ginger)/.exec(p.about || "");
-    return w && p.kind === "Wallet" ? w[1] : uaName(p);
+    // One program under many names (RESET), a borrowed name (Wasabi) or who
+    // runs a scanner: the server knows which rule it was and names the chip.
+    return p.name || uaName(p);
   };
   // A phone shows the three largest chips and a "+ n more" that opens the rest:
   // a full row of chips per table pushes the peers off the screen.
@@ -2021,7 +2006,7 @@
           pill.append(ico, " ");
         }
         pill.append(label);
-        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
+        fit(pill, label, [p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
         // The grey line under the pill, on a wide screen only, is for what
@@ -2081,10 +2066,9 @@
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
           // and everything, the claim too, is in the panel that opens on a tap.
-          // What the session showed is left to the panel: the list keeps one
-          // sentence per peer.
-          const lines = p.about.split("\n").filter((l) => !l.startsWith("In this session: "));
-          about.textContent = probably || lines.join("\n");
+          // One line per peer: the label, where the server has one; what the
+          // session showed is left to the panel.
+          about.textContent = p.label || probably || p.about;
           about.classList.add(probably ? "short" : "clip");
           td.appendChild(about);
         }
@@ -2164,6 +2148,7 @@
         what.appendChild(row);
       }
     }
+    if (p.seen) what.appendChild(el("p", "pd-about", "In this session: " + p.seen));
     if (p.pool_proof) what.appendChild(el("p", "pd-about", p.pool_proof));
     const flags = [];
     // Each fact once: "never first" already says the peer offers no services or
