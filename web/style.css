@@ -531,6 +531,8 @@ a.addr-txt:hover { color: var(--accent); }
 .cards.cards table tr td.k-kind .kind-head { display: inline-flex; }
 .cards.cards table tr td.k-kind .hb-marks:empty { display: none; }
 .cards.cards table tr td.k-kind > small, .cards.cards table tr td.k-kind > .about { grid-column: 1 / -1; padding-left: var(--card-indent); }
+/* The session's line belongs to the sentence above it: no card gap between them. */
+.cards.cards table tr td.k-kind > .about.session { margin-top: -6px; }
 .cards.cards table tr { --card-indent: 39px; }
 .cards.cards table tr td.k-peer .who .flag { display: inline-block; width: 22px; margin-right: 7px; text-align: center; }
 

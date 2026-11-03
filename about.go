@@ -346,6 +346,18 @@ const (
 	unknownAbout       = "Software with a name we don't recognise"
 )
 
+// observedPart is otherAbout's line without the guess at what such a peer
+// is: under a sentence that already says what it is, only what it did
+// belongs. "Only listens: asks for nothing" keeps what follows the colon,
+// "Asks for headers ...: a program that tracks the chain" what comes before.
+func observedPart(line string) string {
+	if rest, ok := strings.CutPrefix(line, "Only listens: "); ok {
+		return strings.ToUpper(rest[:1]) + rest[1:]
+	}
+	before, _, _ := strings.Cut(line, ": ")
+	return before
+}
+
 func aboutOf(subver string) string {
 	for _, r := range aboutRules {
 		if r.re.MatchString(subver) {

@@ -186,3 +186,17 @@ func TestFixedSentenceKeepsTheSession(t *testing.T) {
 		}
 	}
 }
+
+func TestObservedPart(t *testing.T) {
+	for in, want := range map[string]string{
+		"Only listens: hears new transactions, fetches none": "Hears new transactions, fetches none",
+		"Only listens: asks for nothing":                     "Asks for nothing",
+		"Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain": "Asks for headers and wants no transactions",
+		"Asks for our mempool":                        "Asks for our mempool",
+		"Pushes transactions without announcing them": "Pushes transactions without announcing them",
+	} {
+		if got := observedPart(in); got != want {
+			t.Errorf("%q: got %q, want %q", in, got, want)
+		}
+	}
+}

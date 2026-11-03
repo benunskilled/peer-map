@@ -2081,9 +2081,19 @@
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
           // and everything, the claim too, is in the panel that opens on a tap.
-          about.textContent = probably || p.about;
-          about.classList.add(probably ? "short" : "clip");
+          // What the session showed is the evidence: it stands whole on a line
+          // of its own, and only the sentence above it is cut to fit.
+          const lines = p.about.split("\n");
+          const session = !probably && lines[lines.length - 1].startsWith("In this session: ") ? lines.pop() : "";
+          about.textContent = probably || lines.join("\n");
+          about.classList.add(probably || session ? "short" : "clip");
           td.appendChild(about);
+          if (session) {
+            const seen = document.createElement("div");
+            seen.className = "about session";
+            seen.textContent = session;
+            td.appendChild(seen);
+          }
         }
       },
     },
