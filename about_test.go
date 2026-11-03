@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -176,13 +178,16 @@ func TestFixedSentenceKeepsTheSession(t *testing.T) {
 	for _, ua := range []string{"/curl:8.5.0/", "urbit", "/dexcash-nodes:0.1.0/", "/bip157-fetch:0.1/"} {
 		got := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ua, Version: 70016,
 			ServicesNames: []string{}, RelayTxes: &yes, BytesRecvPerMsg: map[string]int64{"mempool": 24}}}, time.Now())[0]
-		if !strings.Contains(got.About, "Asks for our mempool") {
-			t.Errorf("%s: the session is lost: %q", ua, got.About)
+		if !strings.Contains(got.About+"\n"+got.Seen, "Asks for our mempool") {
+			t.Errorf("%s: the session is lost: %q / %q", ua, got.About, got.Seen)
+		}
+		if strings.Contains(got.About, "In this session") {
+			t.Errorf("%s: the session line is in the about again: %q", ua, got.About)
 		}
 		quiet := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ua, Version: 70016,
 			ServicesNames: []string{}, RelayTxes: &yes}}, time.Now())[0]
-		if strings.Contains(quiet.About, "In this session") || strings.Contains(quiet.About, unknownAbout) && aboutOf(ua) != "" {
-			t.Errorf("%s: a quiet session added a line: %q", ua, quiet.About)
+		if quiet.Seen != "" || strings.Contains(quiet.About, unknownAbout) && aboutOf(ua) != "" {
+			t.Errorf("%s: a quiet session added a line: %q / %q", ua, quiet.About, quiet.Seen)
 		}
 	}
 }
@@ -217,8 +222,74 @@ func TestNoTxSaid(t *testing.T) {
 	} {
 		p := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: c.ua, Version: 70016,
 			ServicesNames: []string{}, RelayTxes: c.relay, BytesRecvPerMsg: headers}}, time.Now())[0]
-		if p.NoTxSaid != c.want || c.want && !strings.Contains(strings.ToLower(p.About), "wants no transactions") {
-			t.Errorf("%s relay %v: no_tx_said %v, about %q", c.ua, *c.relay, p.NoTxSaid, p.About)
+		if p.NoTxSaid != c.want || c.want && !strings.Contains(strings.ToLower(p.About+" "+p.Seen), "wants no transactions") {
+			t.Errorf("%s relay %v: no_tx_said %v, about %q, seen %q", c.ua, *c.relay, p.NoTxSaid, p.About, p.Seen)
 		}
+	}
+}
+
+// Every rule has a label that fits one line, 1000 px wide too, and keeps the rule's hedge: a
+// sentence that says "Probably" or "Names" does not turn into a fact.
+func TestLabelsFitAndKeepTheHedge(t *testing.T) {
+	for _, r := range aboutRules {
+		if r.label == "" || len(r.label) > 25 {
+			t.Errorf("%q: label %q (%d chars)", r.text, r.label, len(r.label))
+		}
+		for _, hedge := range []string{"Probably", "Names", "Named"} {
+			if strings.HasPrefix(r.text, hedge) && !strings.HasPrefix(r.label, hedge) && !strings.HasPrefix(r.label, "Borrowed") {
+				t.Errorf("%q: label %q drops %q", r.text, r.label, hedge)
+			}
+		}
+	}
+}
+
+// Label and chip belong to the rule's sentence: a disguise that puts its own
+// about in its place takes them away, a session line keeps its own label.
+func TestLabelGoesWithItsSentence(t *testing.T) {
+	yes := true
+	conv := func(ua string, svc []string, recv map[string]int64) Peer {
+		return convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ua, Version: 70016,
+			ServicesNames: svc, RelayTxes: &yes, BytesRecvPerMsg: recv}}, time.Now())[0]
+	}
+	if p := conv("/reset-header-relay:0.1/", []string{}, nil); p.Label != "Probably a RESET client" || p.Name != "RESET" {
+		t.Errorf("RESET: label %q, name %q", p.Label, p.Name)
+	}
+	// Schildbach's wallet offering blocks is a disguise: its about is the reasons.
+	if p := conv("/bitcoinj:0.14.4/Bitcoin Wallet:5.18/", []string{"NETWORK", "WITNESS"}, nil); p.Kind != "Disguised" || p.Label != "" || p.Seen != "" {
+		t.Errorf("disguised wallet: kind %q, label %q, seen %q", p.Kind, p.Label, p.Seen)
+	}
+	if p := conv("/some-tool:0.1/", []string{}, map[string]int64{"mempool": 24}); p.Label != "Asks for our mempool" || p.Seen != "" {
+		t.Errorf("unknown tool: label %q, seen %q", p.Label, p.Seen)
+	}
+	quiet := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/some-tool:0.1/", Version: 70016,
+		ServicesNames: []string{}, RelayTxes: &yes, ConnTime: time.Now().Unix() - 7200, BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
+	if p := convertAt([]rawPeer{quiet}, time.Now())[0]; p.Label != "Only listens" {
+		t.Errorf("listener: label %q, about %q", p.Label, p.About)
+	}
+	// LinkingLion's range puts its own about in place: the listener's label goes.
+	quiet.mockLinkingLion = true
+	if p := convertAt([]rawPeer{quiet}, time.Now())[0]; p.Label != "" || !strings.Contains(p.About, "LinkingLion") {
+		t.Errorf("LinkingLion: label %q, about %q", p.Label, p.About)
+	}
+}
+
+// Every line sessionLine can give has a short form for the list, and the
+// short form fits one line like the rules' labels.
+func TestSessionLinesHaveShortForms(t *testing.T) {
+	src, err := os.ReadFile("about.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(src[strings.Index(string(src), "func sessionLine("):])
+	body = body[:strings.Index(body, "\n}\n")]
+	n := 0
+	for _, m := range regexp.MustCompile(`, "([^"]*)", (true|false)(\n|$)`).FindAllStringSubmatch(body, -1) {
+		n++
+		if m[1] == "" || len(m[1]) > 25 {
+			t.Errorf("short form %q", m[1])
+		}
+	}
+	if n != 11 {
+		t.Errorf("found %d short forms, want 11 - did a line lose its short form?", n)
 	}
 }

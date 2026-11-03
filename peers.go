@@ -154,6 +154,16 @@ type Peer struct {
 	Subver    string `json:"subver"`
 	Kind      string `json:"kind"`            // what the user agent claims; see kinds.go
 	About     string `json:"about,omitempty"` // what that software is, when known
+	// The about cut to one line, for the list, where the about is a sentence
+	// from the rules or a session line with a guess after it.
+	Label string `json:"label,omitempty"`
+	// What the peer did in this session, where the about says what its name
+	// stands for: the panel shows it under the about, the list does not.
+	Seen string `json:"seen,omitempty"`
+	// The chip the peer is counted under where its user agent does not say:
+	// one program under many names (RESET), a borrowed name (Wasabi), or who
+	// runs a scanner.
+	Name string `json:"name,omitempty"`
 	// Where the name is false or says nothing (Disguised, Other, No user
 	// agent), what the peer does in a few words: the list shows it under the
 	// pill, the panel the whole sentence (tellOf, behaviourTell).
@@ -393,18 +403,21 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// Before the version message arrives Core lists no services, no tx
 		// relay and no chain either: a peer still in its handshake has not said
 		// anything yet.
+		labelled := "" // the about p.Label was made from
 		p.NoServices = r.Version > 0 && r.ServicesNames != nil && len(r.ServicesNames) == 0
 		p.NoTxRelay = r.Version > 0 && refusesTx(r.RelayTxes)
 		p.ChainUnknown = r.Version > 0 && r.SyncedHeaders != nil && *r.SyncedHeaders < 0
 		// Offering nothing means no blocks to pass on, whatever the name says.
 		// Bitcoin Lab strikes the same peers.
 		p.NoRelay = p.NoRelay || p.NoServices
-		borrowedKind, borrowedAbout := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
-		libreKind, libreAbout := libreRelay(r.Subver, r.ServicesNames)
+		borrowedKind, borrowedAbout, borrowedName, borrowedLabel := behindCoreName(r.Subver, r.Version, r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg)
+		libreKind, libreAbout, libreLabel := libreRelay(r.Subver, r.ServicesNames)
 		researcher, host, isResearch := researchHostOf(r.Addr)
 		switch {
 		case isResearch:
 			p.Kind, p.About = "Research scanner", "Probably: "+researcher+"'s network research"
+			// The chip names the university; the line has room for what it is.
+			p.Name, p.Label = researcher, "Probably a university"
 			if r.Subver != "" {
 				claim := claimOf(r.Subver)
 				if a := aboutOf(r.Subver); a != "" {
@@ -412,6 +425,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				}
 				p.About = "Claims: " + claim + "\n" + p.About
 			}
+			labelled = p.About
 			p.PoolProof = "This address is " + host + ", listed by 0xB10C"
 		case p.Kind == "Wallet" && offersWhatNoWalletCan(r.ServicesNames):
 			p.Kind, p.About = fakeWalletKind, fakeAbout(r.Subver, p.About, r.ServicesNames)
@@ -425,13 +439,16 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		case p.Kind == fakeWalletKind:
 			p.About = fakeAbout(r.Subver, "", r.ServicesNames)
 		case isViaBitpeer(r.Subver, r.Version, r.ServicesNames):
-			p.Kind, p.Pool, p.About = "Pool node", "ViaBTC", viaBitpeerAbout
+			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "Probably ViaBTC's relay"
+			labelled = p.About
 			p.PoolProof = "Found by 0xB10C, b10c.me"
 		case libreKind != "":
-			p.Kind, p.About = libreKind, libreAbout
+			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
+			labelled = p.About
 		case borrowedKind != "" &&
 			behaviourAbout(r.Subver, r.Transport, r.BytesRecvPerMsg, r.ConnTime, now) == "":
-			p.Kind, p.About = borrowedKind, borrowedAbout
+			p.Kind, p.About, p.Name, p.Label = borrowedKind, borrowedAbout, borrowedName, borrowedLabel
+			labelled = p.About
 		default:
 			// What a peer does says more than what it lacks: a crawler asking
 			// for addresses again and again is named that, whatever else is off.
@@ -468,25 +485,29 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// this line what the peer did, so the second is added, not dropped.
 		switch p.Kind {
 		case "Other", "Pool node", "Crawler", "Light client", "Other chain":
-			seen, noTx := sessionLine(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
+			seen, short, noTx := sessionLine(r.ServicesNames, r.RelayTxes, r.BytesRecvPerMsg, r.BytesSentPerMsg, r.ConnTime, now)
 			observed := seen != unknownAbout && seen != operatorNamedAbout
 			always := p.Kind == "Other" || p.Kind == "Pool node" || p.Kind == "Crawler"
 			switch {
 			case p.About == "" && (observed || always):
-				p.About = seen
+				// The list gets the short form; the whole line is the panel's.
+				p.About, p.Label = seen, short
+				labelled = p.About
 				p.NoTxSaid = noTx
 			// "Claims:" and "Probably:" already say what the peer did.
 			case p.About != "" && observed && !strings.HasPrefix(p.About, "Claims: "):
-				p.About += "\nIn this session: " + observedPart(seen)
+				p.Seen = observedPart(seen)
 				p.NoTxSaid = noTx
 			}
 		}
 		// Core reports version 0 until the peer's version message arrives:
 		// with a version, the peer did introduce itself, only without a name.
 		if p.Kind == noAgentKind && r.Version > 0 {
-			p.About = noAgentAbout(r.BytesRecvPerMsg, r.ConnTime, now)
+			p.About, p.Label = noAgentLine(r.BytesRecvPerMsg, r.ConnTime, now)
+			labelled = p.About
 		} else if p.Kind == noAgentKind {
-			p.About = "Has not said what it is: usually a connection that only checks the port, or one still starting"
+			p.About, p.Label = "Has not said what it is: usually a connection that only checks the port, or one still starting", "Port check or starting"
+			labelled = p.About
 		}
 		// LinkingLion with a borrowed name is Disguised; without any name it
 		// claims nothing, so it stays "No user agent" and only the about says
@@ -498,7 +519,8 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				lion += linkingLionQuiet
 			}
 			if r.Subver == "" {
-				p.About = "Probably: " + lion
+				p.About, p.Label = "Probably: "+lion, "Probably LinkingLion"
+				labelled = p.About
 			} else {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
 			}
@@ -517,12 +539,13 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if n, byAddr := poolOf(r.Addr, r.Subver); n.pool != "" {
 			switch {
 			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
-				what := "own Bitcoin node"
+				what, short := "own Bitcoin node", "node"
 				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
-					what = "block relay (ckp2p)"
+					what, short = "block relay (ckp2p)", "block relay"
 				}
 				p.Kind, p.Pool = "Pool node", n.pool
 				p.About, p.PoolProof = n.pool+"'s "+what, "This address "+n.proof
+				p.Label, labelled = n.pool+"'s "+short, p.About
 			case !byAddr && p.Kind == "Pool node":
 				p.Pool = n.pool
 			}
@@ -530,6 +553,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// A known block relay keeps its pill; the line under it says whose.
 		if n, ok := relayOf(r.Addr); ok && (p.Kind == noAgentKind || strings.HasPrefix(p.Kind, "Node")) {
 			p.About, p.Tell = n.pool+"'s block relay", n.pool+" block relay"
+			p.Label, labelled = p.About, p.About
 			p.PoolProof = "This address " + n.proof
 		}
 		if p.NoTxRelay {
@@ -556,6 +580,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if p.Kind == "Indexer" && isPrivate(r.Addr) {
 			p.About = "Probably your own " + claimOf(r.Subver) + " on this Umbrel"
 			p.App, _, _ = strings.Cut(strings.Trim(r.Subver, "/"), ":")
+			p.Label, labelled = "Probably your own "+p.App, p.About
 		}
 		if net, ok := operator(r); ok {
 			p.ASN, p.Operator = net.Number, net.Name
@@ -580,6 +605,24 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		if r.MinPing != nil {
 			ms := *r.MinPing * 1000
 			p.MinPingMs = &ms
+		}
+		// A rule's label and chip go with its sentence only: where a later
+		// step put another about in its place, they go too.
+		// A label stands for the about it was made from: a later step that
+		// replaced the about (LinkingLion, a pool's address) takes it away.
+		if p.About != labelled {
+			p.Label = ""
+		}
+		if rule, ok := ruleOf(r.Subver); ok && p.About == rule.text {
+			p.Label = rule.label
+			if p.Name == "" {
+				p.Name = rule.name
+			}
+		}
+		// A disguise or a LinkingLion range gives its reasons from what the
+		// peer did already; the session line would say it twice.
+		if p.Seen != "" && (strings.HasPrefix(p.About, "Claims: ") || strings.HasPrefix(p.About, "Probably: ")) {
+			p.Seen, p.NoTxSaid = "", false
 		}
 		out = append(out, p)
 	}

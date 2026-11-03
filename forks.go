@@ -22,25 +22,25 @@ import (
 const libreRelayService = "UNKNOWN[2^29]"
 
 // libreRelay is the kind and about for a Core name offering bit 29, or "", "".
-func libreRelay(subver string, services []string) (string, string) {
+func libreRelay(subver string, services []string) (kind, about, label string) {
 	if !slices.Contains(services, libreRelayService) {
-		return "", ""
+		return "", "", ""
 	}
 	maj, mnr, ok := claimedNumbers(subver)
 	if !ok {
-		return "", ""
+		return "", "", ""
 	}
 	garbageman := "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"
 	switch {
 	case strings.Contains(subver, "Knots:"):
 		// Libre Relay is Core; only a Garbageman built with its Knots name left in says Knots.
-		return fakeWalletKind, garbageman
+		return fakeWalletKind, garbageman, ""
 	case maj >= 30:
-		return "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"
+		return "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out", "Libre Relay (Core fork)"
 	case maj == 29 && mnr >= 2:
-		return fakeWalletKind, garbageman
+		return fakeWalletKind, garbageman, ""
 	}
-	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"
+	return "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it", "Libre Relay or Garbageman"
 }
 
 // Service bits Knots gives to rules other than Bitcoin's (src/protocol.h on
