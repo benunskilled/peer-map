@@ -395,15 +395,27 @@ func TestOtherChainAbouts(t *testing.T) {
 }
 
 // Names with no public source are not given a kind from what one node saw
-// them do, nor a fixed sentence: the session decides what is said.
+// them do, nor a fixed sentence: the session decides what is said. A name
+// that says what it is does get the kind it names.
 func TestNoKindFromOneNode(t *testing.T) {
-	for _, ua := range []string{"/trinetra:0.1/", "/p2p-probe:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/",
-		"/topology-probe:0.1/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/BTC-Nodes:2026/", "/Natasha:1.0/"} {
+	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/BTC-Nodes:2026/", "/Natasha:1.0/"} {
 		if got := kindOf(ua); got != "Other" {
 			t.Errorf("%s: kind %q, want Other", ua, got)
 		}
 		if got := aboutOf(ua); got != "" {
 			t.Errorf("%s: fixed sentence %q", ua, got)
+		}
+	}
+}
+
+func TestKindFromWhatTheNameSays(t *testing.T) {
+	for ua, want := range map[string]string{
+		"/topology-probe:0.1/": "Crawler", "/p2p-probe:0.1.0/": "Crawler", "/probe:1.0/": "Crawler",
+		"/btc-peers:0.1/": "Crawler", "/alt-bitnodes:0.1/": "Crawler",
+		"/bip157-fetch:0.1/": "Light client", "/dexcash-nodes:0.1.0/": "Other chain",
+	} {
+		if got := kindOf(ua); got != want {
+			t.Errorf("%s: kind %q, want %q", ua, got, want)
 		}
 	}
 }

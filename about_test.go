@@ -31,7 +31,7 @@ func TestOtherAbouts(t *testing.T) {
 		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
 		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
 		{"/jwrd.net:0.9.99.99/", 70016, "Probably a node on JWRD Computing's own bitcoind"},
-		{"/curl:8.5.0/", 70015, "Software with a name we don't recognise"},
+		{"/curl:8.5.0/", 70015, "Names curl, the download tool"},
 	}
 	for _, c := range cases {
 		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
@@ -164,6 +164,25 @@ func TestNoAgentAbout(t *testing.T) {
 	for _, c := range cases {
 		if got := noAgentAbout(c.recv, c.conn, now); got != c.want {
 			t.Errorf("%s: got %q", c.name, got)
+		}
+	}
+}
+
+// A fixed sentence says what a name stands for; what the peer did in the
+// session is still said under it, and a session that showed nothing adds
+// nothing.
+func TestFixedSentenceKeepsTheSession(t *testing.T) {
+	yes := true
+	for _, ua := range []string{"/curl:8.5.0/", "urbit", "/dexcash-nodes:0.1.0/", "/bip157-fetch:0.1/"} {
+		got := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ua, Version: 70016,
+			ServicesNames: []string{}, RelayTxes: &yes, BytesRecvPerMsg: map[string]int64{"mempool": 24}}}, time.Now())[0]
+		if !strings.Contains(got.About, "Asks for our mempool") {
+			t.Errorf("%s: the session is lost: %q", ua, got.About)
+		}
+		quiet := convertAt([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ua, Version: 70016,
+			ServicesNames: []string{}, RelayTxes: &yes}}, time.Now())[0]
+		if strings.Contains(quiet.About, "In this session") || strings.Contains(quiet.About, unknownAbout) && aboutOf(ua) != "" {
+			t.Errorf("%s: a quiet session added a line: %q", ua, quiet.About)
 		}
 	}
 }
