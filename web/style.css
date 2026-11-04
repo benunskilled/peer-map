@@ -44,12 +44,12 @@ body {
   line-height: 1.45;
 }
 
+/* The header is the same in Bitcoin Lab: title, the other app beside it,
+   status on the right - on a phone the status goes under the title. */
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
   padding: 16px 24px;
   border-bottom: 1px solid var(--border);
 }
@@ -57,7 +57,7 @@ body {
 /* The link to the other app in the pair. Quiet on purpose: it is an offer, not
    a part of this dashboard. Hidden until the server has said whether Bitcoin
    Lab is installed: then it opens the app or, without it, its GitHub page. */
-.sibling-link { font-size: 13px; color: var(--muted); text-decoration: none; }
+.sibling-link { margin-right: auto; padding-left: 14px; font-size: 13px; color: var(--muted); text-decoration: none; }
 .sibling-link:hover { color: var(--text); }
 /* The star in the tables and on the map marks the peer that brought the newest
    block here. It lasts two minutes. */
@@ -168,7 +168,7 @@ body {
 }
 .block-body .note { margin: 0; font-size: 13px; color: var(--muted); }
 
-.status-pill { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.status-pill { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 main {
   padding: 20px 24px 40px;
@@ -179,7 +179,8 @@ main {
   margin: 0 auto;
 }
 @media (max-width: 600px) {
-  .topbar { padding: 12px 16px; }
+  .topbar { flex-wrap: wrap; gap: 4px 0; padding: 14px 16px; }
+  .status-pill { flex-basis: 100%; font-size: 12px; }
   main { padding: 16px 16px 32px; }
 }
 
