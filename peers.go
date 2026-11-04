@@ -181,7 +181,7 @@ type Peer struct {
 	ChainUnknown bool   `json:"chain_unknown,omitempty"` // Core has never seen a header from it
 	Fork         string `json:"fork,omitempty"`          // other consensus rules it offers to enforce (forkOf)
 	ForkWhy      string `json:"fork_why,omitempty"`
-	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node while catching up
+	SyncMB       int64  `json:"sync_mb,omitempty"` // blocks it has taken from this node in this session while catching up
 	// The lowest fee rate the peer wants to hear of, in sat/vB to one
 	// decimal: only when it sent a feefilter. Core rounds what it sends on
 	// purpose, so more digits would be noise.

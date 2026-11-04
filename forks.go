@@ -111,7 +111,7 @@ const (
 	syncBehind    = 144
 )
 
-// syncingFrom is how many megabytes of blocks an inbound peer has taken from
+// syncingFrom is how many megabytes of blocks an inbound peer has taken, in this session, from
 // this node while it syncs, or 0. sent is bytessent_per_msg, synced is
 // synced_blocks (nil or below zero: Core does not know), tip the highest
 // header any peer shares.
