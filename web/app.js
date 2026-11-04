@@ -1137,6 +1137,9 @@
     a.href = lab ? siblingURL(null) : LAB_PAGE;
     if (lab) a.removeAttribute("title");
     else a.title = "See which of your peers bring you new blocks first";
+    // The star and the green address are Bitcoin Lab's word; without it the
+    // legend does not explain marks the page never shows.
+    for (const li of document.querySelectorAll(".key .lab-only")) li.hidden = !lab;
   }
 
   // Nodes are what passes blocks on (every "Node (...)" kind and pool nodes),
