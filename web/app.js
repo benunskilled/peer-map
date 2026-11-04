@@ -332,7 +332,7 @@
     };
     const sep = () => add("b-sep", "·");
 
-    add("b-height", b.height ? "Block " + b.height.toLocaleString() : "Last block", b.hash || "");
+    add("b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
     if (b.pool || b.pool_tag) {
       sep();
       add("b-label", "mined by");
@@ -397,7 +397,21 @@
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
 
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
-  const signedMs = (t) => (Math.round(t) === 0 ? "0" : (t > 0 ? "+" : "−") + Math.abs(Math.round(t)) + " ms");
+  // Each stop says how long the block took to get there from the stop before,
+  // not a time counted from the first job: with the owner's own pool first,
+  // every stop before it read "−206 ms" (04.11.2026). The first job is no
+  // station, so it says where it stands against your node instead.
+  const firstJobWords = (win, stops) => {
+    const core = stops.find((st) => st.kind === "core");
+    const d = core ? Math.round(core.t - win.t) : 0;
+    return d === 0 ? "same moment as your node" : Math.abs(d) + " ms " + (d > 0 ? "before" : "after") + " your node";
+  };
+  function stepOf(s, stops) {
+    if (s.kind === "win") return firstJobWords(s, stops);
+    const journey = stops.filter((st) => st.kind !== "win");
+    const i = journey.indexOf(s);
+    return i > 0 ? segLabel(journey[i - 1], s)[0] : "";
+  }
 
   // Which route the card shows: this block, or the typical one. Remembered
   // per browser, because somebody tuning a setup wants the median every time.
@@ -558,7 +572,7 @@
         t.appendChild(tr);
       };
       row("pool", miner, "", "mined it");
-      for (const s of stops) row(s.kind, s.name, signedMs(s.t), s.sub.join(" · "));
+      for (const s of stops) row(s.kind, s.name, s.kind === "win" ? "" : stepOf(s, stops), [...s.sub, s.kind === "win" ? stepOf(s, stops) : ""].filter(Boolean).join(" · "));
       box.appendChild(t);
     } else {
       const rt = document.createElement("div");
@@ -594,7 +608,7 @@
         el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
         const name = fit(txt("b", s.name), s.name, s.title);
         const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : ""), xs[i],
-          [name, txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
+          [name, ...s.sub.map((line) => txt("small", line)), ...(s.kind === "win" ? [txt("small", firstJobWords(s, stops))] : [])]);
         if (s.title) lab.title = s.title;
       });
 
@@ -622,8 +636,7 @@
     note.textContent = ((noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
       + (median
       ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
-      : "0 is the first new job any pool sent here. When the block was found cannot be measured; "
-        + "the hop into your node is estimated from the peer's ping.")
+      : "When the block was found cannot be measured; the hop into your node is estimated from the peer's ping.")
       ).trim();
     box.appendChild(note);
   }
@@ -706,6 +719,11 @@
     }
     body.appendChild(race);
   }
+
+  // The legend folds shut again with a tap anywhere on it, not only on its
+  // title: on a phone the title has scrolled away by then.
+  const keyBox = document.querySelector("details.key");
+  if (keyBox) keyBox.querySelector("ul").addEventListener("click", () => { keyBox.open = false; });
 
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
@@ -2324,13 +2342,23 @@
   }
   // The detail is a row of its own under the peer, as wide as the table. It
   // adds no width to any column: its content is 0 wide and as wide as the cell.
-  function detailRow(tr, p) {
+  function detailRow(tr, p, key) {
     const row = document.createElement("tr");
     row.className = "detail-row";
     const td = document.createElement("td");
     td.colSpan = tr.cells.length;
     td.appendChild(peerDetail(p));
     row.appendChild(td);
+    // A tap on the open panel closes it, so a phone need not go back up to
+    // the row (04.11.2026). Links and buttons in it keep their own job. Its
+    // row comes back into view if it had scrolled away above.
+    row.addEventListener("click", (ev) => {
+      if (ev.target.closest("a, button, input, select, textarea")) return;
+      if (String(window.getSelection()).length > 0) return;
+      toggleDetail(tr, p, key);
+      const top = tr.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy(0, top - 8);
+    });
     return row;
   }
   // One at a time: opening a peer closes the one that was open, so the list does
@@ -2346,7 +2374,7 @@
     }
     state.openRows.clear();
     if (!open) {
-      const row = detailRow(tr, p);
+      const row = detailRow(tr, p, key);
       row.classList.add("opening");
       tr.after(row);
       tr.classList.add("open");
@@ -2462,8 +2490,10 @@
       if (!peers.length) {
         const p = document.createElement("p");
         p.className = "empty";
+        // No inbound at all is what most nodes see; say what brings them.
         p.textContent = state.place || state.group
           ? "None here."
+          : g === "inbound" ? "No inbound peers. For incoming clearnet connections, open port 8333 on your router."
           : "No " + LABEL[g].toLowerCase() + " peers.";
         card.appendChild(p);
         root.appendChild(card);
@@ -2563,7 +2593,7 @@
           toggleDetail(tr, p, rowKey);
         });
         tbody.appendChild(tr);
-        if (reopen) tbody.appendChild(detailRow(tr, p));
+        if (reopen) tbody.appendChild(detailRow(tr, p, rowKey));
       }
       table.appendChild(tbody);
       wrap.appendChild(table);
