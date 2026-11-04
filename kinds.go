@@ -81,7 +81,8 @@ var kindRules = []struct {
 	// pools do: its block observer speaks btcd's old wire library and adds
 	// "Satoshi:0.19" to the library's name, "/btcwire:0.4.1/Satoshi:0.19/"
 	// (blockobserver/coinparam/bitcoin.go in mit-dci/pooldetective).
-	// /trinetra:/ and /p2p-probe:/ have no public source and stay "Other":
+	// /trinetra:/ has no public source and stays "Other" (/p2p-probe:/, no
+	// source either, is a crawler by what its name says):
 	// in peer-observer's record of the node this was written for (21. to
 	// 29.10.2026) each only did the handshake and left within a second, every
 	// time (39 and 3 sessions), but one node is no rule. /rske-research:/ and /acsrg-research:/ say
@@ -92,9 +93,10 @@ var kindRules = []struct {
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
 	// /btc-range-scan/ used to land in "Other". /cryptexplorer:/,
-	// /topology-probe:/, /BlockSail:/ and /your-fork:/ have no public source
-	// and stay "Other", although on that node they asked for addresses and
-	// nothing else (peer-observer, 21. to 29.10.2026). BIP-110 Observer collects peer
+	// /BlockSail:/ and /your-fork:/ have no public source and stay "Other",
+	// although on that node they asked for addresses and nothing else
+	// (peer-observer, 21. to 29.10.2026); /topology-probe:/ and the other
+	// probes are crawlers by what their names say. BIP-110 Observer collects peer
 	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
 	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bip110-observer:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
