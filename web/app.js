@@ -873,10 +873,12 @@
   // Nineteen kinds were one long row of chips, several of them with a single
   // peer. The first level is three families of them and every other kind on
   // its own; the kind is the second, the name the third. A family "Other"
-  // held the kind "Other", and picking it showed "Other" a second time.
+  // held the kind "Other", and picking it showed "Other" a second time. An
+  // indexer (electrs, Fulcrum) is there for wallets, and alone it was a chip
+  // for one peer, mostly the node's own.
   const groupOf = (kind) =>
     kind.startsWith("Node") || kind === POOL_KIND ? "Nodes"
-    : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" ? "Wallets"
+    : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" || kind === "Indexer" ? "Wallets"
     : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
     : kind;
   const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
