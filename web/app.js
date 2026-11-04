@@ -1806,7 +1806,7 @@
     const s = document.createElement("span");
     s.className = "syncing";
     // Core counts bytes per connection, so this is the session, not the whole sync.
-    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks (since connected)`;
+    s.title = `Syncing from your node: ${mbText(p.sync_mb)} of blocks since it connected`;
     const ico = document.createElement("span");
     ico.className = "sync-ico";
     ico.setAttribute("aria-hidden", "true");
