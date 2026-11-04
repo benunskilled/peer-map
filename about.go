@@ -51,6 +51,11 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/satd:`), "satd, a Bitcoin full node written in Rust that works like Core", "satd node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/tbcd:`), "tbcd, the Bitcoin daemon of the Hemi network", "tbcd, Hemi's daemon", ""},
 	{regexp.MustCompile(`(?i)hemi-soak`), "A soak test of the Hemi network's Bitcoin code", "Hemi soak test", ""},
+	// paulscode's release of 28.10.2026, knots31.1.knots-sha256.20261018:
+	// Knots carried on after it hard-forked to BLAKE2b.
+	{regexp.MustCompile(`/KnotsSHA256:`), "Knots (SHA256), paulscode's build of Knots that stays on the SHA256 chain", "Knots (SHA256), paulscode", ""},
+	// github.com/richardkiss/pycoinnet; where it sends this name was not found.
+	{regexp.MustCompile(`^/pycoinnet/`), "Named like pycoinnet, Richard Kiss's Python library for the Bitcoin protocol", "Named like pycoinnet", ""},
 	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly", "Blueberry (BlueWallet)", ""},
 	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly", "Winnow iPhone wallet", ""},
 	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet on Android and others)", "BitcoinKit wallet library", ""},
@@ -403,6 +408,16 @@ func noAgentLine(recv map[string]int64, connTime int64, now time.Time) (line, sh
 	}
 	return "Introduced itself without a name; nothing it did tells what it is", "Nothing it did tells"
 }
+
+// hemiUnnamed is how Hemi's Bitcoin code (tbc) names itself when the program
+// built on it sets no name: "/%v:%v/" with the component empty, the version
+// Major.Minor.Patch-dev+ the first nine characters of the commit, and Core
+// drops the "+" (rawpeer.go, version.go in github.com/hemilabs/heminetwork).
+// The commits seen (539f4e33c, 923cba97a, c1771608d) are not in Hemi's public
+// repository, so it is "probably".
+var hemiUnnamed = regexp.MustCompile(`^/:[0-9]+\.[0-9]+\.[0-9]+-dev\+?[0-9a-f]{9}/$`)
+
+const hemiUnnamedAbout = "Probably a program on Hemi's Bitcoin code (tbc) that left its own name empty"
 
 // noAgentAbout is noAgentLine's sentence alone.
 func noAgentAbout(recv map[string]int64, connTime int64, now time.Time) string {

@@ -504,6 +504,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// with a version, the peer did introduce itself, only without a name.
 		if p.Kind == noAgentKind && r.Version > 0 {
 			p.About, p.Label = noAgentLine(r.BytesRecvPerMsg, r.ConnTime, now)
+			if hemiUnnamed.MatchString(r.Subver) {
+				p.About, p.Label = hemiUnnamedAbout+"\n"+p.About, "Probably Hemi's code"
+			}
 			labelled = p.About
 		} else if p.Kind == noAgentKind {
 			p.About, p.Label = "Has not said what it is: usually a connection that only checks the port, or one still starting", "Port check or starting"

@@ -24,6 +24,7 @@ func TestOtherAbouts(t *testing.T) {
 		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
 		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
 		{"/GlobalNodeMap:2.1/", 70016, "Probably a node map or counter"},
+		{"/pycoinnet/", 70016, "Named like pycoinnet"},
 		{"/reset-header-agent:1.0/", 70016, "Probably a header client for RESET"},
 		{"/RESET-Headers:1.0/", 70016, "Probably a header client for RESET"},
 		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
@@ -307,5 +308,28 @@ func TestPoolLabelLeavesTheNameToItsLine(t *testing.T) {
 		if p.Pool != n.pool || p.Label != "Own Bitcoin node" {
 			t.Errorf("%s: pool %q, label %q", addr, p.Pool, p.Label)
 		}
+	}
+}
+
+// Hemi's code with no program name, as Core shows it (the "+" dropped) and as
+// sent; other empty names are left alone.
+func TestHemiUnnamed(t *testing.T) {
+	for ua, want := range map[string]bool{
+		"/:1.1.0-dev539f4e33c/":  true,
+		"/:1.1.0-dev+c1771608d/": true,
+		"/:2.1.0-dev/":           false,
+		"//":                     false,
+		"/:1.0/":                 false,
+	} {
+		if got := hemiUnnamed.MatchString(ua); got != want {
+			t.Errorf("%q: %v, want %v", ua, got, want)
+		}
+	}
+}
+
+// A Knots node, so it is not in the table above: that one has no services.
+func TestKnotsSHA256About(t *testing.T) {
+	if got := aboutOf("/Satoshi:31.1.0/KnotsSHA256:20261018/"); !strings.HasPrefix(got, "Knots (SHA256), paulscode's build") {
+		t.Errorf("KnotsSHA256: %q", got)
 	}
 }
