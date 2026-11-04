@@ -720,10 +720,18 @@
     body.appendChild(race);
   }
 
-  // The legend folds shut again with a tap anywhere on it, not only on its
-  // title: on a phone the title has scrolled away by then.
-  const keyBox = document.querySelector("details.key");
-  if (keyBox) keyBox.querySelector("ul").addEventListener("click", () => { keyBox.open = false; });
+  // The legend and the block's pool list fold shut again with a tap anywhere
+  // on them, not only on their title: on a phone the title has scrolled away
+  // by then, and it comes back into view.
+  for (const box of document.querySelectorAll("details.key, #blockMore")) {
+    box.addEventListener("click", (ev) => {
+      if (!box.open || ev.target.closest("summary, a, button, input")) return;
+      if (String(window.getSelection()).length > 0) return;
+      box.open = false;
+      const top = box.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy(0, top - 8);
+    });
+  }
 
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
