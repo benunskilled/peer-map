@@ -871,13 +871,14 @@
   const SUB_LABEL = { [POOL_KIND]: "Pools:", Disguised: "Claims:", "Lightning wallet": "lnd:" };
   const subLabel = (kind) => SUB_LABEL[kind] || (kind.startsWith("Node") ? "Versions:" : "Names:");
   // Nineteen kinds were one long row of chips, several of them with a single
-  // peer. The first level is five families of them; the kind itself is the
-  // second, the name the third.
+  // peer. The first level is three families of them and every other kind on
+  // its own; the kind is the second, the name the third. A family "Other"
+  // held the kind "Other", and picking it showed "Other" a second time.
   const groupOf = (kind) =>
     kind.startsWith("Node") || kind === POOL_KIND ? "Nodes"
     : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" ? "Wallets"
     : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
-    : kind === "Disguised" ? "Disguised" : "Other";
+    : kind;
   const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
     : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub));
 
@@ -1814,10 +1815,6 @@
     if (n.size < 2 && !state.kind) return;
     const el = document.createElement("div");
     el.className = "kinds chips pool-picks";
-    const label = document.createElement("span");
-    label.className = "picks-label";
-    label.textContent = "Kinds:";
-    el.appendChild(label);
     for (const [kind, count] of [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
       const b = document.createElement("button");
       b.type = "button";
