@@ -720,6 +720,7 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .key summary { cursor: pointer; }
 .key ul { list-style: none; margin: 8px 0 2px; padding: 0; display: grid; gap: 7px; }
 .key li { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 10px; }
+.key li[hidden] { display: none; }
 .key li > :first-child { justify-self: start; font-weight: 400; }
 .key .hb { font-size: 13px; }
 .key .star { color: var(--accent); }
