@@ -1082,10 +1082,15 @@
   }
   function renderSiblingLink() {
     const a = $("sibling-link");
-    if (a) a.target = LAB_TARGET;
     if (!a || !state.data) return;
-    a.hidden = !state.data.sibling;
-    if (state.data.sibling) a.href = siblingURL(null);
+    // Without Bitcoin Lab the same link leads to where it can be had, as
+    // Bitcoin Lab does for this app.
+    const lab = !!state.data.sibling;
+    a.hidden = false;
+    a.target = lab ? LAB_TARGET : "_blank";
+    a.href = lab ? siblingURL(null) : LAB_PAGE;
+    if (lab) a.removeAttribute("title");
+    else a.title = "See which of your peers bring you new blocks first";
   }
 
   // Nodes are what passes blocks on (every "Node (...)" kind and pool nodes),
