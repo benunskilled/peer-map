@@ -397,21 +397,15 @@
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
 
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
-  // Each stop says how long the block took to get there from the stop before,
-  // not a time counted from the first job: with the owner's own pool first,
-  // every stop before it read "−206 ms" (04.11.2026). The first job is no
+  // A stop says no time counted from the first job: with the owner's own
+  // pool first, every stop before it read "−206 ms" (04.11.2026). The line
+  // between two stops says how long that stretch took; the first job is no
   // station, so it says where it stands against your node instead.
   const firstJobWords = (win, stops) => {
     const core = stops.find((st) => st.kind === "core");
     const d = core ? Math.round(core.t - win.t) : 0;
     return d === 0 ? "same moment as your node" : Math.abs(d) + " ms " + (d > 0 ? "before" : "after") + " your node";
   };
-  function stepOf(s, stops) {
-    if (s.kind === "win") return firstJobWords(s, stops);
-    const journey = stops.filter((st) => st.kind !== "win");
-    const i = journey.indexOf(s);
-    return i > 0 ? segLabel(journey[i - 1], s)[0] : "";
-  }
 
   // Which route the card shows: this block, or the typical one. Remembered
   // per browser, because somebody tuning a setup wants the median every time.
@@ -562,7 +556,7 @@
       const row = (cls, name, time, sub) => {
         const tr = document.createElement("tr");
         tr.className = cls;
-        for (const [c, v] of [["n", name], ["num", time], ["miss", sub]]) {
+        for (const [c, v] of [["n", name], ["miss", sub], ["num", time]]) {
           const td = document.createElement("td");
           td.className = c;
           td.textContent = v;
@@ -572,7 +566,17 @@
         t.appendChild(tr);
       };
       row("pool", miner, "", "mined it");
-      for (const s of stops) row(s.kind, s.name, s.kind === "win" ? "" : stepOf(s, stops), [...s.sub, s.kind === "win" ? stepOf(s, stops) : ""].filter(Boolean).join(" · "));
+      // One rule for every row: the time is from the row above, so it is
+      // never negative. The first job is a row like the others here; the
+      // template's transactions go with the job built from it.
+      const tx = stops.find((st) => st.kind === "tpl")?.tx;
+      stops.forEach((s, i) => {
+        const prev = stops[i - 1];
+        const gap = prev ? Math.round(s.t - prev.t) : null;
+        const time = gap == null ? "" : (prev.kind === "peer" && s.kind === "core" ? "~" : "+") + gap + " ms";
+        const sub = s.kind === "own" && tx != null ? [...s.sub, Math.round(tx).toLocaleString("en-US") + " tx"] : s.sub;
+        row(s.kind, s.name, time, sub.join(" · "));
+      });
       box.appendChild(t);
     } else {
       const rt = document.createElement("div");
@@ -635,7 +639,7 @@
     note.className = "note";
     note.textContent = ((noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
       + (median
-      ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
+      ? `Each stop is its median over the last ${n} blocks. `
       : "When the block was found cannot be measured; the hop into your node is estimated from the peer's ping.")
       ).trim();
     box.appendChild(note);
@@ -753,6 +757,10 @@
     if (p.kind === POOL_KIND) return p.pool || UNKNOWN_POOL;
     if (p.kind.startsWith("Node")) {
       const v = /^\/Satoshi:(\d+)\.(\d+)/.exec(p.subver || "");
+      // Knots names a release by the Core it is built on, down to the second
+      // number (v29.3.knots20260507), and nearly all of it is on one major:
+      // by the major alone every Knots peer was "29.x", one chip, none shown.
+      if (v && p.kind === "Node (Knots)" && /\/Knots:/.test(p.subver)) return v[1] + "." + v[2];
       if (v) return (v[1] === "0" ? "0." + v[2] : v[1]) + ".x";
     }
     // What it pretends to be - a Core node or a wallet; who is behind it
@@ -769,14 +777,26 @@
   // the filters - before it leaves the page, as in an app. One history entry
   // stands for "something is open"; closing it by hand takes that entry back.
   const somethingOpen = () => state.openRows.size > 0 || !!state.group || !!state.place;
+  // Going back by hand can take the page back with it: Safari puts it where it
+  // was when the entry was made, so clearing a filter at the top of the page
+  // threw the reader down to the chip that set it (iPhone, 04.11.2026). Where
+  // the reader is when they close is kept, and put back.
+  let backY = null;
   function layers() {
     try {
       const ours = history.state && history.state.peermapLayer;
       if (somethingOpen() && !ours) history.pushState({ peermapLayer: true }, "");
-      else if (!somethingOpen() && ours) history.back();
+      else if (!somethingOpen() && ours) { backY = window.scrollY; history.back(); }
     } catch { /* sandboxed frame */ }
   }
   window.addEventListener("popstate", () => {
+    if (backY !== null) {
+      const y = backY;
+      backY = null;
+      window.scrollTo(0, y);
+      requestAnimationFrame(() => { if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y); });
+      return;
+    }
     if (!somethingOpen()) return;
     if (state.openRows.size) state.openRows.clear();
     else { state.group = null; state.kind = null; state.sub = null; state.place = null; }
@@ -2367,6 +2387,7 @@
       toggleDetail(tr, p, key);
       const top = tr.getBoundingClientRect().top;
       if (top < 0) window.scrollBy(0, top - 8);
+      if (backY !== null) backY = window.scrollY;  // and the way back keeps this place
     });
     return row;
   }
