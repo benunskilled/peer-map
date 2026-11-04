@@ -714,3 +714,18 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .pd-traffic-row > span { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pd-traffic-row > span:first-child { text-align: left; white-space: normal; }
 .pd-traffic-heading { color: var(--muted); }
+
+/* What the marks mean - phone only, folded; a wide screen says it on hover. */
+.key { display: none; flex: 1 1 100%; border-top: 1px solid var(--border); padding: 10px 16px; color: var(--muted); font-size: 12px; }
+.key summary { cursor: pointer; }
+.key ul { list-style: none; margin: 8px 0 2px; padding: 0; display: grid; gap: 7px; }
+.key li { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 10px; }
+.key li > :first-child { justify-self: start; font-weight: 400; }
+.key .hb { font-size: 13px; }
+.key .star { color: var(--accent); }
+.key .never-mark { color: var(--muted); }
+.key .addr-txt.delivered { color: #56d364; }
+.key b { color: var(--text); font-weight: 600; }
+.key .kind { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); white-space: nowrap; }
+.key .kind.disg { background: rgba(248,81,73,.12); color: #e5534b; }
+@media (max-width: 600px) { .key { display: block; } }
