@@ -1805,7 +1805,8 @@
   function syncSpan(p) {
     const s = document.createElement("span");
     s.className = "syncing";
-    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`;
+    // Core counts bytes per connection, so this is the session, not the whole sync.
+    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node in this session`;
     const ico = document.createElement("span");
     ico.className = "sync-ico";
     ico.setAttribute("aria-hidden", "true");
