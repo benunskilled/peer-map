@@ -2501,6 +2501,7 @@
     const root = $("tables");
     root.textContent = "";
     root.removeAttribute("aria-busy");
+    let picksShown = false;
     for (const g of GROUPS) {
       if (!state.show[g]) continue;
       let peers = state.data.peers.filter((p) => p.group === g);
@@ -2558,13 +2559,10 @@
         // The names belong to one kind: the one picked, or the only one there is.
         const kinds = new Set(inGroup.map((p) => p.kind));
         const kind = state.kind || (kinds.size === 1 ? [...kinds][0] : null);
-        if (kind) renderSubMix(card, kind, inGroup.filter((p) => p.kind === kind));
-        if (kind) renderLabelMix(card, inGroup.filter((p) => p.kind === kind));
-        // A second kind turned up since a name was picked: the name chips are
-        // gone, so the pick goes too rather than filter two kinds unseen.
-        else if (state.sub || state.label) {
-          state.sub = state.label = null;
-          queueMicrotask(applyFilters);
+        if (kind) {
+          picksShown = true;
+          renderSubMix(card, kind, inGroup.filter((p) => p.kind === kind));
+          renderLabelMix(card, inGroup.filter((p) => p.kind === kind));
         }
       }
 
@@ -2719,6 +2717,15 @@
         }
       }
       root.appendChild(card);
+    }
+    // A second kind turned up since a name was picked: no card shows the name
+    // chips any more, so the pick goes too rather than filter two kinds unseen.
+    // Asked of all cards together: the pick sits in one of them, and asked of
+    // each card, any other card without its chips dropped every pick the
+    // moment it was made (2.5.0).
+    if (state.group && state.group !== SYNCING && !picksShown && (state.sub || state.label)) {
+      state.sub = state.label = null;
+      queueMicrotask(applyFilters);
     }
     for (const row of root.querySelectorAll(".one-line")) fitOneLine(row);
     fitTables();
