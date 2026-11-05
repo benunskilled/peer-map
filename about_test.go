@@ -340,3 +340,23 @@ func TestFutureBitApolloAbout(t *testing.T) {
 		t.Errorf("about %q, kind %q", got, kindOf(ua))
 	}
 }
+
+func TestNodeSetupLabels(t *testing.T) {
+	for ua, want := range map[string]string{
+		"/Satoshi:31.0.0(Samourai Dojo 1.29.3)/":         "Labelled by Samourai Dojo",
+		"/Satoshi:29.0.0(RoninDojo 2.3.0)/":              "Labelled RoninDojo",
+		"/Satoshi:31.1.0(MiniBolt node)/":                "Labelled by MiniBolt",
+		"/Satoshi:29.0.0(MiniBolt_Node)/":                "Labelled by MiniBolt",
+		"/Satoshi:32.0.0(Official MiniBolt node)/":       "Labelled by MiniBolt",
+		"/Satoshi:32.1.0(21M; MiniBolt node)/":           "Labelled by MiniBolt",
+		"/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/": "Labelled by MiniBolt",
+		"/Satoshi:29.0.0(bitcore)/":                      "Labelled bitcore",
+	} {
+		if got := aboutOf(ua); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: about %q", ua, got)
+		}
+	}
+	if k := kindOf("/Satoshi:29.4.1(MiniBolt node)/Knots:20260508/"); k != "Node (Knots)" {
+		t.Errorf("MiniBolt on Knots: kind %q", k)
+	}
+}
