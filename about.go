@@ -57,8 +57,18 @@ var aboutRules = []aboutRule{
 	// github.com/richardkiss/pycoinnet; where it sends this name was not found.
 	{regexp.MustCompile(`^/pycoinnet/`), "Named like pycoinnet, Richard Kiss's Python library for the Bitcoin protocol", "Named like pycoinnet", ""},
 	{regexp.MustCompile(`(?i)^/blueberry:`), "Blueberry, BlueWallet's new wallet that talks to nodes directly", "Blueberry (BlueWallet)", ""},
-	// FutureBit's Apollo software puts this comment in Core's user agent.
+	// Labels a node's setup puts in brackets after Core's name. Apollo's own
+	// bitcoin.conf sets it (jstefanop/apolloapi-v2, backend/default-configs).
 	{regexp.MustCompile(`\(FutureBit-Apollo-Node\)`), "Labelled by FutureBit Apollo, a home Bitcoin miner with a built-in full node", "FutureBit Apollo node", ""},
+	// docker/my-dojo/bitcoin/restart.sh: -uacomment="Samourai Dojo $DOJO_VERSION_TAG".
+	{regexp.MustCompile(`\(Samourai Dojo `), "Labelled by Samourai Dojo, the self-hosted backend for Samourai Wallet and other light wallets", "Samourai Dojo node", ""},
+	// Where RoninDojo sets it was not found, so the text says only what it is.
+	{regexp.MustCompile(`\(RoninDojo `), "Labelled RoninDojo, an installer and UI for Samourai Wallet's Dojo", "RoninDojo node", ""},
+	// The bitcoin.conf in MiniBolt's Core and Knots pages: uacomment=MiniBolt node.
+	{regexp.MustCompile(`(?i)\((Official )?MiniBolt[ _]node\)|; MiniBolt node\)`), "Labelled by MiniBolt, a step-by-step guide to building a Bitcoin node", "MiniBolt guide node", ""},
+	// A 2017 Docker image of Bitcore set uacomment=bitcore (m00re/bitcore-docker);
+	// these run newer Core, so the text goes by the name only.
+	{regexp.MustCompile(`\(bitcore\)`), "Labelled bitcore, named like BitPay's Bitcore, an index server that runs on a node", "Labelled bitcore", ""},
 	{regexp.MustCompile(`(?i)^/winnow:`), "Winnow, an iPhone wallet that talks to nodes directly", "Winnow iPhone wallet", ""},
 	{regexp.MustCompile(`(?i)^/BitcoinKit:`), "BitcoinKit, a wallet library (Unstoppable Wallet on Android and others)", "BitcoinKit wallet library", ""},
 	{regexp.MustCompile(`^/WalletKit:`), "Unstoppable Wallet on iPhone", "Unstoppable Wallet iOS", ""},
