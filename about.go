@@ -178,7 +178,6 @@ var aboutRules = []aboutRule{
 	// line, which writes version 99999 as 0.9.99.99; nothing public says it
 	// sends this name.
 	{regexp.MustCompile(`^/jwrd\.net:`), "Probably a node on JWRD Computing's own bitcoind, a fork of an early version", "Probably JWRD's bitcoind", ""},
-	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`^/btcwire:[^/]*/Satoshi:`), "Pool Detective, by MIT's Digital Currency Initiative: watches what mining pools do", "MIT's Pool Detective", "Pool Detective"},
 	{regexp.MustCompile(`(?i)/lit:v`), "lit, a Lightning node by MIT's Digital Currency Initiative, no longer developed", "lit Lightning node (MIT)", ""},
 	// observer/src/protocol.rs in 0xB10C/p2p-observer, work in progress in
@@ -213,6 +212,7 @@ var aboutRules = []aboutRule{
 	// network.py in jimmysong/programmingbitcoin and the course exercises.
 	{regexp.MustCompile(`^/programming(bitcoin|blockchain):`), "Code from Jimmy Song's book or course Programming Bitcoin", "Programming Bitcoin code", ""},
 	{regexp.MustCompile(`^/bip324-ts:`), "bip324-ts, a TypeScript library for encrypted v2 connections", "bip324-ts library", ""},
+	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015", "KIT network monitoring", "KIT"},
 	// btcd's wire library with the app name after it left empty.
 	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty", "btcd library, empty name", ""},
