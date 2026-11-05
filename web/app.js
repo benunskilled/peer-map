@@ -2581,7 +2581,7 @@
         // No inbound at all is what most nodes see; say what brings them.
         p.textContent = state.place || state.group
           ? "None here."
-          : g === "inbound" ? "No inbound peers. For incoming clearnet connections, open port 8333 on your router."
+          : g === "inbound" ? "No inbound peers. For incoming clearnet connections, allow incoming clearnet in your Bitcoin Node app and open port 8333 on your router."
           : "No " + LABEL[g].toLowerCase() + " peers.";
         card.appendChild(p);
         root.appendChild(card);
