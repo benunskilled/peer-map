@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.5.0 – 2026-11-05
+
+The kind filter is grouped into five families, with chips for Knots versions and for labels several nodes share, such as FutureBit Apollo. Nodes set up with Samourai Dojo, RoninDojo, MiniBolt or Apollo say so, and more clients are recognised. Stricter disguise rules keep real nodes from being flagged. Your outbound and manual peers sit in front on the map, phones get a legend and a cleaner block route, and a tap on anything open folds it shut. Pages load faster.
+
 ## 2.4.0 – 2026-11-02
 
 Pool nodes now name their pool for 39 pools, up from 7. ViaBTC's relay software, found by 0xB10C, reads as a pool node instead of Disguised, and known block relays say so under their label. Tables no longer run past their card.

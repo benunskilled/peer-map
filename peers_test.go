@@ -488,7 +488,7 @@ func TestNoTxWhy(t *testing.T) {
 	}{
 		{"inbound block-relay-only", func(r *rawPeer) {}, "Its node opened this connection for blocks only"},
 		{"inbound blocksonly=1", func(r *rawPeer) { r.BytesRecvPerMsg = map[string]int64{"wtxidrelay": 13, "verack": 13, "getaddr": 33} },
-			"Its node runs with blocksonly=1: no transactions at all"},
+			"Its node probably runs with blocksonly=1: it wants no transactions from other nodes"},
 		{"our own block-relay-only", func(r *rawPeer) { r.Inbound, r.ConnectionType = false, "block-relay-only" },
 			"Your node opened this connection for blocks only"},
 		{"handshake not done", func(r *rawPeer) { r.BytesRecvPerMsg = map[string]int64{"version": 126} }, "Wants no transactions from your node"},
