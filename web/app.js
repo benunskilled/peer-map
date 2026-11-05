@@ -751,7 +751,7 @@
     while (i > 0 && /^v?\d[\w.+-]*$/.test(parts[i])) i--;
     const name = (parts[i] || "").split(/[:(]/)[0].trim();
     // "Bither1.6.2", "vds_0.9.53", "BTC RPC Proxy v0.8.1": one chip per program.
-    const bare = name.replace(/(?:[\s_-]+v?|(?<=[A-Za-z]))\d+(\.\d+)+$/, "") || name;
+    const bare = name.replace(/(?:[\s_-]+v?|([A-Za-z]))\d+(\.\d+)+$/, "$1") || name;
     return bare === "Satoshi" ? "Core" : bare === "Schildbach Bitcoin Wallet" ? "Bitcoin Wallet" : bare || NO_NAME;
   };
   // What a node's operator wrote in brackets after the version - an
@@ -2560,6 +2560,12 @@
         const kind = state.kind || (kinds.size === 1 ? [...kinds][0] : null);
         if (kind) renderSubMix(card, kind, inGroup.filter((p) => p.kind === kind));
         if (kind) renderLabelMix(card, inGroup.filter((p) => p.kind === kind));
+        // A second kind turned up since a name was picked: the name chips are
+        // gone, so the pick goes too rather than filter two kinds unseen.
+        else if (state.sub || state.label) {
+          state.sub = state.label = null;
+          queueMicrotask(applyFilters);
+        }
       }
 
       if (peers.length) {
