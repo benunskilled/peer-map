@@ -333,3 +333,10 @@ func TestKnotsSHA256About(t *testing.T) {
 		t.Errorf("KnotsSHA256: %q", got)
 	}
 }
+
+func TestFutureBitApolloAbout(t *testing.T) {
+	ua := "/Satoshi:28.1.0(FutureBit-Apollo-Node)/"
+	if got := aboutOf(ua); !strings.HasPrefix(got, "Labelled by FutureBit Apollo") || kindOf(ua) != "Node (Core)" {
+		t.Errorf("about %q, kind %q", got, kindOf(ua))
+	}
+}

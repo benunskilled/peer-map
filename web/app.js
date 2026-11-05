@@ -52,6 +52,7 @@
     group: null,          // first level of the kind filter: Nodes, Wallets, Watchers, Disguised, Other
     kind: null,           // kind filter from clicking an entry in a group's kind line
     sub: null,            // one level under the kind: a pool, a version, a name
+    label: null,          // beside it, for nodes: the operator's own label, "(FutureBit-Apollo-Node)"
     allSubs: false,       // every chip one level down, not one line of them
     openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
@@ -753,6 +754,14 @@
     const bare = name.replace(/(?:[\s_-]+v?|(?<=[A-Za-z]))\d+(\.\d+)+$/, "") || name;
     return bare === "Satoshi" ? "Core" : bare === "Schildbach Bitcoin Wallet" ? "Bitcoin Wallet" : bare || NO_NAME;
   };
+  // What a node's operator wrote in brackets after the version - an
+  // "(FutureBit-Apollo-Node)", a "(MiniBolt node)" - as written. Nodes only:
+  // elsewhere the brackets are part of the program's own name.
+  const labelOf = (p) => {
+    if (!p.kind.startsWith("Node")) return null;
+    const m = /\(([^)]*)\)/.exec(p.subver || "");
+    return m && m[1].trim() ? m[1].trim() : null;
+  };
   const subOf = (p) => {
     if (p.kind === POOL_KIND) return p.pool || UNKNOWN_POOL;
     if (p.kind.startsWith("Node")) {
@@ -799,7 +808,7 @@
     }
     if (!somethingOpen()) return;
     if (state.openRows.size) state.openRows.clear();
-    else { state.group = null; state.kind = null; state.sub = null; state.place = null; }
+    else { state.group = null; state.kind = null; state.sub = null; state.label = null; state.place = null; }
     applyFilters();
   });
 
@@ -857,7 +866,7 @@
     if (e.target.closest && e.target.closest("input, textarea, select")) return;
     if (e.key === "Escape" && somethingOpen()) {
       if (state.openRows.size) state.openRows.clear();
-      else { state.group = null; state.kind = null; state.sub = null; state.place = null; }
+      else { state.group = null; state.kind = null; state.sub = null; state.label = null; state.place = null; }
       applyFilters();
       e.preventDefault();
       return;
@@ -928,7 +937,7 @@
     : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
     : kind;
   const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
-    : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub));
+    : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub) && (!state.label || labelOf(p) === state.label));
 
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
@@ -1010,12 +1019,12 @@
     const fkey = "filters:" + location.pathname;
     if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
       const f = JSON.parse(sessionStorage.getItem(fkey) || "null");
-      if (f) Object.assign(state, { group: f.group || null, kind: f.kind || null, sub: f.sub || null, place: f.place || null });
+      if (f) Object.assign(state, { group: f.group || null, kind: f.kind || null, sub: f.sub || null, label: f.label || null, place: f.place || null });
     }
     const save = () => {
       try {
         sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY)));
-        sessionStorage.setItem(fkey, JSON.stringify({ group: state.group, kind: state.kind, sub: state.sub, place: state.place }));
+        sessionStorage.setItem(fkey, JSON.stringify({ group: state.group, kind: state.kind, sub: state.sub, label: state.label, place: state.place }));
       } catch { /* private window */ }
     };
     window.addEventListener("pagehide", save);
@@ -1542,7 +1551,7 @@
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
     $("kindFilter").hidden = !state.group;
-    $("kindFilterName").textContent = [state.group, state.kind !== state.group && state.kind, state.sub].filter(Boolean).join(" \u00b7 ");
+    $("kindFilterName").textContent = [state.group, state.kind !== state.group && state.kind, state.sub, state.label].filter(Boolean).join(" \u00b7 ");
   }
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1560,17 +1569,23 @@
     state.group = state.group === group ? null : group;
     state.kind = null;
     state.sub = null;
+    state.label = null;
     state.allSubs = false;
     applyFilters();
   }
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
     state.sub = null;
+    state.label = null;
     state.allSubs = false;
     applyFilters();
   }
   function setSub(sub) {
     state.sub = state.sub === sub ? null : sub;
+    applyFilters();
+  }
+  function setLabel(label) {
+    state.label = state.label === label ? null : label;
     applyFilters();
   }
 
@@ -1582,6 +1597,7 @@
     state.group = null;
     state.kind = null;
     state.sub = null;
+    state.label = null;
     applyFilters();
   });
 
@@ -1919,6 +1935,38 @@
     // One line only: what does not fit waits behind "+ n more", fitted in
     // renderTables before the page is drawn, so nothing flickers.
     if (!state.allSubs) el.classList.add("one-line");
+  }
+
+  // The operators' own labels on these nodes, those that more than one node
+  // carries: one chip each, beside the versions. A label on a single node is
+  // somebody's name for their box, not something to filter by.
+  function renderLabelMix(card, peers) {
+    const n = new Map();
+    for (const p of peers) {
+      const l = labelOf(p);
+      if (l) n.set(l, (n.get(l) || 0) + 1);
+    }
+    const entries = [...n].filter(([l, c]) => c > 1 || l === state.label).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    if (!entries.length) return;
+    const el = document.createElement("div");
+    el.className = "kinds chips pool-picks";
+    const head = document.createElement("span");
+    head.className = "picks-label";
+    head.textContent = "Labels:";
+    el.appendChild(head);
+    for (const [l, count] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip kind-pick" + (state.label === l ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + l);
+      b.title = state.label === l ? "Show all of them again" : `Show only the nodes labelled ${l}`;
+      b.setAttribute("aria-pressed", String(state.label === l));
+      b.addEventListener("click", () => steady(b, () => setLabel(l)));
+      el.appendChild(b);
+    }
+    card.appendChild(el);
   }
 
   // How spread out a group is: distinct operators and countries. Operators by
@@ -2511,6 +2559,7 @@
         const kinds = new Set(inGroup.map((p) => p.kind));
         const kind = state.kind || (kinds.size === 1 ? [...kinds][0] : null);
         if (kind) renderSubMix(card, kind, inGroup.filter((p) => p.kind === kind));
+        if (kind) renderLabelMix(card, inGroup.filter((p) => p.kind === kind));
       }
 
       if (peers.length) {
