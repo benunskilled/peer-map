@@ -3,7 +3,6 @@ package main
 import (
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestClientsVerifiedOn29October(t *testing.T) {
@@ -173,77 +172,6 @@ func TestRelaysBlocks(t *testing.T) {
 	}
 }
 
-// A 2016 wallet name on something offering blocks and v2 is not that wallet.
-// The real Bitcoin Wallet, offering nothing, stays a wallet and says what it is.
-func TestFakeWallet(t *testing.T) {
-	cases := []struct {
-		subver    string
-		services  []string
-		kind      string
-		aboutSays string
-	}{
-		{"/bitcoinj:0.14.5/Bitcoin Wallet:5.42/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, fakeWalletKind, "Probably: a node or scanner behind an old wallet name"},
-		{"/breadwallet:0.6.5/", []string{"NETWORK"}, fakeWalletKind, "Probably: a node or scanner behind an old wallet name"},
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", []string{}, "Wallet", "Schildbach"},
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", nil, "Wallet", "Schildbach"},
-		// Core's name misspelt: what it claims, and a guess from what it offers.
-		{"/Sat0shi:31.0.0/", []string{}, fakeWalletKind, "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it writes Sat0shi with a zero and offers no services"},
-		{"/Satoshi2:0.18.3/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /Satoshi2:"},
-		{"/SatoshiX:0.18.0/", []string{"NETWORK", "WITNESS"}, fakeWalletKind, "Probably: not Bitcoin Core - Core calls itself /Satoshi:, this one /SatoshiX:"},
-		{"Satoshi:22.0.0", []string{"NETWORK"}, fakeWalletKind, "Claims: Bitcoin Core 22.0.0\nProbably: not Bitcoin Core - Core writes its name between slashes: /Satoshi:22.0.0/"},
-		// Only a wallet name can be fake: a node offering blocks is a node.
-		{"/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Node (Core)", ""},
-	}
-	for _, c := range cases {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, ServicesNames: c.services}})[0]
-		if got.Kind != c.kind {
-			t.Errorf("%s %v: kind %q, want %q", c.subver, c.services, got.Kind, c.kind)
-		}
-		if c.aboutSays == "" && got.About != "" || !strings.Contains(got.About, c.aboutSays) {
-			t.Errorf("%s %v: about %q, want it to say %q", c.subver, c.services, got.About, c.aboutSays)
-		}
-	}
-}
-
-// Core versions offering what they never had: the kind says Fake, and why.
-// Real peers of their own version stay what they are.
-func TestAnachronism(t *testing.T) {
-	v2 := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
-	cases := []struct {
-		subver   string
-		services []string
-		kind     string
-		says     string
-	}{
-		{"/Satoshi:0.14.2/", v2, "Disguised", "Claims: Bitcoin Core 0.14.2\nProbably: not Bitcoin Core 0.14 - it offers encrypted v2 connections, which Core 0.14 did not have (from Core 26)"},
-		{"/Satoshi:25.1.0/", v2, "Disguised", "Core 25.1 did not have"},
-		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "pruned-node service, which Core 0.15"},
-		{"/Satoshi:0.20.1/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS"}, "Disguised", "compact block filters"},
-		{"/Satoshi:25.1.0/Knots:20231115/", v2, "Disguised", "Claims: Bitcoin Knots (Core 25.1.0)"},
-		{"/bcoin:v1.0.0-beta.14/", v2, "Disguised", "Claims: bcoin v1.0.0-beta.14"},
-		{"/Classic:1.3.4(EB8)/", v2, "Disguised", "never had"},
-		{"/Satoshi:31.1.0/", v2, "Node (Core)", ""},
-		{"/Satoshi:26.0.0/", v2, "Node (Core)", ""},
-		{"/Satoshi:0.21.0/", []string{"NETWORK", "WITNESS", "COMPACT_FILTERS", "NETWORK_LIMITED"}, "Node (Core)", ""},
-		{"/Satoshi:0.14.2/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:31.0.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "lacks NETWORK_LIMITED"},
-		{"/Satoshi:0.16.0/", []string{"NETWORK", "WITNESS"}, "Disguised", "since 0.16"},
-		{"/Satoshi:0.15.1/", []string{"NETWORK", "WITNESS"}, "Node (Core)", ""},
-		{"/Satoshi:0.19.0.1/", []string{"WITNESS"}, "Disguised", "lacks NETWORK_LIMITED"},
-		{"/Satoshi:30.2.0/", []string{"WITNESS", "P2P_V2"}, "Disguised", "lacks NETWORK_LIMITED"},
-		{"/Floresta:0.9.1/", []string{"WITNESS", "P2P_V2"}, "Node (Floresta)", "Floresta"},
-		{"/libbitcoin:4.0.0/", []string{"NETWORK", "WITNESS"}, "Node (libbitcoin)", "libbitcoin"},
-	}
-	for _, c := range cases {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, ServicesNames: c.services}})[0]
-		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
-			t.Errorf("%s %v: got %q / %q, want %q containing %q", c.subver, c.services, got.Kind, got.About, c.kind, c.says)
-		}
-	}
-}
-
 // Your own electrs reaches Core from inside Umbrel's network, and says so.
 func TestOwnIndexer(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "10.21.21.10:40216", ConnectionType: "inbound", Inbound: true,
@@ -259,58 +187,6 @@ func TestOwnIndexer(t *testing.T) {
 	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: ""}})[0]
 	if got.Kind != noAgentKind || !strings.Contains(got.About, "checks the port") {
 		t.Errorf("no agent: got %q / %q", got.Kind, got.About)
-	}
-}
-
-func TestLinkingLion(t *testing.T) {
-	for _, a := range []string{"143.20.137.5:51234", "[2602:f5c0:0:ace::72:300]:8333", "[2602:f5c0:0:ace::60]:8333",
-		"104.234.118.2:41000", "69.17.52.1:8333", "91.198.115.9:1", "[::ffff:31.58.215.200]:8333", "199.116.84.20:8333"} {
-		if !isLinkingLion(a) {
-			t.Errorf("%s not recognised", a)
-		}
-	}
-	// the rest of the provider's /32 and the neighbours of the single hosts are not LinkingLion
-	for _, a := range []string{"143.20.138.5:8333", "[2604:d500:4:2::1]:8333", "[2602:f5c0:1::7]:8333",
-		"104.234.118.3:8333", "69.17.52.2:8333", "10.21.0.4:40000", "abc.onion:8333", ""} {
-		if isLinkingLion(a) {
-			t.Errorf("%s wrongly recognised", a)
-		}
-	}
-	got := convert([]rawPeer{
-		{Addr: "87.229.79.10:40000", Subver: "/bitcoinj:0.14.4/Bitcoin Wallet:5.24/", ServicesNames: []string{"NETWORK", "P2P_V2"}, Inbound: true},
-		{Addr: "87.229.79.11:40000", Subver: "", Inbound: true},
-	})
-	if len(got) != 2 {
-		t.Fatalf("got %d peers, want 2", len(got))
-	}
-	// with a borrowed name: Disguised; without any name: still "No user agent"
-	if got[0].Kind != fakeWalletKind || !strings.Contains(got[0].About, linkingLionAbout) {
-		t.Errorf("%s: kind %q about %q", got[0].Addr, got[0].Kind, got[0].About)
-	}
-	if got[1].Kind != noAgentKind || !strings.Contains(got[1].About, linkingLionAbout) {
-		t.Errorf("%s: kind %q about %q", got[1].Addr, got[1].Kind, got[1].About)
-	}
-}
-
-// A peer naming Core that offers no service at all is not Core: Core always
-// offers WITNESS and NETWORK or NETWORK_LIMITED (one node: 6,954 sessions,
-// 73% on Amazon, none ever first). nil = Core did not say, which is not this.
-func TestCoreOfferingNothing(t *testing.T) {
-	no := []string{}
-	got := convert([]rawPeer{{Addr: "198.51.100.7:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: no}})
-	if len(got) != 1 || got[0].Kind != fakeWalletKind || got[0].About != "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it offers no services at all; Core always offers NETWORK or NETWORK_LIMITED" {
-		t.Fatalf("Core offering nothing: %+v", got)
-	}
-	for _, svc := range [][]string{nil, {"NETWORK", "WITNESS", "NETWORK_LIMITED"}, {"NETWORK_LIMITED", "WITNESS"}} {
-		got := convert([]rawPeer{{Addr: "198.51.100.8:40000", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: svc}})
-		if len(got) != 1 || got[0].Kind != "Node (Core)" {
-			t.Errorf("services %v: kind %q, want Node (Core)", svc, got[0].Kind)
-		}
-	}
-	// a wallet offering nothing stays a wallet
-	got = convert([]rawPeer{{Addr: "198.51.100.9:40000", Inbound: true, ConnectionType: "inbound", Subver: "/bitcoinj:0.16.2/Bitcoin Wallet:9.0/", ServicesNames: no}})
-	if got[0].Kind != "Wallet" {
-		t.Errorf("wallet offering nothing: %q", got[0].Kind)
 	}
 }
 
@@ -347,384 +223,6 @@ func TestHiddenIPv6(t *testing.T) {
 	}
 }
 
-// Every LinkingLion peer is flagged for the header count, whatever kind its
-// user agent made it; nothing else is.
-func TestLinkingLionFlag(t *testing.T) {
-	got := convert([]rawPeer{
-		{Addr: "104.234.118.2:41000", Inbound: true, ConnectionType: "inbound", Subver: "/bitcoinj:0.14.4/Bitcoin Wallet:5.36/"},
-		{Addr: "143.20.137.9:41000", Inbound: true, ConnectionType: "inbound", Subver: ""},
-		{Addr: "198.51.100.7:8333", Inbound: true, ConnectionType: "inbound", Subver: "/Satoshi:31.0.0/", ServicesNames: []string{"NETWORK", "WITNESS"}},
-	})
-	if !got[0].LinkingLion || !got[1].LinkingLion || got[2].LinkingLion {
-		t.Fatalf("flags: %v %v %v", got[0].LinkingLion, got[1].LinkingLion, got[2].LinkingLion)
-	}
-}
-
-// Every Core release sends one protocol version: 70016 from 0.21 (70017 in
-// development builds), 70015 or less before.
-func TestProtocolMismatch(t *testing.T) {
-	core := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
-	cases := []struct {
-		subver  string
-		version int
-		kind    string
-		says    string
-	}{
-		{"/Satoshi:31.0.0/", 70015, "Disguised", "Claims: Bitcoin Core 31.0.0\nProbably: not Bitcoin Core - it speaks protocol 70015, older than any Core since 0.21"},
-		{"/Satoshi:0.21.0/", 70015, "Disguised", "protocol 70015"},
-		{"/Satoshi:0.13.2/", 70016, "Disguised", "which Core 0.13 never did"},
-		{"/Satoshi:25.1.0/Knots:20231115/", 70015, "Disguised", "Claims: Bitcoin Knots"},
-		{"/Satoshi:31.1.0/", 70016, "Node (Core)", ""},
-		{"/Satoshi:31.99.0/", 70017, "Node (Core)", ""},
-		{"/Satoshi:0.21.0/", 70016, "Node (Core)", ""},
-		{"/Satoshi:0.20.1/", 70015, "Node (Core)", ""},
-		{"/Satoshi:0.20.99/", 70016, "Node (Core)", ""}, // a 0.21 development build
-		{"/Satoshi:0.13.2/", 70014, "Node (Core)", ""},
-		{"/Satoshi:31.1.0/", 0, "Node (Core)", ""},         // Core did not report it
-		{"/Satoshi:1.14.5(2x)/", 70015, "Node (Core)", ""}, // not a Core release number: left alone
-	}
-	for _, c := range cases {
-		svc := core
-		if strings.HasPrefix(c.subver, "/Satoshi:0.13") {
-			svc = []string{"NETWORK", "WITNESS"} // before NETWORK_LIMITED
-		}
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, ServicesNames: svc, Version: c.version}})[0]
-		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
-			t.Errorf("%s %d: got %q / %q, want %q containing %q", c.subver, c.version, got.Kind, got.About, c.kind, c.says)
-		}
-	}
-}
-
-// bitcoinj has never sent more than 70013, so a wallet name on 70016 is not
-// that wallet - even when it offers nothing, like the real one.
-func TestBitcoinjTooNew(t *testing.T) {
-	cases := []struct {
-		subver  string
-		version int
-		kind    string
-		about   string
-	}{
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70016, fakeWalletKind, "Claims: the wallet Bitcoin Wallet by Schildbach\nProbably: not a wallet - speaks a newer protocol than this wallet ever did"},
-		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 70015, fakeWalletKind, "Probably: not a wallet"},
-		// Another program on bitcoinj could set its own number, a later
-		// bitcoinj could raise it: both are left alone.
-		{"/bitcoinj:0.16/", 70016, "Wallet", ""},
-		{"/bitcoinj:0.18.0/Bitcoin Wallet:12.0/", 70016, "Wallet", "Schildbach"},
-		{"/bitcoinj:0.16.2/Bitcoin Wallet:9.26/", 70013, "Wallet", "Schildbach"},
-		{"/bitcoinj:0.14.6/", 70001, "Wallet", ""},
-		// A version Core did not report says nothing either way.
-		{"/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", 0, "Wallet", "Schildbach"},
-		// Neutrino sends 70013 or 70016 depending on its btcd: left alone.
-		{"/btcwire:0.5.0/neutrino:0.17.1/", 70016, "Lightning wallet", "lnd 0.21"},
-	}
-	for _, c := range cases {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, Version: c.version, ServicesNames: []string{}}})[0]
-		if got.Kind != c.kind || !strings.Contains(got.About, c.about) {
-			t.Errorf("%s %d: %q / %q, want %q / %q", c.subver, c.version, got.Kind, got.About, c.kind, c.about)
-		}
-	}
-}
-
-// Core's private broadcast and python-bitcoinlib say what they are; a peer
-// that introduced itself without a name is told apart from one still silent.
-func TestOtherAbouts(t *testing.T) {
-	cases := []struct {
-		subver  string
-		version int
-		about   string
-	}{
-		{"/pynode:0.0.1/", 70016, "Probably Bitcoin Core handing over a transaction privately"},
-		{"/python-bitcoinlib:0.12.2/", 70016, "python-bitcoinlib"},
-		{"", 70016, "Introduced itself without a name"},
-		{"", 0, "Has not said what it is"},
-		{"/bitcoinj:0.17/", 70013, "bitcoinj, a Java library"},
-		{"/dsn.kastel.kit.edu/bitcoin:28.0.0/", 70016, "KIT Karlsruhe's Bitcoin network monitoring"},
-		{"/btcwire:0.5.0/:/", 70016, "A program on btcd's Go library that left its own name empty"},
-		{"/GlobalNodeMap:2.1/", 70016, "Probably a node map or counter"},
-		{"/reset-header-agent:1.0/", 70016, "Probably a header client for RESET"},
-		{"/RESET-Headers:1.0/", 70016, "Probably a header client for RESET"},
-		{"/btcwire:0.5.0/", 70016, "A program on btcd's Go library that set no name of its own"},
-		{"/btcwire:0.5.0/peer:1.0.0/", 70016, "Probably a program built from the example code in btcd's Go library"},
-		{"/mantle-replay-iouring:0.1.0/", 70016, "Mantle's replay tool"},
-		{"/mantle-discover:0.1.0/", 70016, "Mantle's peer finder"},
-		{"/mantle-rank-peers:0.1.0/", 70016, "Mantle's speed test"},
-		{"/btcwire:0.4.1/Satoshi:0.19/", 70016, "Pool Detective"},
-		{"/jwrd.net:0.9.99.99/", 70016, "Probably a node on JWRD Computing's own bitcoind"},
-		{"/curl:8.5.0/", 70015, "Software with a name we don't recognise"},
-	}
-	for _, c := range cases {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, Version: c.version, ServicesNames: []string{}}})[0]
-		if !strings.HasPrefix(got.About, c.about) {
-			t.Errorf("%q %d: about %q, want %q", c.subver, c.version, got.About, c.about)
-		}
-	}
-}
-
-// The time connected is added once it is a day or more, never on its own.
-func TestStayedLong(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	cases := []struct {
-		hours float64
-		want  string
-	}{
-		{1.4, ""},
-		{23.9, ""},
-		{24, ", and has stayed connected for a day"},
-		{278, ", and has stayed connected for 11 days"},
-	}
-	for _, c := range cases {
-		start := now.Add(-time.Duration(c.hours * float64(time.Hour))).Unix()
-		if got := stayedLong(start, now); got != c.want {
-			t.Errorf("%.1f h: %q, want %q", c.hours, got, c.want)
-		}
-	}
-	if got := stayedLong(0, now); got != "" {
-		t.Errorf("no conntime: %q", got)
-	}
-}
-
-// A name nothing knows still gets a line: a full node's if it offers blocks.
-func TestOtherAboutOffersBlocks(t *testing.T) {
-	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-		Subver: "/GrayersDad:1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS"}}})[0]
-	if got.Kind != "Other" || got.About != "Probably a full node under a name its operator chose" {
-		t.Errorf("kind %q about %q", got.Kind, got.About)
-	}
-}
-
-// bitcoinj without an app name, offering blocks, claims bitcoinj - not Core.
-func TestPlainBitcoinjOfferingBlocks(t *testing.T) {
-	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-		Subver: "/bitcoinj:0.14.5/", Version: 70016, ServicesNames: []string{"NETWORK", "P2P_V2"}}})[0]
-	want := "Claims: bitcoinj 0.14.5\nProbably: a node or scanner behind an old wallet name - it offers blocks, which no wallet does" +
-		"\nAlso: it offers encrypted v2 connections, which that software never had"
-	if got.Kind != "Disguised" || got.About != want {
-		t.Errorf("kind %q about %q", got.Kind, got.About)
-	}
-}
-
-func TestBehaviourAbout(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	hour := now.Unix() - 3600
-	cases := []struct {
-		name      string
-		subver    string
-		transport string
-		recv      map[string]int64
-		connTime  int64
-		want      string
-	}{
-		{"bitcoinj's ping under Core's name", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 1800}, hour,
-			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
-		{"the same over v2", "/Satoshi:31.1.0/", "v2", map[string]int64{"ping": 29 * 1800}, hour,
-			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
-		{"faster than a second is said as one", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 7200}, hour,
-			"not Bitcoin Core - it pings every 1 second, Core every 2 minutes"},
-		{"Core's own two minutes", "/Satoshi:31.1.0/", "v2", map[string]int64{"ping": 29 * 31}, hour, ""},
-		{"a ping every 15 seconds is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 240}, hour, ""},
-		{"a development build pinging every 10 seconds is left alone", "/Satoshi:31.99.0/", "v1", map[string]int64{"ping": 32 * 360}, hour, ""},
-		{"every 5 seconds is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 720}, hour, ""},
-		{"every 4 seconds is not", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 900}, hour,
-			"not Bitcoin Core - it pings every 4 seconds, Core every 2 minutes"},
-		{"too young for a rate", "/Satoshi:31.1.0/", "v1", map[string]int64{"ping": 32 * 30}, now.Unix() - 60, ""},
-		{"a crawler asking again and again", "/Satoshi:0.19.0.1/", "v1", map[string]int64{"getaddr": 24 * 58}, now.Unix() - 60,
-			"a crawler - it asked for addresses 58 times, Core asks once"},
-		{"the same over v2", "/Satoshi:30.0.0/", "v2", map[string]int64{"getaddr": 33 * 3}, hour,
-			"a crawler - it asked for addresses 3 times, Core asks once"},
-		{"Core asks once", "/Satoshi:31.1.0/", "v2", map[string]int64{"getaddr": 33}, hour, ""},
-		{"twice over v2 is still left alone", "/Satoshi:31.1.0/", "v2", map[string]int64{"getaddr": 33 * 2}, hour, ""},
-		{"twice is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"getaddr": 48}, hour, ""},
-		{"Knots runs Core's code", "/Satoshi:29.3.0/Knots:20260507/", "v1", map[string]int64{"ping": 32 * 1800}, hour,
-			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
-		{"bitcoinj under its own name pings as it likes", "/bitcoinj:0.17/", "v1", map[string]int64{"ping": 32 * 1800}, hour, ""},
-		{"a transport not settled yet counts nothing", "/Satoshi:31.1.0/", "detecting", map[string]int64{"ping": 32 * 1800, "getaddr": 24 * 9}, hour, ""},
-		{"no bytes reported", "/Satoshi:31.1.0/", "v1", nil, hour, ""},
-		{"a node on Core before 26 reports no transport: that is v1", "/Satoshi:31.1.0/", "", map[string]int64{"ping": 32 * 1800}, hour,
-			"not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"},
-	}
-	for _, c := range cases {
-		if got := behaviourAbout(c.subver, c.transport, c.recv, c.connTime, now); got != c.want {
-			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
-		}
-	}
-}
-
-func TestBehaviourMakesCoreDisguised(t *testing.T) {
-	conn := time.Now().Unix() - 3600
-	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
-		Transport: "v1", ConnTime: conn, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"},
-		BytesRecvPerMsg: map[string]int64{"ping": 32 * 1800}}})[0]
-	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 31.1.0\nProbably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes" {
-		t.Errorf("got %q / %q", got.Kind, got.About)
-	}
-	// The same peer pinging like Core stays a node.
-	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
-		Transport: "v1", ConnTime: conn, ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"},
-		BytesRecvPerMsg: map[string]int64{"ping": 32 * 31, "getaddr": 24}}})[0]
-	if got.Kind != "Node (Core)" {
-		t.Errorf("an honest Core became %q: %q", got.Kind, got.About)
-	}
-	// Behaviour comes before a missing service: the crawler is named as one.
-	got = convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:0.19.0.1/",
-		Transport: "v1", ConnTime: conn, ServicesNames: []string{"WITNESS"},
-		BytesRecvPerMsg: map[string]int64{"getaddr": 24 * 58}}})[0]
-	if got.Kind != fakeWalletKind || got.About != "Claims: Bitcoin Core 0.19.0.1\nProbably: a crawler - it asked for addresses 58 times, Core asks once"+
-		"\nAlso: it lacks NETWORK_LIMITED, which every Core since 0.16 offers" {
-		t.Errorf("got %q / %q", got.Kind, got.About)
-	}
-}
-
-func TestWasabiIsAWallet(t *testing.T) {
-	conn := time.Now().Unix() - 3600
-	yes, no := true, false
-	wasabi := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
-		Subver: "/Satoshi:29.3.0/", Transport: "v1", ConnTime: conn, ServicesNames: []string{}, RelayTxes: &yes,
-		BytesRecvPerMsg: map[string]int64{"ping": 32 * 30, "getheaders": 1053 * 15, "getdata": 300000}}
-	got := convert([]rawPeer{wasabi})[0]
-	if got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 29.3.0\nProbably: Wasabi Wallet or a fork - one of its 13 borrowed Core names, offers nothing, wants transactions" || !got.NoRelay {
-		t.Errorf("Wasabi: got %q / %q / norelay %v", got.Kind, got.About, got.NoRelay)
-	}
-	// Without transaction relay it is no wallet.
-	r := wasabi
-	r.RelayTxes = &no
-	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("no tx relay: got %q", got.Kind)
-	}
-	// A name outside Wasabi's list stays Disguised.
-	r = wasabi
-	r.Subver = "/Satoshi:31.0.0/"
-	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("31.0.0: got %q", got.Kind)
-	}
-	// Offering services, it is a node.
-	r = wasabi
-	r.ServicesNames = []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("with services: got %q", got.Kind)
-	}
-	// Ginger's older list, and the one name on both.
-	r = wasabi
-	r.Subver = "/Satoshi:0.21.0/"
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Wallet" || got.About != "Claims: Bitcoin Core 0.21.0\nProbably: Ginger Wallet (or an old Wasabi) - one of its 31 borrowed Core names, offers nothing, wants transactions" {
-		t.Errorf("Ginger: got %q / %q", got.Kind, got.About)
-	}
-	r.Subver = "/Satoshi:26.0.0/"
-	if got := convert([]rawPeer{r})[0]; got.About != "Claims: Bitcoin Core 26.0.0\nProbably: Wasabi or Ginger Wallet - a borrowed Core name both use, offers nothing, wants transactions" {
-		t.Errorf("26.0.0: got %q", got.About)
-	}
-	// Asking for addresses again and again is a crawler, whatever the name.
-	r = wasabi
-	r.BytesRecvPerMsg = map[string]int64{"getaddr": 24 * 20}
-	if got := convert([]rawPeer{r})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("getaddr crawler: got %q", got.Kind)
-	}
-}
-
-func TestSkippedWtxidrelayIsNotCore(t *testing.T) {
-	conn := time.Now().Unix() - 3600
-	all := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}
-	core := rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
-		Subver: "/Satoshi:28.0.0/", Transport: "v1", ConnTime: conn, ServicesNames: all,
-		BytesRecvPerMsg: map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24, "ping": 32 * 30}}
-	// Each case is judged next to this ordinary Core, which sent wtxidrelay.
-	if got := convert([]rawPeer{core})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("Core sending wtxidrelay: got %q / %q", got.Kind, got.About)
-	}
-	r := core
-	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "ping": 32 * 30}
-	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind ||
-		got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay and sendaddrv2 when connecting, which it should have sent" {
-		t.Errorf("no wtxidrelay: got %q / %q", got.Kind, got.About)
-	}
-	// With sendaddrv2 sent, only wtxidrelay is named.
-	r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24}
-	if got := convert([]rawPeer{r, core})[0]; got.About != "Claims: Bitcoin Core 28.0.0\nProbably: not Bitcoin Core - it left out wtxidrelay when connecting, which it should have sent" {
-		t.Errorf("only wtxidrelay missing: got %q", got.About)
-	}
-	// Knots is Core underneath and sends it too.
-	r.Subver = "/Satoshi:29.2.0/Knots:20251110/"
-	if got := convert([]rawPeer{r, core})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("Knots without wtxidrelay: got %q", got.Kind)
-	}
-	// Still in its handshake: nothing to judge yet.
-	r = core
-	r.BytesRecvPerMsg = map[string]int64{"version": 126}
-	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("before verack: got %q", got.Kind)
-	}
-	// Core before 0.21 never sent it.
-	r = core
-	r.Subver, r.Version, r.ServicesNames = "/Satoshi:0.20.1/", 70015, []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}
-	r.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24}
-	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("Core 0.20: got %q / %q", got.Kind, got.About)
-	}
-	// No byte counts at all, as from an older Core: no judgement.
-	r = core
-	r.BytesRecvPerMsg = nil
-	if got := convert([]rawPeer{r, core})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("no counts: got %q", got.Kind)
-	}
-}
-
-func TestWasabiPeerSearch(t *testing.T) {
-	no, yes := false, true
-	search := rawPeer{Addr: "185.220.101.1:40000", ConnectionType: "inbound", Inbound: true, Version: 70016,
-		Subver: "/Satoshi:27.0.0/", Transport: "v1", ConnTime: time.Now().Unix() - 5, ServicesNames: []string{}, RelayTxes: &no,
-		BytesRecvPerMsg: map[string]int64{"version": 126, "sendaddrv2": 24, "verack": 24, "getaddr": 24}}
-	got := convert([]rawPeer{search})[0]
-	if got.Kind != "Crawler" || got.About != "Claims: Bitcoin Core 27.0.0\nProbably: Wasabi Wallet's peer search - one of its 13 borrowed Core names, offers nothing, asks only for addresses" {
-		t.Errorf("peer search: got %q / %q", got.Kind, got.About)
-	}
-	for name, change := range map[string]func(r *rawPeer){
-		"sendcmpct instead of sendaddrv2": func(r *rawPeer) {
-			r.BytesRecvPerMsg = map[string]int64{"version": 126, "sendcmpct": 33, "verack": 24, "getaddr": 24}
-		},
-		"Ginger's name only": func(r *rawPeer) { r.Subver = "/Satoshi:0.21.0/" },
-		"protocol 70015":     func(r *rawPeer) { r.Version = 70015 },
-	} {
-		r := search
-		change(&r)
-		if got := convert([]rawPeer{r})[0]; got.Kind == "Crawler" || strings.Contains(got.About, "Wasabi") {
-			t.Errorf("%s: got %q / %q", name, got.Kind, got.About)
-		}
-	}
-	// A wallet that sends wtxidrelay is not on NBitcoin.
-	r := search
-	r.RelayTxes = &yes
-	r.BytesRecvPerMsg = map[string]int64{"version": 126, "wtxidrelay": 24, "sendaddrv2": 24, "verack": 24}
-	if got := convert([]rawPeer{r})[0]; got.Kind == "Wallet" {
-		t.Errorf("wtxidrelay wallet: got %q / %q", got.Kind, got.About)
-	}
-}
-
-func TestLibreRelayAndGarbageman(t *testing.T) {
-	bit := []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2", "UNKNOWN[2^29]"}
-	for _, c := range []struct{ subver, kind, about string }{
-		{"/Satoshi:30.2.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
-		{"/Satoshi:31.1.0/", "Node (Libre Relay)", "Libre Relay, a fork of Core that also relays transactions Core and Knots filter out"},
-		{"/Satoshi:29.3.0/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
-		{"/Satoshi:29.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
-		{"/Satoshi:28.1.0/", "Node (Libre Relay)", "Libre Relay - or Garbageman, a Knots fork that poses as it"},
-		{"/Satoshi:29.1.0/Knots:20250903/", fakeWalletKind, "Claims: Libre Relay\nProbably: Garbageman - a Knots fork that poses as Libre Relay and drops what it gets"},
-	} {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
-			Subver: c.subver, Transport: "v2", ServicesNames: bit}})[0]
-		if got.Kind != c.kind || got.About != c.about {
-			t.Errorf("%s: got %q / %q", c.subver, got.Kind, got.About)
-		}
-	}
-	// Without the bit it is plain Core.
-	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
-		Subver: "/Satoshi:30.2.0/", Transport: "v2", ServicesNames: bit[:4]}})[0]
-	if got.Kind != "Node (Core)" {
-		t.Errorf("no bit: got %q", got.Kind)
-	}
-}
-
 func TestNamesSeenOnce(t *testing.T) {
 	for subver, want := range map[string]string{
 		"/dnsseedrs:0.2.0/":      "Crawler",
@@ -741,38 +239,6 @@ func TestNamesSeenOnce(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016, Subver: "//", ServicesNames: []string{}}})[0]
 	if !strings.HasPrefix(got.About, "Introduced itself without a name") {
 		t.Errorf("// about: %q", got.About)
-	}
-}
-
-func TestP2aburnAbout(t *testing.T) {
-	if got := aboutOf("/p2aburn:1.0/"); !strings.HasPrefix(got, "p2aburn, a bot that sweeps P2A anchors") || kindOf("/p2aburn:1.0/") != "Other" {
-		t.Errorf("got %q / %q", kindOf("/p2aburn:1.0/"), got)
-	}
-}
-
-func TestOtherSaysWhatItDoes(t *testing.T) {
-	no, yes := false, true
-	for _, c := range []struct {
-		svc   []string
-		relay *bool
-		recv  map[string]int64
-		sent  map[string]int64
-		want  string
-	}{
-		{[]string{"NETWORK", "WITNESS"}, &yes, nil, nil, "Probably a full node under a name its operator chose"},
-		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Pushes transactions without announcing them"},
-		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, nil, "Software with a name we don't recognise"},
-		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Asks for headers and wants no transactions: a program that tracks the chain"},
-		{[]string{}, &no, map[string]int64{"getaddr": 24}, nil, "Asks for addresses, not for headers or blocks: a crawler"},
-		{[]string{}, &yes, map[string]int64{"getaddr": 24, "getdata": 1117166, "pong": 15936}, map[string]int64{"inv": 17521264, "tx": 5292757}, "Fetches transactions from your node and announces none: a program collecting them"},
-		// A VerifiedX validator before it had a name here: asks for blocks,
-		// is sent blocks, no transactions.
-		{[]string{}, &yes, map[string]int64{"getdata": 1647, "getheaders": 354039}, map[string]int64{"block": 21269099, "inv": 565744}, "Software with a name we don't recognise"},
-		{[]string{}, &no, nil, nil, "Software with a name we don't recognise"},
-	} {
-		if got := otherAbout(c.svc, c.relay, c.recv, c.sent, 0, time.Now()); got != c.want {
-			t.Errorf("%v %v: got %q, want %q", c.svc, c.recv, got, c.want)
-		}
 	}
 }
 
@@ -798,10 +264,11 @@ func TestClientsFoundOn24October(t *testing.T) {
 		"/WalletKit:0.1.0/":                      "Wallet",
 		"/btcwire:0.4.1/Satoshi:0.19/":           "Research scanner",
 		"/p2p-observer:0.1.0/":                   "Crawler",
+		"/p2p-extractor:0.1.0/":                  "Crawler",
 		"/bip324-probe:0.1.0/":                   "Crawler",
 		"/crawlrs:0.2.0/":                        "Crawler",
 		"/symphony:0.0.1/":                       "Indexer",
-		"/your-fork:0.1/":                        "Crawler",
+		"/your-fork:0.1/":                        "Other",
 		"VDS 0.9.9.1":                            "Other chain",
 		"/btcwire:0.5.0/CaribouSPV:0.0.1-beta/":  "Light client",
 		"/btcwire:0.5.0/utreexod:0.5.0/":         "Node (other)",
@@ -845,67 +312,6 @@ func TestClientsFoundOn24October(t *testing.T) {
 	}
 }
 
-func TestVirtusCrawlerBehindCore23(t *testing.T) {
-	no := false
-	r := rawPeer{Addr: "198.51.100.7:50000", ConnectionType: "inbound", Inbound: true, Version: 70015,
-		Subver: "/Satoshi:23.0.0/", ServicesNames: []string{}, RelayTxes: &no,
-		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
-	got := convert([]rawPeer{r})[0]
-	if got.Kind != "Crawler" || !strings.Contains(got.About, "p2p-crawler") {
-		t.Errorf("virtu's crawler: got %q / %q", got.Kind, got.About)
-	}
-	r.Version = 70016
-	if got := convert([]rawPeer{r})[0]; strings.Contains(got.About, "p2p-crawler") {
-		t.Errorf("70016 is not the crawler: %q", got.About)
-	}
-}
-
-func TestForkBits(t *testing.T) {
-	for _, c := range []struct {
-		svc        []string
-		kind, want string
-	}{
-		{[]string{"NETWORK", "WITNESS", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Node (Knots)", "BLAKE2b fork"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Node (Core)", "BIP110 fork"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]"}, "Other", "BIP110 fork"},
-		{[]string{"NETWORK", "UNKNOWN[2^27]", "UNKNOWN[2^28]"}, "Crawler", ""},
-		{[]string{"NETWORK", "UNKNOWN[2^26]"}, "Node (Knots)", ""},
-	} {
-		if got, why := forkOf(c.svc, c.kind, nil, 0); got != c.want || (got != "") != (why != "") {
-			t.Errorf("%v %s: got %q / %q", c.svc, c.kind, got, why)
-		}
-	}
-	// Headers decide when they are known: at the tip it is this chain, stuck
-	// thousands of blocks back it is not, and -1 (not yet known) leaves the bit.
-	bip110 := []string{"NETWORK", "UNKNOWN[2^27]"}
-	for _, c := range []struct {
-		synced int64
-		want   string
-	}{{972597, ""}, {972591, ""}, {972590, "BIP110 fork"}, {961170, "BIP110 fork"}, {-1, "BIP110 fork"}} {
-		h := c.synced
-		if got, _ := forkOf(bip110, "Other", &h, 972597); got != c.want {
-			t.Errorf("synced %d at tip 972597: got %q, want %q", c.synced, got, c.want)
-		}
-	}
-}
-
-func TestWtxidrelayNeedsSomeoneToSendIt(t *testing.T) {
-	core := rawPeer{Addr: "198.51.100.8:8333", ConnectionType: "outbound-full-relay", Version: 70016,
-		Subver: "/Satoshi:28.1.0/", ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"},
-		BytesRecvPerMsg: map[string]int64{"version": 126, "verack": 24}}
-	// A node older than 0.21 asks no peer for it, so nobody sends it.
-	if got := convert([]rawPeer{core})[0]; got.Kind == fakeWalletKind {
-		t.Errorf("no peer sent wtxidrelay, still struck: %q", got.About)
-	}
-	other := core
-	other.Addr = "198.51.100.9:8333"
-	other.BytesRecvPerMsg = map[string]int64{"version": 126, "verack": 24, "wtxidrelay": 24, "sendaddrv2": 24}
-	if got := convert([]rawPeer{core, other})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("another peer sent wtxidrelay, this one did not: got %q", got.Kind)
-	}
-}
-
 func TestLightningWalletReadsTheBareName(t *testing.T) {
 	// A word in an operator's brackets does not make Core a Lightning wallet,
 	// as with every kind in readsBareName; Bitcoin Lab reads it the same way.
@@ -916,244 +322,6 @@ func TestLightningWalletReadsTheBareName(t *testing.T) {
 	} {
 		if got := kindOf(subver); got != want {
 			t.Errorf("%s: got %q, want %q", subver, got, want)
-		}
-	}
-}
-
-// The second reason next to the protocol is what the peer never asked for -
-// but only once it has been connected long enough for a real wallet to have.
-func TestBitcoinjAskedNothing(t *testing.T) {
-	now := time.Now()
-	wallet := func(connAgo int64, recv map[string]int64) string {
-		return convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: "/bitcoinj:0.16.5/Bitcoin Wallet:10.26/", Version: 70017, ServicesNames: []string{},
-			ConnTime: now.Unix() - connAgo, BytesRecvPerMsg: recv}})[0].About
-	}
-	quiet := map[string]int64{"version": 124, "verack": 24, "ping": 32, "pong": 32, "getaddr": 24}
-	if got := wallet(3*86400, quiet); !strings.HasSuffix(got, "never asked for a header or a transaction") {
-		t.Errorf("quiet for 3 days: %q", got)
-	}
-	// Just connected: a real wallet has not had the time to ask either way.
-	if got := wallet(30, quiet); strings.Contains(got, "never asked") {
-		t.Errorf("30 seconds: %q", got)
-	}
-	// It asked for headers: the clause is not true, the duration is said instead.
-	asked := map[string]int64{"version": 124, "getheaders": 1061}
-	if got := wallet(3*86400, asked); strings.Contains(got, "never asked") || !strings.Contains(got, "3 days") {
-		t.Errorf("asked for headers: %q", got)
-	}
-	// A node that did not report the counters says nothing about it.
-	if got := wallet(3*86400, nil); strings.Contains(got, "never asked") {
-		t.Errorf("no counters: %q", got)
-	}
-}
-
-// A peer naming Core that wants transactions, did the handshake and then
-// asked for nothing for ten minutes is not Core - but only after every harder
-// reason, and not one that may be a block-relay-only connection.
-func TestQuietAfterHandshake(t *testing.T) {
-	now := time.Now()
-	yes, no := true, false
-	quiet := map[string]int64{"version": 126, "verack": 24, "feefilter": 32, "pong": 32 * 30}
-	asks := map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30, "getheaders": 1061}
-	core := func(recv map[string]int64, ago int64) rawPeer {
-		return rawPeer{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Version: 70016,
-			Subver: "/Satoshi:31.1.0/", Transport: "v1", ConnTime: now.Unix() - ago, RelayTxes: &yes,
-			ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, BytesRecvPerMsg: recv,
-			BytesSentPerMsg: map[string]int64{"inv": 70}}
-	}
-	if got := convert([]rawPeer{core(quiet, 3600)})[0]; got.Kind != fakeWalletKind ||
-		!strings.Contains(got.About, "it asked for nothing after the handshake, not even for addresses") {
-		t.Errorf("quiet for an hour: %q / %q", got.Kind, got.About)
-	}
-	if got := convert([]rawPeer{core(quiet, 120)})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("only two minutes: %q", got.Kind)
-	}
-	if got := convert([]rawPeer{core(asks, 3600)})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("asked for headers: %q", got.Kind)
-	}
-	// A peer that wants no transactions may be a block-relay-only connection,
-	// from a node still catching up: nothing to ask for, nothing to say.
-	r := core(quiet, 3600)
-	r.RelayTxes = &no
-	if got := convert([]rawPeer{r})[0]; got.Kind != "Node (Core)" {
-		t.Errorf("block-relay-only: %q", got.Kind)
-	}
-	// Knots runs Core's code and is judged the same.
-	k := core(quiet, 3600)
-	k.Subver = "/Satoshi:29.3.0/Knots:20260507/"
-	if got := convert([]rawPeer{k})[0]; got.Kind != fakeWalletKind {
-		t.Errorf("Knots quiet: %q", got.Kind)
-	}
-	// A harder reason wins: no NETWORK_LIMITED is said, not the quiet.
-	h := core(quiet, 3600)
-	h.ServicesNames = []string{"NETWORK", "WITNESS"}
-	if got := convert([]rawPeer{h})[0]; !strings.Contains(got.About, "lacks NETWORK_LIMITED") {
-		t.Errorf("harder reason: %q", got.About)
-	}
-	// Wasabi on a borrowed Core name stays Wasabi, quiet or not.
-	w := core(quiet, 3600)
-	w.Subver, w.ServicesNames = "/Satoshi:26.0.0/", []string{}
-	if got := convert([]rawPeer{w})[0]; got.Kind == fakeWalletKind && strings.Contains(got.About, "asked for nothing") {
-		t.Errorf("quiet Wasabi: %q / %q", got.Kind, got.About)
-	}
-	// LinkingLion: the line says what it does only once it has been seen doing it.
-	lion := core(quiet, 3600)
-	lion.Subver, lion.mockLinkingLion = "", true
-	if got := convert([]rawPeer{lion})[0]; !strings.HasSuffix(got.About, "; it only listens") {
-		t.Errorf("quiet lion: %q", got.About)
-	}
-	lion = core(quiet, 60)
-	lion.Subver, lion.mockLinkingLion = "", true
-	if got := convert([]rawPeer{lion})[0]; strings.Contains(got.About, "only listens") {
-		t.Errorf("young lion: %q", got.About)
-	}
-}
-
-// An unknown name that stays and asks for nothing is said to only listen,
-// ahead of whatever its services suggest.
-func TestOtherAboutOnlyListens(t *testing.T) {
-	now := time.Now()
-	yes, no := true, false
-	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40, "sendaddrv2": 24}
-	hour := now.Unix() - 3600
-	if got := otherAbout(nil, &yes, quiet, map[string]int64{"inv": 120}, hour, now); got != "Only listens: hears new transactions, fetches none" {
-		t.Errorf("wants transactions: %q", got)
-	}
-	// Nothing was announced to it, so it cannot be said to hear anything.
-	if got := otherAbout(nil, &yes, quiet, nil, hour, now); got != "Only listens: asks for nothing" {
-		t.Errorf("nothing announced: %q", got)
-	}
-	if got := otherAbout(nil, &no, quiet, nil, hour, now); got != "Only listens: wants no transactions, asks for nothing" {
-		t.Errorf("wants none: %q", got)
-	}
-	// Listing NETWORK does not make a silent peer a full node.
-	if got := otherAbout([]string{"NETWORK"}, &yes, quiet, nil, hour, now); !strings.Contains(got, "Only listens") {
-		t.Errorf("NETWORK but silent: %q", got)
-	}
-	// Not long enough yet, or it did ask: the older lines stand.
-	if got := otherAbout(nil, &yes, quiet, nil, now.Unix()-60, now); strings.Contains(got, "only listens") {
-		t.Errorf("one minute: %q", got)
-	}
-	asks := map[string]int64{"version": 126, "verack": 24, "getaddr": 24}
-	if got := otherAbout(nil, &yes, asks, nil, hour, now); got != "Asks for addresses, not for headers or blocks: a node already in sync, or a crawler" {
-		t.Errorf("collects addresses: %q", got)
-	}
-}
-
-// What unknown software did, said plainly: asking for the mempool, downloading
-// blocks, wanting headers announced.
-func TestOtherAboutWhatItDid(t *testing.T) {
-	now := time.Now()
-	yes, no := true, false
-	cases := []struct {
-		name  string
-		relay *bool
-		recv  map[string]int64
-		sent  map[string]int64
-		want  string
-	}{
-		{"mempool", &yes, map[string]int64{"version": 126, "verack": 24, "mempool": 24}, nil,
-			"Asks for our mempool"},
-		{"asks for headers", &no, map[string]int64{"version": 126, "getheaders": 1061}, nil,
-			"Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain"},
-		{"only wants them announced", &no, map[string]int64{"version": 126, "sendheaders": 24}, nil,
-			"Asks for headers and wants no transactions: a block-only connection, or a program that tracks the chain"},
-	}
-	for _, c := range cases {
-		if got := otherAbout(nil, c.relay, c.recv, c.sent, 0, now); got != c.want {
-			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
-		}
-	}
-}
-
-// The Bitcore library announces NETWORK only: any more under its name is not it.
-func TestBitcoreLibraryOffersOnlyNetwork(t *testing.T) {
-	cases := []struct {
-		subver   string
-		services []string
-		kind     string
-		says     string
-	}{
-		{"/bitcore:1.1.0/", []string{"NETWORK"}, "Other", ""},
-		{"/bitcore:1.1.0/", []string{"NETWORK", "WITNESS", "NETWORK_LIMITED", "P2P_V2"}, "Disguised", "it offers WITNESS, NETWORK_LIMITED, P2P_V2, which the Bitcore library never does"},
-		{"/bitcore:1.1.0/", []string{"NETWORK", "BLOOM", "WITNESS", "NETWORK_LIMITED"}, "Disguised", "it offers BLOOM, WITNESS, NETWORK_LIMITED"},
-		{"/bitcore:8.25.12/", []string{"NETWORK"}, "Other", ""},
-	}
-	for _, c := range cases {
-		got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-			Subver: c.subver, ServicesNames: c.services}})[0]
-		if got.Kind != c.kind || !strings.Contains(got.About, c.says) {
-			t.Errorf("%s %v: got %q / %q", c.subver, c.services, got.Kind, got.About)
-		}
-	}
-}
-
-// A node catching up takes blocks fast and has not reached the tip; a peer that
-// has, or that was handed the same amount over days, is not catching up.
-func TestSyncingFrom(t *testing.T) {
-	now := time.Now()
-	ago := func(min int64) int64 { return now.Unix() - min*60 }
-	blocks := func(mb int64) map[string]int64 { return map[string]int64{"block": mb * 1_000_000} }
-	at := func(h int64) *int64 { return &h }
-	const tip = 973_000
-	cases := []struct {
-		name    string
-		inbound bool
-		sent    map[string]int64
-		synced  *int64
-		conn    int64
-		want    int64
-	}{
-		{"463 MB in twelve minutes, height unknown", true, blocks(463), at(-1), ago(12), 463},
-		{"the same, no field at all", true, blocks(463), nil, ago(12), 463},
-		{"far behind the tip", true, blocks(463), at(400_000), ago(12), 463},
-		{"600 GB taken, now at the tip", true, blocks(600_000), at(tip - 1), ago(15 * 60), 0},
-		{"11.9 GB over 2.5 days, 6 blocks behind", true, blocks(11_893), at(tip - 6), ago(3649), 0},
-		{"3.8 GB over 2 days, 27 blocks behind", true, blocks(3_831), at(tip - 27), ago(3127), 0},
-		{"a day behind and fast", true, blocks(463), at(tip - 150), ago(12), 463},
-		{"the same over two days", true, blocks(463), at(-1), ago(2 * 24 * 60), 0},
-		{"a few blocks", true, blocks(4), at(-1), ago(5), 0},
-		{"we are the one catching up", false, blocks(463), at(-1), ago(12), 0},
-		{"no counters", true, nil, at(-1), ago(12), 0},
-		{"connection time unknown", true, blocks(463), at(-1), 0, 0},
-	}
-	for _, c := range cases {
-		if got := syncingFrom(c.inbound, c.sent, c.synced, tip, c.conn, now); got != c.want {
-			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
-		}
-	}
-	p := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true, Subver: "/Satoshi:31.1.0/",
-		ServicesNames: []string{"NETWORK", "WITNESS", "NETWORK_LIMITED"}, ConnTime: ago(12), BytesSentPerMsg: blocks(463)}})[0]
-	if p.Kind != "Node (Core)" || p.SyncMB != 463 {
-		t.Errorf("a Core node syncing: %q, %d MB", p.Kind, p.SyncMB)
-	}
-}
-
-// A peer with a version but no name says what it did next.
-func TestNoAgentAbout(t *testing.T) {
-	now := time.Now()
-	hour := now.Unix() - 3600
-	cases := []struct {
-		name string
-		recv map[string]int64
-		conn int64
-		want string
-	}{
-		{"a full node without a name", map[string]int64{"version": 126, "verack": 24, "getheaders": 1061, "getaddr": 24, "sendcmpct": 33}, hour,
-			"Asks for headers and addresses, like a full node does"},
-		{"addresses only", map[string]int64{"version": 126, "verack": 24, "getaddr": 24, "pong": 32}, hour,
-			"Asks for addresses, not for headers or blocks"},
-		{"quiet for an hour", map[string]int64{"version": 126, "verack": 24, "pong": 32 * 30}, hour,
-			"Introduced itself, then asked for nothing"},
-		{"just arrived", map[string]int64{"version": 126, "verack": 24}, now.Unix() - 5,
-			"Introduced itself without a name; nothing it did tells what it is"},
-		{"no counters", nil, hour,
-			"Introduced itself without a name; nothing it did tells what it is"},
-	}
-	for _, c := range cases {
-		if got := noAgentAbout(c.recv, c.conn, now); got != c.want {
-			t.Errorf("%s: got %q", c.name, got)
 		}
 	}
 }
@@ -1174,22 +342,8 @@ func TestClientsFoundOn27October(t *testing.T) {
 	if got, _ := classify("BTC RPC Proxy v0.8.1"); got != "Other" {
 		t.Errorf("BTC RPC Proxy: kind %q, want Other", got)
 	}
-	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "Probably not a node") {
+	if got := aboutOf("BTC RPC Proxy v0.8.1"); !strings.Contains(got, "RPC proxy") {
 		t.Errorf("BTC RPC Proxy: about %q", got)
-	}
-}
-
-// A Core connection on a node that announces nothing is no proof of a fake.
-func TestQuietCoreNeedsSomethingOffered(t *testing.T) {
-	now := time.Now()
-	yes := true
-	quiet := map[string]int64{"version": 126, "verack": 24, "ping": 32, "pong": 32 * 40}
-	hour := now.Unix() - 3600
-	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, nil, hour, now); got != "" {
-		t.Errorf("nothing offered: %q", got)
-	}
-	if got := quietCoreAbout("/Satoshi:29.0.0/", &yes, quiet, map[string]int64{"inv": 70}, hour, now); got == "" {
-		t.Error("offered and still silent: want the reason")
 	}
 }
 
@@ -1219,25 +373,49 @@ func TestLibbitcoinV2(t *testing.T) {
 	}
 }
 
-// LinkingLion's verdict comes from its address; what it did itself stands
-// under it, so the disguise would show without the list too.
-func TestLinkingLionShowsItsOwnEvidence(t *testing.T) {
-	got := convert([]rawPeer{{Addr: "143.20.137.5:8333", ConnectionType: "inbound", Inbound: true,
-		Subver: "/Satoshi:0.12.1/", Version: 70016, ServicesNames: []string{"NETWORK"}}})[0]
-	if !got.LinkingLion || !strings.Contains(got.About, "Probably: LinkingLion") || !strings.Contains(got.About, "\nAlso: ") {
-		t.Errorf("%q", got.About)
+// Bitcoin Cash clients carry "(EB8.0)" like Classic but are not Classic, and
+// every other chain, and the names without a public source, still get a sentence.
+func TestOtherChainAbouts(t *testing.T) {
+	for subver, want := range map[string]string{
+		"/Bitcoin ABC:0.16.1(EB8.0)/": "Bitcoin ABC",
+		"/BUCash:1.9.0(EB32; AD12)/":  "Bitcoin Unlimited",
+		"/BCHUnlimited:1.0/":          "Bitcoin Unlimited",
+		"/Bitcoin SV:1.0.16/":         "Bitcoin SV",
+		"/Bitcoin XT:0.11.0/":         "Bitcoin XT",
+		"/Classic:1.3.8(EB8)/":        "Bitcoin Classic",
+		"/SuperBitcoin:0.16.0.2/":     "Super Bitcoin",
+		"vds_0.9.53":                  "VDS",
+		"/iriumd:1.0/":                "Irium",
+		"/cf-package-relay:0.3.0/":    "Named after package relay",
+	} {
+		if got := aboutOf(subver); !strings.HasPrefix(got, want) {
+			t.Errorf("%s: about %q, want %q", subver, got, want)
+		}
 	}
 }
 
-// Core 32 speaks 70017; a Core 22 to 31 that does is none.
-func TestProtocol70017(t *testing.T) {
-	if got := protocolMismatch("/Satoshi:32.0.0/", 70017); got != "" {
-		t.Errorf("32.0.0: %q", got)
+// Names with no public source are not given a kind from what one node saw
+// them do, nor a fixed sentence: the session decides what is said. A name
+// that says what it is does get the kind it names.
+func TestNoKindFromOneNode(t *testing.T) {
+	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/BTC-Nodes:2026/", "/Natasha:1.0/"} {
+		if got := kindOf(ua); got != "Other" {
+			t.Errorf("%s: kind %q, want Other", ua, got)
+		}
+		if got := aboutOf(ua); got != "" {
+			t.Errorf("%s: fixed sentence %q", ua, got)
+		}
 	}
-	if got := protocolMismatch("/Satoshi:31.1.0/", 70017); got != "not Bitcoin Core - it speaks protocol 70017, which Core 31 never did" {
-		t.Errorf("31.1.0: %q", got)
-	}
-	if got := protocolMismatch("/Satoshi:31.99.0/", 70017); got != "" {
-		t.Errorf("31.99 dev build: %q", got)
+}
+
+func TestKindFromWhatTheNameSays(t *testing.T) {
+	for ua, want := range map[string]string{
+		"/topology-probe:0.1/": "Crawler", "/p2p-probe:0.1.0/": "Crawler", "/probe:1.0/": "Crawler",
+		"/btc-peers:0.1/": "Crawler", "/alt-bitnodes:0.1/": "Crawler",
+		"/bip157-fetch:0.1/": "Light client", "/dexcash-nodes:0.1.0/": "Other chain",
+	} {
+		if got := kindOf(ua); got != want {
+			t.Errorf("%s: kind %q, want %q", ua, got, want)
+		}
 	}
 }

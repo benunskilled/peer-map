@@ -67,7 +67,7 @@ func TestShortReasons(t *testing.T) {
 // except the two that say nothing was seen. Read from the source, so a new
 // sentence without a short form fails here.
 func TestEveryBehaviourHasATell(t *testing.T) {
-	src, err := os.ReadFile("kinds.go")
+	src, err := os.ReadFile("about.go")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestEveryBehaviourHasATell(t *testing.T) {
 		"Asks for addresses, not for headers or blocks":                     true,
 	}
 	n := 0
-	for _, fn := range []string{"func otherAbout(", "func noAgentAbout("} {
+	for _, fn := range []string{"func sessionLine(", "func noAgentLine("} {
 		body := string(src[strings.Index(string(src), fn):])
 		body = body[:strings.Index(body, "\n}\n")]
 		for _, m := range regexp.MustCompile(`return "([^"]+)"`).FindAllStringSubmatch(body, -1) {

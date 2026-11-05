@@ -49,9 +49,10 @@
     world: null,          // world.json
     show: { manual: true, inbound: true, outbound: true },
     place: null,          // location filter from clicking a marker: { key, label }
+    group: null,          // first level of the kind filter: Nodes, Wallets, Watchers, Disguised, Other
     kind: null,           // kind filter from clicking an entry in a group's kind line
     sub: null,            // one level under the kind: a pool, a version, a name
-    allKinds: false,      // on a phone: every kind chip, not only the three largest
+    label: null,          // beside it, for nodes: the operator's own label, "(FutureBit-Apollo-Node)"
     allSubs: false,       // every chip one level down, not one line of them
     openRows: new Set(),  // rows the reader has opened by a tap or click: "group address"
     sort: {},             // per group: { key, dir }
@@ -332,7 +333,7 @@
     };
     const sep = () => add("b-sep", "·");
 
-    add("b-height", b.height ? "Block " + b.height.toLocaleString() : "Last block", b.hash || "");
+    add("b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
     if (b.pool || b.pool_tag) {
       sep();
       add("b-label", "mined by");
@@ -397,7 +398,15 @@
   const ROUTE_GAP = 150;   // the closest two stops may sit, so labels never touch
 
   const hostOf = (a) => (a.startsWith("[") ? a.slice(1, a.indexOf("]")) : a.replace(/:\d+$/, ""));
-  const signedMs = (t) => (Math.round(t) === 0 ? "0" : (t > 0 ? "+" : "−") + Math.abs(Math.round(t)) + " ms");
+  // A stop says no time counted from the first job: with the owner's own
+  // pool first, every stop before it read "−206 ms" (04.11.2026). The line
+  // between two stops says how long that stretch took; the first job is no
+  // station, so it says where it stands against your node instead.
+  const firstJobWords = (win, stops) => {
+    const core = stops.find((st) => st.kind === "core");
+    const d = core ? Math.round(core.t - win.t) : 0;
+    return d === 0 ? "same moment as your node" : Math.abs(d) + " ms " + (d > 0 ? "before" : "after") + " your node";
+  };
 
   // Which route the card shows: this block, or the typical one. Remembered
   // per browser, because somebody tuning a setup wants the median every time.
@@ -548,7 +557,7 @@
       const row = (cls, name, time, sub) => {
         const tr = document.createElement("tr");
         tr.className = cls;
-        for (const [c, v] of [["n", name], ["num", time], ["miss", sub]]) {
+        for (const [c, v] of [["n", name], ["miss", sub], ["num", time]]) {
           const td = document.createElement("td");
           td.className = c;
           td.textContent = v;
@@ -558,7 +567,17 @@
         t.appendChild(tr);
       };
       row("pool", miner, "", "mined it");
-      for (const s of stops) row(s.kind, s.name, signedMs(s.t), s.sub.join(" · "));
+      // One rule for every row: the time is from the row above, so it is
+      // never negative. The first job is a row like the others here; the
+      // template's transactions go with the job built from it.
+      const tx = stops.find((st) => st.kind === "tpl")?.tx;
+      stops.forEach((s, i) => {
+        const prev = stops[i - 1];
+        const gap = prev ? Math.round(s.t - prev.t) : null;
+        const time = gap == null ? "" : (prev.kind === "peer" && s.kind === "core" ? "~" : "+") + gap + " ms";
+        const sub = s.kind === "own" && tx != null ? [...s.sub, Math.round(tx).toLocaleString("en-US") + " tx"] : s.sub;
+        row(s.kind, s.name, time, sub.join(" · "));
+      });
       box.appendChild(t);
     } else {
       const rt = document.createElement("div");
@@ -594,7 +613,7 @@
         el("rt-dot " + s.kind + (s.group ? " " + s.group : ""), xs[i]);
         const name = fit(txt("b", s.name), s.name, s.title);
         const lab = el("rt-lab " + s.kind + (s.plain ? " plain" : ""), xs[i],
-          [name, txt("span", signedMs(s.t), "t"), ...s.sub.map((line) => txt("small", line))]);
+          [name, ...s.sub.map((line) => txt("small", line)), ...(s.kind === "win" ? [txt("small", firstJobWords(s, stops))] : [])]);
         if (s.title) lab.title = s.title;
       });
 
@@ -621,9 +640,8 @@
     note.className = "note";
     note.textContent = ((noRaceHere ? "No race was recorded for this block, so this is the typical route. " : "")
       + (median
-      ? `Each stop is its median over the last ${n} blocks, counted from that block's first job. `
-      : "0 is the first new job any pool sent here. When the block was found cannot be measured; "
-        + "the hop into your node is estimated from the peer's ping.")
+      ? `Each stop is its median over the last ${n} blocks. `
+      : "When the block was found cannot be measured; the hop into your node is estimated from the peer's ping.")
       ).trim();
     box.appendChild(note);
   }
@@ -707,6 +725,19 @@
     body.appendChild(race);
   }
 
+  // The legend and the block's pool list fold shut again with a tap anywhere
+  // on them, not only on their title: on a phone the title has scrolled away
+  // by then, and it comes back into view.
+  for (const box of document.querySelectorAll("details.key, #blockMore")) {
+    box.addEventListener("click", (ev) => {
+      if (!box.open || ev.target.closest("summary, a, button, input")) return;
+      if (String(window.getSelection()).length > 0) return;
+      box.open = false;
+      const top = box.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy(0, top - 8);
+    });
+  }
+
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
   const SYNCING = "syncing";
@@ -714,14 +745,31 @@
   // name, nodes by version, everything else by the software it names.
   const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool", NO_NAME = "no name";
   const uaName = (p) => {
-    const parts = (p.subver || "").split("/").filter(Boolean);
-    const name = (parts[parts.length - 1] || "").split(/[:(]/)[0].trim();
-    return name === "Satoshi" ? "Core" : name || NO_NAME;
+    const parts = (p.subver || "").split("/").map((s) => s.trim()).filter(Boolean);
+    // "nebula/2.4.1", "Yuki / 0.0.1": the last part may be only a version.
+    let i = parts.length - 1;
+    while (i > 0 && /^v?\d[\w.+-]*$/.test(parts[i])) i--;
+    const name = (parts[i] || "").split(/[:(]/)[0].trim();
+    // "Bither1.6.2", "vds_0.9.53", "BTC RPC Proxy v0.8.1": one chip per program.
+    const bare = name.replace(/(?:[\s_-]+v?|([A-Za-z]))\d+(\.\d+)+$/, "$1") || name;
+    return bare === "Satoshi" ? "Core" : bare === "Schildbach Bitcoin Wallet" ? "Bitcoin Wallet" : bare || NO_NAME;
+  };
+  // What a node's operator wrote in brackets after the version - an
+  // "(FutureBit-Apollo-Node)", a "(MiniBolt node)" - as written. Nodes only:
+  // elsewhere the brackets are part of the program's own name.
+  const labelOf = (p) => {
+    if (!p.kind.startsWith("Node")) return null;
+    const m = /\(([^)]*)\)/.exec(p.subver || "");
+    return m && m[1].trim() ? m[1].trim() : null;
   };
   const subOf = (p) => {
     if (p.kind === POOL_KIND) return p.pool || UNKNOWN_POOL;
     if (p.kind.startsWith("Node")) {
       const v = /^\/Satoshi:(\d+)\.(\d+)/.exec(p.subver || "");
+      // Knots names a release by the Core it is built on, down to the second
+      // number (v29.3.knots20260507), and nearly all of it is on one major:
+      // by the major alone every Knots peer was "29.x", one chip, none shown.
+      if (v && p.kind === "Node (Knots)" && /\/Knots:/.test(p.subver)) return v[1] + "." + v[2];
       if (v) return (v[1] === "0" ? "0." + v[2] : v[1]) + ".x";
     }
     // What it pretends to be - a Core node or a wallet; who is behind it
@@ -730,33 +778,37 @@
       if (/bitcoinj|breadwallet|\/bread:|multibit|bither|wallet/i.test(p.subver || "")) return "as wallet";
       return /^\/?Satoshi/i.test(p.subver || "") ? "as Core" : "as " + uaName(p);
     }
-    if (p.kind === "Lightning wallet") {
-      if (/lnd 0\.21/.test(p.about || "")) return "lnd 0.21+";
-      if (/^Older lnd/.test(p.about || "")) return "older lnd";
-    }
-    // Wasabi and Ginger borrow Core's names: the about says which it is.
-    const w = /(Wasabi|Ginger)/.exec(p.about || "");
-    return w && p.kind === "Wallet" ? w[1] : uaName(p);
+    // One program under many names (RESET), a borrowed name (Wasabi) or who
+    // runs a scanner: the server knows which rule it was and names the chip.
+    return p.name || uaName(p);
   };
-  // A phone shows the three largest chips and a "+ n more" that opens the rest:
-  // a full row of chips per table pushes the peers off the screen.
-  const PHONE_CHIPS = 3;
-  const phoneCut = () => !state.allKinds && window.matchMedia("(max-width: 600px)").matches;
   // Swiping back, or the back button, closes what is open - a panel, then
   // the filters - before it leaves the page, as in an app. One history entry
   // stands for "something is open"; closing it by hand takes that entry back.
-  const somethingOpen = () => state.openRows.size > 0 || !!state.kind || !!state.place;
+  const somethingOpen = () => state.openRows.size > 0 || !!state.group || !!state.place;
+  // Going back by hand can take the page back with it: Safari puts it where it
+  // was when the entry was made, so clearing a filter at the top of the page
+  // threw the reader down to the chip that set it (iPhone, 04.11.2026). Where
+  // the reader is when they close is kept, and put back.
+  let backY = null;
   function layers() {
     try {
       const ours = history.state && history.state.peermapLayer;
       if (somethingOpen() && !ours) history.pushState({ peermapLayer: true }, "");
-      else if (!somethingOpen() && ours) history.back();
+      else if (!somethingOpen() && ours) { backY = window.scrollY; history.back(); }
     } catch { /* sandboxed frame */ }
   }
   window.addEventListener("popstate", () => {
+    if (backY !== null) {
+      const y = backY;
+      backY = null;
+      window.scrollTo(0, y);
+      requestAnimationFrame(() => { if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y); });
+      return;
+    }
     if (!somethingOpen()) return;
     if (state.openRows.size) state.openRows.clear();
-    else { state.kind = null; state.sub = null; state.place = null; }
+    else { state.group = null; state.kind = null; state.sub = null; state.label = null; state.place = null; }
     applyFilters();
   });
 
@@ -814,7 +866,7 @@
     if (e.target.closest && e.target.closest("input, textarea, select")) return;
     if (e.key === "Escape" && somethingOpen()) {
       if (state.openRows.size) state.openRows.clear();
-      else { state.kind = null; state.sub = null; state.place = null; }
+      else { state.group = null; state.kind = null; state.sub = null; state.label = null; state.place = null; }
       applyFilters();
       e.preventDefault();
       return;
@@ -873,8 +925,19 @@
   }
   const SUB_LABEL = { [POOL_KIND]: "Pools:", Disguised: "Claims:", "Lightning wallet": "lnd:" };
   const subLabel = (kind) => SUB_LABEL[kind] || (kind.startsWith("Node") ? "Versions:" : "Names:");
-  const matchesKind = (p) => !state.kind || (state.kind === SYNCING ? !!p.sync_mb
-    : p.kind === state.kind && (!state.sub || subOf(p) === state.sub));
+  // Nineteen kinds were one long row of chips, several of them with a single
+  // peer. The first level is three families of them and every other kind on
+  // its own; the kind is the second, the name the third. A family "Other"
+  // held the kind "Other", and picking it showed "Other" a second time. An
+  // indexer (electrs, Fulcrum) is there for wallets, and alone it was a chip
+  // for one peer, mostly the node's own.
+  const groupOf = (kind) =>
+    kind.startsWith("Node") || kind === POOL_KIND ? "Nodes"
+    : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" || kind === "Indexer" ? "Wallets"
+    : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
+    : kind;
+  const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
+    : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub) && (!state.label || labelOf(p) === state.label));
 
   const visiblePeers = () =>
     (state.data ? state.data.peers.filter((p) => state.show[p.group] && matchesKind(p)) : []);
@@ -956,12 +1019,12 @@
     const fkey = "filters:" + location.pathname;
     if (nav && (nav.type === "reload" || nav.type === "back_forward")) {
       const f = JSON.parse(sessionStorage.getItem(fkey) || "null");
-      if (f) Object.assign(state, { kind: f.kind || null, sub: f.sub || null, place: f.place || null });
+      if (f) Object.assign(state, { group: f.group || null, kind: f.kind || null, sub: f.sub || null, label: f.label || null, place: f.place || null });
     }
     const save = () => {
       try {
         sessionStorage.setItem(key, String(reloadY !== null ? reloadY : Math.round(window.scrollY)));
-        sessionStorage.setItem(fkey, JSON.stringify({ kind: state.kind, sub: state.sub, place: state.place }));
+        sessionStorage.setItem(fkey, JSON.stringify({ group: state.group, kind: state.kind, sub: state.sub, label: state.label, place: state.place }));
       } catch { /* private window */ }
     };
     window.addEventListener("pagehide", save);
@@ -1074,10 +1137,18 @@
   }
   function renderSiblingLink() {
     const a = $("sibling-link");
-    if (a) a.target = LAB_TARGET;
     if (!a || !state.data) return;
-    a.hidden = !state.data.sibling;
-    if (state.data.sibling) a.href = siblingURL(null);
+    // Without Bitcoin Lab the same link leads to where it can be had, as
+    // Bitcoin Lab does for this app.
+    const lab = !!state.data.sibling;
+    a.hidden = false;
+    a.target = lab ? LAB_TARGET : "_blank";
+    a.href = lab ? siblingURL(null) : LAB_PAGE;
+    if (lab) a.removeAttribute("title");
+    else a.title = "See which of your peers bring you new blocks first";
+    // The star and the green address are Bitcoin Lab's word; without it the
+    // legend does not explain marks the page never shows.
+    for (const li of document.querySelectorAll(".key .lab-only")) li.hidden = !lab;
   }
 
   // Nodes are what passes blocks on (every "Node (...)" kind and pool nodes),
@@ -1245,14 +1316,17 @@
     const hot = new Set(bs.map((b) => b.cc));
     for (const el of $("countries").children) el.classList.toggle("hot", hot.has(el.dataset.cc));
 
-    // Largest first, so small markers are drawn on top and stay clickable -
-    // and the one that delivered the block last of all, so a star is never
-    // hidden under a neighbouring country.
-    for (const b of [...bs].sort((x, y) => Number(Boolean(x.delivered)) - Number(Boolean(y.delivered)))) {
+    // Inbound-only places first, in the background, then outbound and
+    // manual on top; within each, largest first, so small markers are drawn
+    // on top and stay clickable. The one that delivered the block last of
+    // all, so a star is never hidden under a neighbouring country.
+    const order = (b) => (b.delivered ? 3 : RANK[leadGroup(b)]);
+    for (const b of [...bs].sort((x, y) => order(x) - order(y))) {
       const r = radius(b.total);
       const g = document.createElementNS(NS, "g");
       const selected = state.place && state.place.key === b.key;
-      g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : ""));
+      g.setAttribute("class", "marker" + (selected ? " selected" : "") + (b.delivered ? " delivered" : "") +
+        (leadGroup(b) === "inbound" ? " back" : ""));
       g.dataset.x = b.pt[0];
       g.dataset.y = b.pt[1];
       g.dataset.key = b.key;
@@ -1333,7 +1407,12 @@
     placeMarkers();
   }
 
-  const leadGroup = (b) => (b.manual ? "manual" : b.outbound > b.inbound ? "outbound" : "inbound");
+  // Yours first, then the ones this node chose: a place with one outbound
+  // peer among thirty inbound ones still shows as outbound. A node with an
+  // open port has far more inbound peers, and by majority the map would be
+  // all inbound.
+  const leadGroup = (b) => (b.manual ? "manual" : b.outbound ? "outbound" : "inbound");
+  const RANK = { inbound: 0, outbound: 1, manual: 2 };
 
   // This node itself, from the region its peers see it in (the server reads
   // getpeerinfo's addrlocal and sends only the region, never the address).
@@ -1471,8 +1550,8 @@
   function renderPlaceFilter() {
     $("placeFilter").hidden = !state.place;
     $("placeFilterName").textContent = state.place ? state.place.label : "";
-    $("kindFilter").hidden = !state.kind;
-    $("kindFilterName").textContent = (state.kind || "") + (state.kind && state.sub ? " \u00b7 " + state.sub : "");
+    $("kindFilter").hidden = !state.group;
+    $("kindFilterName").textContent = [state.group, state.kind !== state.group && state.kind, state.sub, state.label].filter(Boolean).join(" \u00b7 ");
   }
 
   // Both filters redraw the same three things, and the map is in that list on
@@ -1486,14 +1565,27 @@
     renderTables();
   }
 
+  function setGroup(group) {
+    state.group = state.group === group ? null : group;
+    state.kind = null;
+    state.sub = null;
+    state.label = null;
+    state.allSubs = false;
+    applyFilters();
+  }
   function setKind(kind) {
     state.kind = state.kind === kind ? null : kind;
     state.sub = null;
+    state.label = null;
     state.allSubs = false;
     applyFilters();
   }
   function setSub(sub) {
     state.sub = state.sub === sub ? null : sub;
+    applyFilters();
+  }
+  function setLabel(label) {
+    state.label = state.label === label ? null : label;
     applyFilters();
   }
 
@@ -1502,8 +1594,10 @@
     applyFilters();
   });
   $("kindFilterClear").addEventListener("click", () => {
+    state.group = null;
     state.kind = null;
     state.sub = null;
+    state.label = null;
     applyFilters();
   });
 
@@ -1750,7 +1844,8 @@
   function syncSpan(p) {
     const s = document.createElement("span");
     s.className = "syncing";
-    s.title = `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`;
+    // Core counts bytes per connection, so this is the session, not the whole sync.
+    s.title = `Syncing from your node: ${mbText(p.sync_mb)} of blocks since it connected`;
     const ico = document.createElement("span");
     ico.className = "sync-ico";
     ico.setAttribute("aria-hidden", "true");
@@ -1765,26 +1860,47 @@
   // here and on the map; clicking it again puts everyone back.
   function renderKindMix(el, peers) {
     const n = new Map();
-    for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
+    for (const p of peers) n.set(groupOf(p.kind), (n.get(groupOf(p.kind)) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    const cut = !state.kind && phoneCut() && entries.length > PHONE_CHIPS + 1;
-    entries.forEach(([kind, count], idx) => {
-      if (cut && idx >= PHONE_CHIPS) return;
-      // With one kind picked the others step aside: on a phone they would
+    // Five groups fit a phone in two lines: no "+ n more" here.
+    entries.forEach(([group, count]) => {
+      // With one group picked the others step aside: on a phone they would
       // fill the screen above the chips that matter now.
-      if (state.kind && state.kind !== kind) return;
+      if (state.group && state.group !== group) return;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip kind-pick" + (state.group === group ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + group);
+      b.title = state.group === group ? "Show every kind again" : `Show only ${group}`;
+      b.setAttribute("aria-pressed", String(state.group === group));
+      b.addEventListener("click", () => steady(b, () => setGroup(group)));
+      el.appendChild(b);
+    });
+  }
+
+  // With a group picked, the kinds in it, when there is more than one: the
+  // second level, laid out like the names below it.
+  function renderKindPicks(card, peers) {
+    const n = new Map();
+    for (const p of peers) n.set(p.kind, (n.get(p.kind) || 0) + 1);
+    if (n.size < 2 && !state.kind) return;
+    const el = document.createElement("div");
+    el.className = "kinds chips pool-picks";
+    for (const [kind, count] of [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "chip kind-pick" + (state.kind === kind ? " on" : "");
       const i = document.createElement("i");
       i.textContent = count;
       b.append(i, " " + kind);
-      b.title = state.kind === kind ? "Show every kind again" : `Show only ${kind}`;
+      b.title = state.kind === kind ? "Show the whole group again" : `Show only ${kind}`;
       b.setAttribute("aria-pressed", String(state.kind === kind));
       b.addEventListener("click", () => steady(b, () => setKind(kind)));
       el.appendChild(b);
-    });
-    if (cut) moreChip(el, entries.length - PHONE_CHIPS, "allKinds");
+    }
+    card.appendChild(el);
   }
 
   // With a kind picked, what those peers are one level down: one chip per
@@ -1819,6 +1935,38 @@
     // One line only: what does not fit waits behind "+ n more", fitted in
     // renderTables before the page is drawn, so nothing flickers.
     if (!state.allSubs) el.classList.add("one-line");
+  }
+
+  // The operators' own labels on these nodes, those that more than one node
+  // carries: one chip each, beside the versions. A label on a single node is
+  // somebody's name for their box, not something to filter by.
+  function renderLabelMix(card, peers) {
+    const n = new Map();
+    for (const p of peers) {
+      const l = labelOf(p);
+      if (l) n.set(l, (n.get(l) || 0) + 1);
+    }
+    const entries = [...n].filter(([l, c]) => c > 1 || l === state.label).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    if (!entries.length) return;
+    const el = document.createElement("div");
+    el.className = "kinds chips pool-picks";
+    const head = document.createElement("span");
+    head.className = "picks-label";
+    head.textContent = "Labels:";
+    el.appendChild(head);
+    for (const [l, count] of entries) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip kind-pick" + (state.label === l ? " on" : "");
+      const i = document.createElement("i");
+      i.textContent = count;
+      b.append(i, " " + l);
+      b.title = state.label === l ? "Show all of them again" : `Show only the nodes labelled ${l}`;
+      b.setAttribute("aria-pressed", String(state.label === l));
+      b.addEventListener("click", () => steady(b, () => setLabel(l)));
+      el.appendChild(b);
+    }
+    card.appendChild(el);
   }
 
   // How spread out a group is: distinct operators and countries. Operators by
@@ -1997,7 +2145,7 @@
           pill.append(ico, " ");
         }
         pill.append(label);
-        fit(pill, label, [p.about, p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
+        fit(pill, label, [p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
         td.appendChild(head);
         // The grey line under the pill, on a wide screen only, is for what
@@ -2010,7 +2158,7 @@
         // card is the place, the address and the pill and nothing more.
         const probably = p.about ? p.about.split("\n").find((l) => l.startsWith("Probably:")) : "";
         // With a kind filter on, the sentence below says the reason already.
-        const tell = p.tell && !(state.kind && p.about) ? p.tell : "";
+        const tell = p.tell && !(state.group && p.about) ? p.tell : "";
         const syncing = !!p.sync_mb;
         const pruned = isPruned(p);
         if (tell || p.pool || syncing || pruned || p.fork) {
@@ -2052,12 +2200,14 @@
         }
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then.
-        if (state.kind && p.about) {
+        if (state.group && p.about) {
           const about = document.createElement("div");
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
           // and everything, the claim too, is in the panel that opens on a tap.
-          about.textContent = probably || p.about;
+          // One line per peer: the label, where the server has one; what the
+          // session showed is left to the panel.
+          about.textContent = p.label || probably || p.about;
           about.classList.add(probably ? "short" : "clip");
           td.appendChild(about);
         }
@@ -2096,6 +2246,7 @@
   // open across a refresh.
   const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
+  const NO_TX_WHY = "Wants no transactions from your node";
   const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
   function peerDetail(p) {
     const el = (tag, cls, text) => {
@@ -2136,14 +2287,20 @@
         what.appendChild(row);
       }
     }
+    if (p.seen) what.appendChild(el("p", "pd-about", "In this session: " + p.seen));
     if (p.pool_proof) what.appendChild(el("p", "pd-about", p.pool_proof));
     const flags = [];
+    // Each fact once: "never first" already says the peer offers no services or
+    // is on a chain of its own, so those flags are folded into it, and "no tx"
+    // stays out when the server says the line above already tells it.
     if (p.sync_mb) flags.push(["syncing", `Still syncing: it has taken ${mbText(p.sync_mb)} of blocks from this node`, "sync"]);
-    if (p.no_relay) flags.push(["never first", neverNote(p)]);
-    if (p.no_services) flags.push(["no services", NO_SERVICES_WHY]);
-    if (p.no_tx_relay) flags.push(["no tx", p.no_tx_why || "Wants no transactions from your node"]);
+    if (p.fork) flags.push([p.fork, p.fork_why + (p.no_relay ? " - it can never deliver one of your blocks first." : "")]);
+    else if (p.no_relay) flags.push(["never first", neverNote(p)]);
+    if (p.no_services && !p.no_relay) flags.push(["no services", NO_SERVICES_WHY]);
+    // A reason of its own (blocks-only connection, blocksonly=1) still stands.
+    const plainNoTx = !p.no_tx_why || p.no_tx_why === NO_TX_WHY;
+    if (p.no_tx_relay && !(p.no_tx_said && plainNoTx)) flags.push(["no tx", p.no_tx_why || NO_TX_WHY]);
     if (p.chain_unknown && !p.sync_mb) flags.push(["no headers", NO_HEADERS_WHY]);
-    if (p.fork) flags.push([p.fork, p.fork_why]);
     if (isPruned(p)) flags.push(["pruned", PRUNED_WHY, "", true]);
     // The fee rate below which it wants no transactions announced. A peer that
     // takes none at all sends the highest there is: "no tx" says that already.
@@ -2155,7 +2312,7 @@
       row.append(el("span", "pd-flag" + (cls ? " " + cls : ""), word), " " + why);
       // Without Bitcoin Lab next door nothing in the map says what "first"
       // is: where someone wonders, one line says where to find out.
-      if (word === "never first" && !state.data.sibling) {
+      if (p.no_relay && (word === "never first" || word === p.fork) && !state.data.sibling) {
         const more = el("span", "pd-more", "Which of your peers bring you new blocks first: ");
         const a = el("a", "", "Bitcoin Lab \u2197");
         a.href = LAB_PAGE;
@@ -2265,13 +2422,24 @@
   }
   // The detail is a row of its own under the peer, as wide as the table. It
   // adds no width to any column: its content is 0 wide and as wide as the cell.
-  function detailRow(tr, p) {
+  function detailRow(tr, p, key) {
     const row = document.createElement("tr");
     row.className = "detail-row";
     const td = document.createElement("td");
     td.colSpan = tr.cells.length;
     td.appendChild(peerDetail(p));
     row.appendChild(td);
+    // A tap on the open panel closes it, so a phone need not go back up to
+    // the row (04.11.2026). Links and buttons in it keep their own job. Its
+    // row comes back into view if it had scrolled away above.
+    row.addEventListener("click", (ev) => {
+      if (ev.target.closest("a, button, input, select, textarea")) return;
+      if (String(window.getSelection()).length > 0) return;
+      toggleDetail(tr, p, key);
+      const top = tr.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy(0, top - 8);
+      if (backY !== null) backY = window.scrollY;  // and the way back keeps this place
+    });
     return row;
   }
   // One at a time: opening a peer closes the one that was open, so the list does
@@ -2287,7 +2455,7 @@
     }
     state.openRows.clear();
     if (!open) {
-      const row = detailRow(tr, p);
+      const row = detailRow(tr, p, key);
       row.classList.add("opening");
       tr.after(row);
       tr.classList.add("open");
@@ -2339,7 +2507,7 @@
       const all = peers.length;
       if (state.place) peers = peers.filter(peerMatchesPlace);
       const kindPool = peers;
-      if (state.kind) peers = peers.filter(matchesKind);
+      if (state.group) peers = peers.filter(matchesKind);
 
       const card = document.createElement("section");
       card.className = "card group-card";
@@ -2359,18 +2527,18 @@
       const n = document.createElement("span");
       n.className = "chip count";
       const ni = document.createElement("i");
-      ni.textContent = state.place || state.kind ? `${peers.length} of ${all}` : String(all);
+      ni.textContent = state.place || state.group ? `${peers.length} of ${all}` : String(all);
       n.append(ni, " peers");
       mix.appendChild(n);
       // How many are catching up from this node right now, and what they took.
       const syncing = kindPool.filter((p) => p.sync_mb);
-      if (syncing.length && (!state.kind || state.kind === SYNCING)) {
+      if (syncing.length && (!state.group || state.group === SYNCING)) {
         const sc = document.createElement("button");
         sc.type = "button";
-        sc.className = "chip kind-pick syncing" + (state.kind === SYNCING ? " on" : "");
+        sc.className = "chip kind-pick syncing" + (state.group === SYNCING ? " on" : "");
         const taken = `${syncing.length} syncing from this node, ${mbText(syncing.reduce((t, p) => t + p.sync_mb, 0))} of blocks taken so far`;
-        sc.title = state.kind === SYNCING ? "Show every kind again" : taken + " - click to show only these";
-        sc.setAttribute("aria-pressed", String(state.kind === SYNCING));
+        sc.title = state.group === SYNCING ? "Show every kind again" : taken + " - click to show only these";
+        sc.setAttribute("aria-pressed", String(state.group === SYNCING));
         const si = document.createElement("i");
         si.textContent = syncing.length;
         const ico = document.createElement("span");
@@ -2378,13 +2546,27 @@
         ico.setAttribute("aria-hidden", "true");
         ico.textContent = "\u21bb";
         sc.append(ico, si, " syncing");
-        sc.addEventListener("click", () => steady(sc, () => setKind(SYNCING)));
+        sc.addEventListener("click", () => steady(sc, () => setGroup(SYNCING)));
         mix.appendChild(sc);
       }
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
-      if (state.kind && state.kind !== SYNCING) renderSubMix(card, state.kind, kindPool.filter((p) => p.kind === state.kind));
+      if (state.group && state.group !== SYNCING) {
+        const inGroup = kindPool.filter((p) => groupOf(p.kind) === state.group);
+        renderKindPicks(card, inGroup);
+        // The names belong to one kind: the one picked, or the only one there is.
+        const kinds = new Set(inGroup.map((p) => p.kind));
+        const kind = state.kind || (kinds.size === 1 ? [...kinds][0] : null);
+        if (kind) renderSubMix(card, kind, inGroup.filter((p) => p.kind === kind));
+        if (kind) renderLabelMix(card, inGroup.filter((p) => p.kind === kind));
+        // A second kind turned up since a name was picked: the name chips are
+        // gone, so the pick goes too rather than filter two kinds unseen.
+        else if (state.sub || state.label) {
+          state.sub = state.label = null;
+          queueMicrotask(applyFilters);
+        }
+      }
 
       if (peers.length) {
         const spread = document.createElement("p");
@@ -2396,8 +2578,10 @@
       if (!peers.length) {
         const p = document.createElement("p");
         p.className = "empty";
-        p.textContent = state.place || state.kind
+        // No inbound at all is what most nodes see; say what brings them.
+        p.textContent = state.place || state.group
           ? "None here."
+          : g === "inbound" ? "No inbound peers. For incoming clearnet connections, allow incoming clearnet in your Bitcoin Node app and open port 8333 on your router."
           : "No " + LABEL[g].toLowerCase() + " peers.";
         card.appendChild(p);
         root.appendChild(card);
@@ -2497,7 +2681,7 @@
           toggleDetail(tr, p, rowKey);
         });
         tbody.appendChild(tr);
-        if (reopen) tbody.appendChild(detailRow(tr, p));
+        if (reopen) tbody.appendChild(detailRow(tr, p, rowKey));
       }
       table.appendChild(tbody);
       wrap.appendChild(table);

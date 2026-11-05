@@ -76,7 +76,6 @@ var poolNodes = map[netip.Addr]poolNode{
 	netip.MustParseAddr("142.132.135.164"): {"Kryptex", "is btc.kryptex.network and other Kryptex hosts, Kryptex's stratum host"},
 	netip.MustParseAddr("158.255.5.154"):   {"Kryptex", "is btc-ru.kryptex.network, Kryptex's stratum host"},
 	netip.MustParseAddr("158.255.5.205"):   {"Kryptex", "is btc-ru.kryptex.network, Kryptex's stratum host"},
-	netip.MustParseAddr("46.36.37.246"):    {"Lajkto", "is lajkto.eu, Lajkto's stratum host"},
 	netip.MustParseAddr("209.38.2.206"):    {"Lincoin", "is na.lincoin.com, Lincoin's stratum host"},
 	netip.MustParseAddr("188.245.242.25"):  {"Mineshop Solo", "is stratum-de.solo.mineshop.eu, Mineshop Solo's stratum host"},
 	netip.MustParseAddr("204.168.216.218"): {"Mineshop Solo", "is solo.mineshop.eu, Mineshop Solo's stratum host"},
@@ -137,8 +136,8 @@ var relayNodes = map[netip.Addr]poolNode{
 
 // relayOf says which block relay network an address belongs to.
 func relayOf(addr string) (poolNode, bool) {
-	if a, err := netip.ParseAddr(hostOf(addr)); err == nil {
-		n, ok := relayNodes[a.Unmap()]
+	if a, ok := ipOf(addr); ok {
+		n, ok := relayNodes[a]
 		return n, ok
 	}
 	return poolNode{}, false
@@ -171,8 +170,8 @@ var poolLabels = []struct {
 // list of proven addresses, else from a pool the user agent names. The second
 // result says the address proved it.
 func poolOf(addr, subver string) (poolNode, bool) {
-	if a, err := netip.ParseAddr(hostOf(addr)); err == nil {
-		if n, ok := poolNodes[a.Unmap()]; ok {
+	if a, ok := ipOf(addr); ok {
+		if n, ok := poolNodes[a]; ok {
 			return n, true
 		}
 	}
