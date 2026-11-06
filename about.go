@@ -27,6 +27,9 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/BitcoinRocks:`), "BitcoinRocks, an experimental fork of Core using RocksDB and compressed block storage", "BitcoinRocks, a Core fork", ""},
 	{regexp.MustCompile(`(?i)^/EMPORION:`), "EMPORION, a Bitcoin header client for verifying OpenTimestamps proofs; later renamed SYMMARTYS", "EMPORION header client", ""},
 	{regexp.MustCompile(`(?i)^/SYMMARTYS:`), "SYMMARTYS, formerly EMPORION: follows Bitcoin headers to verify OpenTimestamps proofs", "SYMMARTYS header client", ""},
+	{regexp.MustCompile(`^/bitcoin-peers:`), "bitcoin-peers, a Rust toolkit to connect to and survey Bitcoin peers", "bitcoin-peers crawler", ""},
+	{regexp.MustCompile(`^/logos-peer-list:`), "Logos peer list, a crawler that checks onion peers for the Logos wallet", "Logos peer list", ""},
+	{regexp.MustCompile(`^/mako:`), "mako, a Bitcoin full node written in C", "mako node (C)", ""},
 	{regexp.MustCompile(`(?i)^/bip110-observer:`), "BIP-110 Observer, a crawler that collects peer user agents and advertised services", "BIP-110 Observer crawler", ""},
 	// Only the name points to favillakey.io; the site documents no P2P
 	// connections, so the kind stays Other.
@@ -41,7 +44,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^/clearbit:`), "clearbit, a Bitcoin full node written in Zig (hashhog)", "clearbit node (Zig)", ""},
 	{regexp.MustCompile(`(?i)^/nimrod:`), "nimrod, a Bitcoin full node written in Nim (hashhog)", "nimrod node (Nim)", ""},
 	{regexp.MustCompile(`(?i)^/hotbuns:`), "hotbuns, a Bitcoin full node written in TypeScript on Bun (hashhog)", "hotbuns node (TypeScript)", ""},
-	{regexp.MustCompile(`(?i)^/bitcoin-hybrid:`), "ouroboros, a Bitcoin full node written in Rust and Python (hashhog)", "ouroboros node (Rust)", ""},
+	{regexp.MustCompile(`(?i)^/(bitcoin-hybrid|ouroboros):`), "ouroboros, a Bitcoin full node written in Rust and Python (hashhog)", "ouroboros node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/rbitcoin:`), "rbitcoin, a Bitcoin full node written in Rust (reardencode)", "rbitcoin node (Rust)", ""},
 	{regexp.MustCompile(`(?i)^/rbtc:`), "rbtc, Bitcoin Core rewritten in Rust", "rbtc, Core in Rust", ""},
 	{regexp.MustCompile(`(?i)^/BitcoinEcho:`), "Bitcoin Echo, a full node in plain C, meant to be frozen as it is", "Bitcoin Echo node (C)", ""},
@@ -119,6 +122,8 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)^bloXroute Gateway`), "bloXroute Gateway, a relay network's gateway: passes on blocks and transactions", "bloXroute gateway", ""},
 	{regexp.MustCompile(`^/RelayNetwork(Client|Server):`), "Matt Corallo's old Relay Network, which ran until 2017", "Old Relay Network", ""},
 	{regexp.MustCompile(`^/Cornell-Falcon-Network:`), "Falcon, Cornell's block relay network from 2016", "Cornell's Falcon relay", ""},
+	// Before NBitcoin, whose name is inside "OpenBitcoin".
+	{regexp.MustCompile(`^/OpenBitcoin-crawler:`), "OpenBitcoin's crawler, a survey of reachable nodes for openbitcoin.com", "OpenBitcoin crawler", ""},
 	{regexp.MustCompile(`(?i)NBitcoin`), "NBitcoin, a .NET Bitcoin library (behind BTCPay Server, among others)", "NBitcoin .NET library", ""},
 	{regexp.MustCompile(`(?i)/bitcore:`), "Bitcore, BitPay's node and index server", "Bitcore (BitPay)", ""},
 	// Core's private broadcast (v31): it opens a connection over Tor or I2P,

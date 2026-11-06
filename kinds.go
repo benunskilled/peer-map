@@ -102,8 +102,12 @@ var kindRules = []struct {
 	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
 	// nodes.mom.market and bitcoinstats.com listened to what was announced and
 	// asked for nothing in 0xB10C's list of 15.05.2023 (entities.toml on the
-	// 2023-05-inv-eaters branch of bitcoin-noc/banlist).
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bip110-observer:|^/nodes\.mom\.market:|^/btcwire:[^/]*/bitcoinstats\.com:`), false},
+	// 2023-05-inv-eaters branch of bitcoin-noc/banlist). bitcoin-peers, a
+	// toolkit with a crawler, says "/bitcoin-peers:<version>/"
+	// (connection/src/connection/configuration.rs in nyonson/bitcoin-peers);
+	// the Logos peer list checks onion peers for the Logos wallet
+	// (crawler/src/p2p.rs in logos-co/logos-bitcoin-peer-list).
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bitcoin-peers:|^/logos-peer-list:|^/bip110-observer:|^/nodes\.mom\.market:|^/btcwire:[^/]*/bitcoinstats\.com:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
@@ -167,13 +171,15 @@ var kindRules = []struct {
 	// BobClawblaw/bitcoinmachinecode, kernel-node/kernel-node, tbcd, the
 	// Hemi network's Bitcoin daemon (hemilabs/heminetwork),
 	// illuminodes/mantle, gosuda/bitcoin-rs, epochbtc/satd and
-	// yuvicc/bitcoinkernel-node. Three more have no public source and stay
+	// yuvicc/bitcoinkernel-node. hashhog's ouroboros now says
+	// "/ouroboros:0.1.0/" (src/ouroboros/peer.py), and chjj/mako, a full node in
+	// C, "/mako:0.0.0/" (include/mako/net.h). Three more have no public source and stay
 	// "Other", although they acted as full nodes on the node this was written for (peer-observer, 21. to
 	// 29.10.2026): /Prometheus:/ and /BTC-Nodes:/ were among its own outbound
 	// peers, offering blocks (NETWORK) and relaying transactions for hours;
 	// /Natasha:/ offers the same services and sent headers. BTC-Nodes' other
 	// name, "/BTC-Nodes:<date>/Sonar/", is caught as a crawler first.
-	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd):|/utreexod:`), true},
+	{"Node (other)", regexp.MustCompile(`(?i)^/(CamlCoin|rustoshi|LunarBlock|Haskoin|beamchain|blockbrew|clearbit|nimrod|hotbuns|bitcoin-hybrid|ouroboros|mako|rbitcoin|rbtc|BitcoinEcho|BitcoinMachineCode|kernel-node|bitcoinkernel-node|tbcd|mantle|bitcoin-rs|satd):|/utreexod:`), true},
 	{"Node (Knots)", regexp.MustCompile(`(?i)Knots`), true},
 	{"Node (Core)", regexp.MustCompile(`^/Satoshi:`), true},
 }
