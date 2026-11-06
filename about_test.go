@@ -70,6 +70,12 @@ func TestOtherSaysWhatItDoes(t *testing.T) {
 		want  string
 	}{
 		{[]string{"NETWORK", "WITNESS"}, &yes, nil, nil, "Probably a full node under a name its operator chose"},
+		// It offers blocks but takes transactions and announces none: what it
+		// did comes before the guess (/spynode:0.1/, 06.11.2026).
+		{[]string{"NETWORK"}, &yes, map[string]int64{"getdata": 41000, "getheaders": 210, "pong": 2100}, map[string]int64{"inv": 9000000, "tx": 7300000, "block": 20000000}, "Fetches transactions from your node and announces none: a node that hears of them elsewhere first, or a program collecting them"},
+		// It offers blocks and sends transactions it announced: still the guess
+		// (/Dain:0.1.0/, 06.11.2026).
+		{[]string{"NETWORK", "WITNESS"}, &yes, map[string]int64{"inv": 400000, "tx": 9100000, "getdata": 60000}, map[string]int64{"inv": 3000000, "tx": 6700000}, "Probably a full node under a name its operator chose"},
 		{[]string{}, &yes, map[string]int64{"tx": 90 * 3}, nil, "Pushes transactions without announcing them"},
 		{[]string{}, &yes, map[string]int64{"tx": 90, "inv": 61}, nil, "Software with a name we don't recognise"},
 		{[]string{}, &no, map[string]int64{"getheaders": 1053, "sendheaders": 24}, nil, "Asks for headers and wants no transactions: a program that tracks the chain"},

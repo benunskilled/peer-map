@@ -424,11 +424,15 @@ table.peers.aligned { table-layout: fixed; }
 .foot a { color: var(--muted); }
 
 /* ---- the wave: rolls across the page once when a new block lands ---- */
+/* The same wave as Bitcoin Lab's: slanted, in its orange, from just off the
+   left edge to just off the right at an even pace, fading once it is out.
+   It was upright and faint here, and eased, so it faded before the right
+   half (05.11.2026). */
 .block-wave { position: fixed; inset: 0; pointer-events: none; z-index: 20; opacity: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(247,147,26,0) 35%, rgba(247,147,26,.14) 48%, rgba(255,190,110,.28) 50%, rgba(247,147,26,.14) 52%, rgba(247,147,26,0) 65%, transparent 100%);
-  background-size: 300% 100%; }
-.block-wave.run { animation: block-wave-roll 1.4s ease-out; }
-@keyframes block-wave-roll { 0% { opacity: 1; background-position: 100% 0; } 85% { opacity: 1; } 100% { opacity: 0; background-position: 0% 0; } }
+  background: linear-gradient(100deg, transparent 0%, transparent 38%, rgba(247,147,26,.55) 48%, rgba(247,147,26,.85) 50%, rgba(247,147,26,.55) 52%, transparent 62%, transparent 100%);
+  background-size: 300% 100%; background-position: 105% 0; }
+.block-wave.run { animation: block-wave-roll 1.4s linear; }
+@keyframes block-wave-roll { 0% { opacity: 1; background-position: 105% 0; } 92% { opacity: 1; } 100% { opacity: 0; background-position: -5% 0; } }
 @media (prefers-reduced-motion: reduce) { .block-wave.run { animation: none; } }
 
 /* ---- V2 design ---- */
