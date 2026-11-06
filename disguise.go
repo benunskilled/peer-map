@@ -195,6 +195,7 @@ const (
 	behaviourMinAge = 10 * 60 // seconds connected before a ping rate means anything
 	pingFastSeconds = 5
 	getaddrTooMany  = 3
+	getaddrCrawler  = 10 // from here on the line calls it a crawler
 )
 
 // msgCount turns Core's bytes per message type back into a count, for
@@ -266,6 +267,12 @@ func behaviourAbout(subver, transport string, recv map[string]int64, connTime in
 		return ""
 	}
 	if n := msgCount(recv["getaddr"], 0, transport, false); n >= getaddrTooMany {
+		// A few requests say only that it is not Core; "a crawler" takes many.
+		// Seen 06.11.2026: the /Satoshi:31.0.0/ fleet, which pushes transactions,
+		// asked three times in 37 hours and read as a crawler.
+		if n < getaddrCrawler {
+			return fmt.Sprintf("not Bitcoin Core - it asked for addresses %d times, Core asks once", n)
+		}
 		return fmt.Sprintf("a crawler - it asked for addresses %d times, Core asks once", n)
 	}
 	if !connectedFor(connTime, now, behaviourMinAge) {
