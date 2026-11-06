@@ -40,7 +40,7 @@ Switch on Bitcoin Lab's Stratum Race, add your own pool, and the story goes all 
 
 ![A block from the winning hash to the peer that delivered it first](https://raw.githubusercontent.com/benunskilled/bitcoin-lab-community-store/main/bitcoinlab-peermap/block-to-job.gif)
 
-*A block on my node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/e50a460f-b903-4b9e-9668-a80b3573a03c).*
+*A block on my node, from the winning hash to the peer that delivered it first. [Watch its whole route to the mining job](https://github.com/user-attachments/assets/9323f876-6693-4932-b407-07b71cdd5d4f).*
 
 ## Quiet and local
 
