@@ -139,6 +139,11 @@ body {
 .rt-list .miss { color: var(--muted); max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rt-list tr.pool .n, .rt-list tr.own .n, .rt-list tr.own .num { color: var(--accent); }
 .block-route .note { margin: 0; font-size: 13px; color: var(--muted); }
+.block-recon { padding: 0 16px 10px; }
+.block-recon .rt-switch { margin: 0 8px 0 0; vertical-align: middle; }
+.block-recon .recon-head { font-size: 13px; color: var(--muted); margin-right: 8px; }
+.block-recon .recon-line { margin: 6px 0 0; font-size: 13px; color: var(--text); }
+.block-recon .recon-line small { color: var(--muted); font-size: 13px; }
 .block-card .b-height { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .block-card .b-sep { color: var(--border); }
 .block-card .b-pool { color: var(--accent); }

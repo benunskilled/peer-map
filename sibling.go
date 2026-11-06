@@ -88,6 +88,17 @@ type routeMedian struct {
 	Tx *medianStop `json:"tx,omitempty"`
 }
 
+// How blocks were rebuilt from their compact form over a day or a week, as
+// Bitcoin Lab counted them: from the mempool alone, after asking for missing
+// transactions (and what came back on average), or downloaded whole.
+type reconWindow struct {
+	Blocks        int    `json:"blocks"`
+	Mempool       int    `json:"mempool"`
+	Asked         int    `json:"asked"`
+	Full          int    `json:"full"`
+	AskedAvgBytes *int64 `json:"asked_avg_bytes,omitempty"`
+}
+
 type stratumEntry struct {
 	Label     string   `json:"label"`
 	Own       bool     `json:"own,omitempty"` // a pool the owner added, not one of the public ones
@@ -126,6 +137,13 @@ type lastBlock struct {
 	TemplateTx *int `json:"template_tx,omitempty"`
 	// The same route for the typical block, the median over the last hundred.
 	RouteMedian *routeMedian `json:"route_median,omitempty"`
+	// How Core put this block together from its compact form: "mempool",
+	// "asked" (with the bytes that came back) or "full". Absent where Bitcoin
+	// Lab could not tell, or is older than this.
+	Recon             string       `json:"recon,omitempty"`
+	ReconMissingBytes *int64       `json:"recon_missing_bytes,omitempty"`
+	ReconDay          *reconWindow `json:"recon_day,omitempty"`
+	ReconWeek         *reconWindow `json:"recon_week,omitempty"`
 	// Every address Bitcoin Lab has ever credited with delivering a block
 	// first. The tables tint those rows.
 	DeliveredEver []string `json:"delivered_ever,omitempty"`
@@ -261,7 +279,17 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		TemplateTx    *int     `json:"templateTx"`
 		FirstPingMs   *float64 `json:"firstPingMs"`
 		DeliveredEver []string `json:"deliveredEver"`
-		RouteMedian   *struct {
+		Recon         *string  `json:"recon"`
+		ReconMissing  *int64   `json:"reconMissingBytes"`
+		ReconDay      *struct {
+			Blocks, Mempool, Asked, Full int
+			AskedAvgBytes                *int64 `json:"askedAvgBytes"`
+		} `json:"reconDay"`
+		ReconWeek *struct {
+			Blocks, Mempool, Asked, Full int
+			AskedAvgBytes                *int64 `json:"askedAvgBytes"`
+		} `json:"reconWeek"`
+		RouteMedian *struct {
 			Blocks   int         `json:"blocks"`
 			Core     *medianStop `json:"core"`
 			Peer     *medianStop `json:"peer"`
@@ -313,24 +341,48 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	if m := got.RouteMedian; m != nil && m.Blocks > 0 {
 		med = &routeMedian{Blocks: m.Blocks, Core: m.Core, Peer: m.Peer, Template: m.Template, Own: m.Own, OwnLabel: m.OwnLabel, Tx: m.Tx}
 	}
+	window := func(blocks, mempool, asked, full int, avg *int64) *reconWindow {
+		if blocks <= 0 {
+			return nil
+		}
+		return &reconWindow{Blocks: blocks, Mempool: mempool, Asked: asked, Full: full, AskedAvgBytes: avg}
+	}
+	var reconDay, reconWeek *reconWindow
+	if d := got.ReconDay; d != nil {
+		reconDay = window(d.Blocks, d.Mempool, d.Asked, d.Full, d.AskedAvgBytes)
+	}
+	if w := got.ReconWeek; w != nil {
+		reconWeek = window(w.Blocks, w.Mempool, w.Asked, w.Full, w.AskedAvgBytes)
+	}
+	recon := ""
+	if got.Recon != nil {
+		switch *got.Recon {
+		case "mempool", "asked", "full":
+			recon = *got.Recon
+		}
+	}
 	s.blockAt = now
 	s.block = &lastBlock{
-		Hash:          got.Hash,
-		Height:        got.Height,
-		Pool:          got.Pool,
-		PoolName:      got.PoolName,
-		PoolTag:       got.PoolTag,
-		PoolSource:    got.PoolSource,
-		FirstPeers:    got.FirstPeers,
-		Eligible:      got.Eligible,
-		Stratum:       race,
-		TemplateMs:    got.TemplateMs,
-		TemplateTx:    got.TemplateTx,
-		FirstPingMs:   got.FirstPingMs,
-		RouteMedian:   med,
-		DeliveredEver: got.DeliveredEver,
-		AgeMs:         age,
-		MarkForMs:     blockMarkFor.Milliseconds(),
+		Hash:              got.Hash,
+		Height:            got.Height,
+		Pool:              got.Pool,
+		PoolName:          got.PoolName,
+		PoolTag:           got.PoolTag,
+		PoolSource:        got.PoolSource,
+		FirstPeers:        got.FirstPeers,
+		Eligible:          got.Eligible,
+		Stratum:           race,
+		TemplateMs:        got.TemplateMs,
+		TemplateTx:        got.TemplateTx,
+		FirstPingMs:       got.FirstPingMs,
+		RouteMedian:       med,
+		Recon:             recon,
+		ReconMissingBytes: got.ReconMissing,
+		ReconDay:          reconDay,
+		ReconWeek:         reconWeek,
+		DeliveredEver:     got.DeliveredEver,
+		AgeMs:             age,
+		MarkForMs:         blockMarkFor.Milliseconds(),
 	}
 	// Keep the arrival instant rather than the age, so a cached copy handed
 	// out nine seconds later does not claim to be nine seconds younger.
