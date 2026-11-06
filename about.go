@@ -214,6 +214,11 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`^/bip324-ts:`), "bip324-ts, a TypeScript library for encrypted v2 connections", "bip324-ts library", ""},
 	// dsn.kastel.kit.edu/bitcoin, the DSN group at KIT.
 	{regexp.MustCompile(`(?i)^/dsn\.[a-z]+\.kit\.edu/`), "KIT Karlsruhe's Bitcoin network monitoring, measuring the network since 2015", "KIT network monitoring", "KIT"},
+	// app/network/scanner.py in DogukanBaysal/DaeConn; the other two from
+	// 0xB10C's list of 15.05.2023 (2023-05-inv-eaters in bitcoin-noc/banlist).
+	{regexp.MustCompile(`^/connector/$`), "DaeConn, a research tool that measures the networks of Bitcoin and its forks", "DaeConn research tool", ""},
+	{regexp.MustCompile(`^/nodes\.mom\.market:`), "nodes.mom.market, a site that monitors Bitcoin nodes (BitFence)", "mom.market monitoring", ""},
+	{regexp.MustCompile(`^/btcwire:[^/]*/bitcoinstats\.com:`), "bitcoinstats.com, a site with statistics on the Bitcoin network", "bitcoinstats.com", ""},
 	// btcd's wire library with the app name after it left empty.
 	{regexp.MustCompile(`^/btcwire:[^/]*/:/$`), "A program on btcd's Go library that left its own name empty", "btcd library, empty name", ""},
 	{regexp.MustCompile(`(?i)btcd:`), "btcd, a full node written in Go", "btcd node (Go)", ""},

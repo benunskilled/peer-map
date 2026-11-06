@@ -88,7 +88,9 @@ var kindRules = []struct {
 	// time (39 and 3 sessions), but one node is no rule. /rske-research:/ and /acsrg-research:/ say
 	// what they are; the second took 81,563 transactions in one session.
 	// /dataforge-observer:/ only listened to what was announced.
-	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:`), false},
+	// DaeConn, a measurement tool for Bitcoin-derived networks, says
+	// "/connector/" (app/network/scanner.py in DogukanBaysal/DaeConn).
+	{"Research scanner", regexp.MustCompile(`(?i)kit\.edu|dsn\.tm|dsn\.kastel|\.ac\.|uni-|^/btcwire:[^/]*/Satoshi:|^/rske-research:|^/acsrg-research:|^/dataforge-observer:|^/connector/$`), false},
 	// Crawlers, seeders and node counters: they collect addresses and look,
 	// and several of them say so only as "scan", "seeder", "census" or
 	// "monitor" - on one node 953 sessions of /bitcoin-seeder/ and 372 of
@@ -98,7 +100,10 @@ var kindRules = []struct {
 	// (peer-observer, 21. to 29.10.2026); /topology-probe:/ and the other
 	// probes are crawlers by what their names say. BIP-110 Observer collects peer
 	// user agents and services (app/crawler.py in decentralizedb/bip110-observer).
-	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bip110-observer:`), false},
+	// nodes.mom.market and bitcoinstats.com listened to what was announced and
+	// asked for nothing in 0xB10C's list of 15.05.2023 (entities.toml on the
+	// 2023-05-inv-eaters branch of bitcoin-noc/banlist).
+	{"Crawler", regexp.MustCompile(`(?i)bitnodes|bluematt-tokio-client|metrika|nodemap|crawl|scan|seeder|census|monitor|observatory|sonar|scout|nebula|watch|listener|argus|readonly|bitdash|logosnaut|dnsseed|survey|lionseed|gnoban|^/p2p-observer:|^/p2p-extractor:|^/bip324-probe:|^/topology-probe:|^/p2p-probe:|^/probe:|^/btc-peers:|^/bip110-observer:|^/nodes\.mom\.market:|^/btcwire:[^/]*/bitcoinstats\.com:`), false},
 	// Address indexers for wallets: they follow the chain but relay nothing.
 	// "/mempool" at the start of a part of the agent: "/mempool/" and
 	// "/mempool.space:1.0/" are the indexer, "(mempool.guide)" is a node label.
