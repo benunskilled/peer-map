@@ -307,11 +307,6 @@ func sessionLine(services []string, relayTxes *bool, recv, sent map[string]int64
 		}
 		return "Only listens: wants no transactions, asks for nothing", "Only listens", true
 	}
-	for _, s := range services {
-		if s == "NETWORK" {
-			return operatorNamedAbout, "Probably a full node", false
-		}
-	}
 	// What it did, where Core counted it: a name nobody knows still says
 	// little, its messages say more. Seen on the node this was written for,
 	// 21. to 24.10.2026: /pwsh-pusher/ and /p2aburn/ pushing transactions
@@ -351,6 +346,15 @@ func sessionLine(services []string, relayTxes *bool, recv, sent map[string]int64
 	case recv["getaddr"] > 0 && recv["getheaders"] == 0 && recv["getdata"] == 0:
 		// 6.2% of the real nodes above did the same: one in sync asks for no headers.
 		return "Asks for addresses, not for headers or blocks: " + or("a node already in sync", "a crawler"), "Asks only for addresses", false
+	}
+	// Offering blocks is only a guess at what it is, so what it did comes
+	// first. Seen 04. to 06.11.2026: /spynode:0.1/ listing NETWORK, fetching
+	// transactions for a day and a half and sending none back, was called a
+	// full node.
+	for _, s := range services {
+		if s == "NETWORK" {
+			return operatorNamedAbout, "Probably a full node", false
+		}
 	}
 	return unknownAbout, "Unknown software", false
 }
