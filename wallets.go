@@ -81,8 +81,10 @@ func bitcoinjWhy(r rawPeer, now time.Time) string {
 	return stayedLong(r.ConnTime, now)
 }
 
-// Wasabi Wallet 2.8 connects to nodes itself, always through Tor since 2.8.2
-// (PR #15003), so it reaches a clearnet node from a Tor exit. Each connection
+// Wasabi Wallet 2.8 connects to nodes itself, through Tor unless the user
+// turns Tor off ("Network anonymization"); since 2.8.2 (PR #15003, 29.08.2026)
+// that holds for clearnet nodes too, so it reaches one from a Tor exit. Older
+// versions and Tor switched off connect directly. Each connection
 // names one of these Core versions at random (Constants.UserAgents in
 // WalletWasabi/Helpers/Constants.cs, used by P2pConnectionManager.cs), offers
 // nothing and asks for transactions. On the node this was written for, on
@@ -91,9 +93,9 @@ func bitcoinjWhy(r rawPeer, now time.Time) string {
 // for hours, some also compact block filters. In five weeks before: 1,420
 // such sessions, 73% from Tor exits. A crawler borrowing one of these names
 // usually turns transaction relay off; one that keeps it on is counted here
-// as a wallet. Forks carry lists of their own in between
-// (Zecure: 18 names from 0.20.0 to 28.1.0, each on this list or Ginger's),
-// so the about says "or a fork".
+// as a wallet. Forks pick at random the same way, some with lists of their
+// own in between (Zecure: 18 names from 0.20.0 to 28.1.0, each on this list
+// or Ginger's; also Wasabito and AnonTx), so the about says "or a fork".
 var wasabiAgents = map[string]bool{
 	"/Satoshi:30.2.0/": true, "/Satoshi:30.0.0/": true,
 	"/Satoshi:29.3.0/": true, "/Satoshi:29.2.0/": true, "/Satoshi:29.0.0/": true,
@@ -104,7 +106,7 @@ var wasabiAgents = map[string]bool{
 
 // Ginger Wallet, a fork of Wasabi, does the same with the older list Wasabi
 // had before 2.5 (Constants.UserAgents in GingerPrivacy/GingerWallet), also
-// through Tor. On the node this was written for, in five weeks: 161 sessions
+// through Tor unless it is turned off (on by default). On the node this was written for, in five weeks: 161 sessions
 // with a name only on this list, offering nothing and relaying transactions,
 // 89% from Tor exits, the names spread evenly over the list.
 var gingerAgents = map[string]bool{
