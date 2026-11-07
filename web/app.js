@@ -332,7 +332,15 @@
   const RECON_WHY = "A new block arrives as a compact block: short ids for its transactions, " +
     "which your node fills in from its own mempool. Whatever it does not have, it asks the peer for - " +
     "one more round trip before the block is complete.";
-  const kB = (bytes) => (bytes < 1000 ? "under 1 kB" : Math.round(bytes / 1000).toLocaleString("en-US") + " kB");
+  // No-break spaces keep a number and its unit on one line on a phone.
+  const kB = (bytes) => (bytes < 1000 ? "under 1\u00a0kB" : Math.round(bytes / 1000).toLocaleString("en-US") + "\u00a0kB");
+
+  // What was missing as a share of the whole block, once Bitcoin Lab knows its size.
+  function shareOfBlock(b) {
+    if (!b.block_size || b.recon_missing_bytes == null) return "";
+    const p = (100 * b.recon_missing_bytes) / b.block_size;
+    return ", " + (p < 1 ? "under 1\u00a0%" : Math.round(p) + "\u00a0%") + " of the block";
+  }
 
   function renderRecon(box, b) {
     const has = b.recon || b.recon_day || b.recon_week;
@@ -366,7 +374,7 @@
     if (view === "block") {
       line.textContent = {
         mempool: "Rebuilt from your mempool, nothing was missing",
-        asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}`,
+        asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
         full: "Downloaded whole, not as a compact block",
       }[b.recon] || "Not measured for this block";
     } else {

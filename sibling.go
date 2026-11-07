@@ -140,10 +140,12 @@ type lastBlock struct {
 	// How Core put this block together from its compact form: "mempool",
 	// "asked" (with the bytes that came back) or "full". Absent where Bitcoin
 	// Lab could not tell, or is older than this.
-	Recon             string       `json:"recon,omitempty"`
-	ReconMissingBytes *int64       `json:"recon_missing_bytes,omitempty"`
-	ReconDay          *reconWindow `json:"recon_day,omitempty"`
-	ReconWeek         *reconWindow `json:"recon_week,omitempty"`
+	Recon             string `json:"recon,omitempty"`
+	ReconMissingBytes *int64 `json:"recon_missing_bytes,omitempty"`
+	// The block's size in bytes, to show what was missing as a share of it.
+	BlockSize *int64       `json:"block_size,omitempty"`
+	ReconDay  *reconWindow `json:"recon_day,omitempty"`
+	ReconWeek *reconWindow `json:"recon_week,omitempty"`
 	// Every address Bitcoin Lab has ever credited with delivering a block
 	// first. The tables tint those rows.
 	DeliveredEver []string `json:"delivered_ever,omitempty"`
@@ -281,6 +283,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		DeliveredEver []string `json:"deliveredEver"`
 		Recon         *string  `json:"recon"`
 		ReconMissing  *int64   `json:"reconMissingBytes"`
+		BlockSize     *int64   `json:"blockSize"`
 		ReconDay      *struct {
 			Blocks, Mempool, Asked, Full int
 			AskedAvgBytes                *int64 `json:"askedAvgBytes"`
@@ -378,6 +381,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		RouteMedian:       med,
 		Recon:             recon,
 		ReconMissingBytes: got.ReconMissing,
+		BlockSize:         got.BlockSize,
 		ReconDay:          reconDay,
 		ReconWeek:         reconWeek,
 		DeliveredEver:     got.DeliveredEver,
