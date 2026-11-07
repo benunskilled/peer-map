@@ -353,7 +353,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 	recon := ""
 	if got.Recon != nil {
 		switch *got.Recon {
-		case "mempool", "asked", "full":
+		case "mempool", "asked", "full", "unclear":
 			recon = *got.Recon
 		}
 	}

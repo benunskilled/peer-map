@@ -367,3 +367,21 @@ func TestSiblingLinkPort(t *testing.T) {
 func offSibling() *siblingCheck {
 	return &siblingCheck{url: "off", now: time.Now}
 }
+
+// A block the Lab could not tell ("unclear": asked and downloaded whole at
+// once) passes through; a word Peer Map does not know is still dropped.
+func TestSiblingReconUnclear(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	for _, c := range []struct{ in, want string }{{"unclear", "unclear"}, {"sideways", ""}} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprintf(w, `{"hash":"00beef","height":967724,"detectedAt":%d,"recon":%q}`, now.UnixMilli(), c.in)
+		}))
+		s := &siblingCheck{url: srv.URL + "/api/health", blockURL: srv.URL + "/api/blocks/latest", client: srv.Client(), every: time.Minute, now: func() time.Time { return now }}
+		got := s.latest(context.Background())
+		srv.Close()
+		if got == nil || got.Recon != c.want {
+			t.Errorf("recon %q: got %+v", c.in, got)
+		}
+	}
+}

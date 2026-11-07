@@ -379,6 +379,7 @@
         mempool: "Rebuilt from your mempool, nothing was missing",
         asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
         full: "Downloaded in full, not rebuilt from your mempool",
+        unclear: "Not clear for this block",
       }[b.recon] || "Not measured for this block";
     } else {
       const w = last;
