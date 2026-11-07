@@ -419,3 +419,28 @@ func TestKindFromWhatTheNameSays(t *testing.T) {
 		}
 	}
 }
+
+// Named from their own code or 0xB10C's list; all three were "Other" before.
+func TestScannersFromCodeAndList(t *testing.T) {
+	for _, c := range []struct{ subver, kind, about string }{
+		{"/connector/", "Research scanner", "DaeConn"},
+		{"/nodes.mom.market:0.2/", "Crawler", "nodes.mom.market"},
+		{"/btcwire:0.5.0/bitcoinstats.com:0.2/", "Crawler", "bitcoinstats.com"},
+		{"/bitcoin-peers:0.2.0/", "Crawler", "bitcoin-peers"},
+		{"/logos-peer-list:0.1.0/", "Crawler", "Logos peer list"},
+		{"/ouroboros:0.1.0/", "Node (other)", "ouroboros"},
+		{"/mako:0.0.0/", "Node (other)", "mako"},
+		{"/OpenBitcoin-crawler:0.1/", "Crawler", "OpenBitcoin's crawler"},
+		{"/NBitcoin:9.0.0/", "Other", "NBitcoin"},
+		// Similar names are not evidence for a match.
+		{"/connector:1.0/", "Other", ""},
+		{"/Satoshi:31.1.0(bitcoinstats.com)/", "Node (Core)", ""},
+	} {
+		if got := kindOf(c.subver); got != c.kind {
+			t.Errorf("%s: kind %q, want %q", c.subver, got, c.kind)
+		}
+		if got := aboutOf(c.subver); !strings.Contains(got, c.about) || c.about == "" && got != "" {
+			t.Errorf("%s: about %q, want %q", c.subver, got, c.about)
+		}
+	}
+}

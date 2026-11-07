@@ -140,7 +140,7 @@ func TestBehaviourAbout(t *testing.T) {
 		{"a crawler asking again and again", "/Satoshi:0.19.0.1/", "v1", map[string]int64{"getaddr": 24 * 58}, now.Unix() - 60,
 			"a crawler - it asked for addresses 58 times, Core asks once"},
 		{"the same over v2", "/Satoshi:30.0.0/", "v2", map[string]int64{"getaddr": 33 * 3}, hour,
-			"a crawler - it asked for addresses 3 times, Core asks once"},
+			"not Bitcoin Core - it asked for addresses 3 times, Core asks once"},
 		{"Core asks once", "/Satoshi:31.1.0/", "v2", map[string]int64{"getaddr": 33}, hour, ""},
 		{"twice over v2 is still left alone", "/Satoshi:31.1.0/", "v2", map[string]int64{"getaddr": 33 * 2}, hour, ""},
 		{"twice is still left alone", "/Satoshi:31.1.0/", "v1", map[string]int64{"getaddr": 48}, hour, ""},

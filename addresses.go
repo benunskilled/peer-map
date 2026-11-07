@@ -16,7 +16,9 @@ import (
 // fakeWalletKind already catches.
 // It stays Disguised: the kind says what it does, the about says who.
 // Current ranges from the bnoc banlist (github.com/bitcoin-noc/banlist,
-// entities.toml, after PR #4 of 16.09.2026): the IPv6 range is one /64, not the
+// entities/linkinglion.toml since the split of 02.11.2026, compared on
+// 06.11.2026; the ranges are the same as after PR #4 of 16.09.2026): the IPv6
+// range is one /64, not the
 // provider's whole /32, and two single hosts come on top. One of them,
 // 104.234.118.2, made 5,822 sessions on the node this was written for, with 82
 // different fake user agents from that one address.
