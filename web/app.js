@@ -2275,8 +2275,10 @@
         // With a kind filter on, the question is why these peers are in it:
         // the description is shown under the kind, only then. Not for nodes:
         // their label (FutureBit Apollo, Umbrel …) is a chip in the filter bar
-        // already, and in the panel a tap opens.
-        if (state.group && p.about && !String(p.kind || "").startsWith("Node")) {
+        // already, and in the panel a tap opens. Nor where the label only
+        // repeats the pool named in the line above ("AtlasPool block relay").
+        const repeatsPool = p.pool && p.label && p.label.includes(p.pool);
+        if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
           const about = document.createElement("div");
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
