@@ -43,6 +43,10 @@ func TestPoolProof(t *testing.T) {
 	if p.PoolProof != "This address hands out AtlasPool's mining jobs (AtlasPool/IAD)" {
 		t.Errorf("got %q", p.PoolProof)
 	}
+	// The row says whose relay it is, not only the filter.
+	if p.Label != "AtlasPool block relay" {
+		t.Errorf("label %q", p.Label)
+	}
 }
 
 // A pool node no rule describes still gets a line.

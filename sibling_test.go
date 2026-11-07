@@ -163,6 +163,9 @@ func TestSiblingLatestBlock(t *testing.T) {
 				{"label":"My pool","own":true,"latencyMs":412.5,"rank":2,"miss":false},
 				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]},
 			"templateMs":84.5,"firstPingMs":98,"deliveredEver":["1.2.3.4:8333","5.6.7.8:8333"],
+			"recon":"asked","reconMissingBytes":38000,"blockSize":1520000,
+			"reconDay":{"blocks":140,"mempool":76,"asked":61,"full":3,"askedAvgBytes":38200},
+			"reconWeek":{"blocks":0,"mempool":0,"asked":0,"full":0,"askedAvgBytes":null},
 			"routeMedian":{"blocks":100,"core":{"ms":210,"n":100},"peer":{"ms":120,"n":97},
 				"template":{"ms":295,"n":60},"own":{"ms":420,"n":99},"ownLabel":"My pool"}}`, detected, detected-225)
 	}))
@@ -196,6 +199,19 @@ func TestSiblingLatestBlock(t *testing.T) {
 	}
 	// The three roles arrive separately and stay separate: mined, delivered,
 	// and turned into work.
+	// How the block was rebuilt rides along; an empty window is left out.
+	if got.Recon != "asked" || got.ReconMissingBytes == nil || *got.ReconMissingBytes != 38000 {
+		t.Errorf("recon %q %v", got.Recon, got.ReconMissingBytes)
+	}
+	if got.BlockSize == nil || *got.BlockSize != 1520000 {
+		t.Errorf("block size %v", got.BlockSize)
+	}
+	if got.ReconDay == nil || got.ReconDay.Blocks != 140 || got.ReconDay.AskedAvgBytes == nil || *got.ReconDay.AskedAvgBytes != 38200 {
+		t.Errorf("recon day %+v", got.ReconDay)
+	}
+	if got.ReconWeek != nil {
+		t.Errorf("an empty week must be left out: %+v", got.ReconWeek)
+	}
 	if got.Eligible != 204 {
 		t.Errorf("eligible %d, want 204", got.Eligible)
 	}

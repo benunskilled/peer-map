@@ -544,7 +544,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			case byAddr && (p.Kind == "Pool node" || strings.HasPrefix(p.Kind, "Node")):
 				what, short := "own Bitcoin node", "Own Bitcoin node"
 				if strings.HasPrefix(aboutOf(r.Subver), "ckp2p") {
-					what, short = "block relay (ckp2p)", "Block relay"
+					// Whose relay, in the row itself: the pool's name otherwise
+					// shows only in the filter (06.11.2026).
+					what, short = "block relay (ckp2p)", n.pool+" block relay"
 				}
 				p.Kind, p.Pool = "Pool node", n.pool
 				p.About, p.PoolProof = n.pool+"'s "+what, "This address "+n.proof
