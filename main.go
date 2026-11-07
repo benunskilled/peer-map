@@ -268,23 +268,27 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 		w.Header().Set("Content-Type", "text/plain")
 		io.WriteString(w, "ok\n")
 	})
+	// One answer in the making at a time, whoever asks: the locks below are
+	// held across Core's and Bitcoin Lab's answers, up to 24 seconds, and a
+	// browser that gives up meanwhile must not leave a worker of its own
+	// behind. Requests that come while one is under way wait for that one.
+	fetch := &sharedFetch{}
 	mux.HandleFunc("GET /api/peers", func(w http.ResponseWriter, r *http.Request) {
-		// The locks are held across Core's and Bitcoin Lab's answers, up to
-		// 24 seconds. A browser that gives up meanwhile stops waiting here;
-		// the work goes on in the background, so the next poller gets it.
-		ready := make(chan snapshot, 1)
-		go func() {
-			snap := src.get(r.Context())
-			snap.Sibling = sib.installed(r.Context())
+		call := fetch.join(func() snapshot {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			snap := src.get(ctx)
+			snap.Sibling = sib.installed(ctx)
 			if snap.Sibling {
 				snap.SiblingPort = siblingLinkPort()
 			}
-			snap.LastBlock = sib.latest(r.Context())
-			ready <- snap
-		}()
+			snap.LastBlock = sib.latest(ctx)
+			return snap
+		})
 		var snap snapshot
 		select {
-		case snap = <-ready:
+		case <-call.done:
+			snap = call.snap
 		case <-r.Context().Done():
 			return
 		}
@@ -319,7 +323,7 @@ func newHandler(src *source, sib *siblingCheck) http.Handler {
 func gzipped(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept-Encoding")
-		if r.Method != http.MethodGet || r.Header.Get("Range") != "" || !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		if r.Method != http.MethodGet || r.Header.Get("Range") != "" || !acceptsGzip(r.Header.Get("Accept-Encoding")) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -460,4 +464,53 @@ func listenConfig() *net.ListenConfig {
 	lc := &net.ListenConfig{}
 	lc.SetMultipathTCP(false)
 	return lc
+}
+
+// sharedFetch runs at most one fetch at a time and hands its result to every
+// request that joined while it ran. A request that gives up only stops
+// waiting; the fetch finishes for the others, and nothing else is left behind.
+type sharedFetch struct {
+	mu  sync.Mutex
+	cur *fetchCall
+}
+
+type fetchCall struct {
+	done chan struct{}
+	snap snapshot
+}
+
+func (f *sharedFetch) join(fn func() snapshot) *fetchCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.cur != nil {
+		return f.cur
+	}
+	c := &fetchCall{done: make(chan struct{})}
+	f.cur = c
+	go func() {
+		c.snap = fn()
+		f.mu.Lock()
+		f.cur = nil
+		f.mu.Unlock()
+		close(c.done)
+	}()
+	return c
+}
+
+// acceptsGzip reads Accept-Encoding as a list: "gzip" or "*" counts, unless
+// its weight is zero ("gzip;q=0" means: never gzip).
+func acceptsGzip(header string) bool {
+	for _, part := range strings.Split(header, ",") {
+		name, params, _ := strings.Cut(strings.TrimSpace(part), ";")
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name != "gzip" && name != "*" {
+			continue
+		}
+		q := strings.ReplaceAll(strings.ToLower(params), " ", "")
+		if q == "q=0" || strings.HasPrefix(q, "q=0.0") && strings.Trim(strings.TrimPrefix(q, "q="), "0.") == "" {
+			return false
+		}
+		return true
+	}
+	return false
 }
