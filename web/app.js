@@ -325,7 +325,7 @@
   // How Core put the block together from its compact form (BIP152), as
   // Bitcoin Lab read it from getpeerinfo: from the mempool alone, or after
   // asking a peer for the transactions it did not have - a full round trip -
-  // or downloaded whole. This block, or the share over the last day or week.
+  // or downloaded in full. This block, or the share over the last day or week.
   // Absent with a Bitcoin Lab from before it measured this.
   const RECON_VIEW_KEY = "peermap.reconView";
   state.reconView = (() => { try { return localStorage.getItem(RECON_VIEW_KEY) || "block"; } catch { return "block"; } })();
@@ -375,7 +375,7 @@
       line.textContent = {
         mempool: "Rebuilt from your mempool, nothing was missing",
         asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
-        full: "Downloaded whole, not as a compact block",
+        full: "Downloaded in full, not rebuilt from your mempool",
       }[b.recon] || "Not measured for this block";
     } else {
       const w = view === "day" ? b.recon_day : b.recon_week;
@@ -385,7 +385,7 @@
         const pct = (n) => Math.round((100 * n) / w.blocks) + " %";
         const parts = [`${pct(w.mempool)} rebuilt from your mempool`];
         if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
-        if (w.full) parts.push(`${pct(w.full)} downloaded whole`);
+        if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
         line.textContent = parts.join(" \u00b7 ") + " ";
         const n = document.createElement("small");
         n.textContent = `\u00b7 ${w.blocks.toLocaleString("en-US")} ${w.blocks === 1 ? "block" : "blocks"}`;
