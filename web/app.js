@@ -815,6 +815,13 @@
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
   const SYNCING = "syncing";
+  // Peers that can never bring you a block because they are not on your chain: altcoins and forks of
+  // their own, and Knots nodes on a chain split off from yours (BIP110, BLAKE2b). One filter for both,
+  // like syncing; the pill still says which is which.
+  const FORKED = "other chain";
+  const OTHER_CHAIN = "Other chain";
+  const offChain = (p) => !!p.fork || p.kind === OTHER_CHAIN;
+  const special = (g) => g === SYNCING || g === FORKED;
   // Under a kind its peers are picked the same way, one level down: pools by
   // name, nodes by version, everything else by the software it names.
   const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool", NO_NAME = "no name";
@@ -1010,7 +1017,7 @@
     : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" || kind === "Indexer" ? "Wallets"
     : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
     : kind;
-  const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
+  const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb : state.group === FORKED ? offChain(p)
     : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub) && (!state.label || labelOf(p) === state.label));
 
   const visiblePeers = () =>
@@ -1934,7 +1941,8 @@
   // here and on the map; clicking it again puts everyone back.
   function renderKindMix(el, peers) {
     const n = new Map();
-    for (const p of peers) n.set(groupOf(p.kind), (n.get(groupOf(p.kind)) || 0) + 1);
+    // Altcoins are in the "other chain" chip beside these, not a group of their own.
+    for (const p of peers) if (p.kind !== OTHER_CHAIN) n.set(groupOf(p.kind), (n.get(groupOf(p.kind)) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     // Five groups fit a phone in two lines: no "+ n more" here.
     entries.forEach(([group, count]) => {
@@ -2628,10 +2636,24 @@
         sc.addEventListener("click", () => steady(sc, () => setGroup(SYNCING)));
         mix.appendChild(sc);
       }
+      const forked = kindPool.filter(offChain);
+      if (forked.length && (!state.group || state.group === FORKED)) {
+        const fc = document.createElement("button");
+        fc.type = "button";
+        fc.className = "chip kind-pick forked" + (state.group === FORKED ? " on" : "");
+        fc.title = state.group === FORKED ? "Show every kind again"
+          : `${forked.length} not on your chain (${[...new Set(forked.map((p) => p.fork || OTHER_CHAIN))].join(", ")}) - click to show only these`;
+        fc.setAttribute("aria-pressed", String(state.group === FORKED));
+        const fi = document.createElement("i");
+        fi.textContent = forked.length;
+        fc.append(fi, " other chain");
+        fc.addEventListener("click", () => steady(fc, () => setGroup(FORKED)));
+        mix.appendChild(fc);
+      }
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
-      if (state.group && state.group !== SYNCING) {
+      if (state.group && !special(state.group)) {
         const inGroup = kindPool.filter((p) => groupOf(p.kind) === state.group);
         renderKindPicks(card, inGroup);
         // The names belong to one kind: the one picked, or the only one there is.
@@ -2801,7 +2823,7 @@
     // Asked of all cards together: the pick sits in one of them, and asked of
     // each card, any other card without its chips dropped every pick the
     // moment it was made (2.5.0).
-    if (state.group && state.group !== SYNCING && !picksShown && (state.sub || state.label)) {
+    if (state.group && !special(state.group) && !picksShown && (state.sub || state.label)) {
       state.sub = state.label = null;
       queueMicrotask(applyFilters);
     }
