@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.6.0 – 2026-11-07
+
+The block card shows how your node rebuilt the block: from its mempool, after asking for missing transactions, with how much of the block that was, or downloaded whole. Switch to 24 hours or 7 days for the averages; this needs Bitcoin Lab 2.4.0. Pool nodes say whose block relay they are, a disguised peer only reads as a crawler when it asks for many addresses, and more clients are recognised.
+
 ## 2.5.2 – 2026-11-06
 
 The block wave runs evenly across the page, as in Bitcoin Lab. A peer with a name Peer Map doesn't know is described by what it did before it is guessed to be a full node, so one that only takes transactions no longer reads as a node.
