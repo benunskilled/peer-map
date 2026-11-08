@@ -424,16 +424,18 @@
     add(part(), "b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
     // Who mined it, without "mined by": the orange name says it, and on a
     // phone the words were what pushed the line to wrap.
-    const mined = part();
-    // A miner's own text stays on one line and ends in … when it is too long.
-    if (!b.pool && b.pool_tag) mined.classList.add("b-cut");
     if (b.pool || b.pool_tag) {
+      const mined = part();
+      // A miner's own text stays on one line and ends in … when it is too long.
+      if (!b.pool) mined.classList.add("b-cut");
       // The full name, as on mempool.space: "Foundry USA", not "Foundry".
       const name = b.pool_name || b.pool;
       add(mined, "b-pool" + (name ? "" : " raw"), name || `"${b.pool_tag}"`,
         name ? `Mined by ${name}` : `Mined by a pool we do not know - this is the text in its coinbase: "${b.pool_tag}"`);
-    } else {
-      add(mined, "b-unknown", "Unknown", "Mined by a pool we do not know: neither the payout address nor the coinbase text matched");
+    } else if (b.pool_source === "none") {
+      // Only once the Lab has read the coinbase and found nothing: before
+      // that, or when it could not read it, nothing was checked yet.
+      add(part(), "b-unknown", "Unknown", "Mined by a pool we do not know: neither the payout address nor the coinbase text matched");
     }
     const n = (b.first_peers || []).length;
     // One peer and a known place: say where it came from, with its flag.
