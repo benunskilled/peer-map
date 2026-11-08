@@ -145,9 +145,17 @@ body {
 .block-recon .recon-line { margin: 6px 0 0; font-size: 13px; color: var(--text); }
 .block-recon .recon-line small { color: var(--muted); font-size: 13px; }
 .block-card .b-height { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-.block-card .b-sep { color: var(--border); }
+/* Each part carries its dot in front, inside a 21px lead-in. The parts sit
+   21px to the left of the clipping box, so on every line the first part's dot
+   falls outside it and only the dots between parts show. */
+.block-card .b-line { flex: 1 1 0; min-width: 0; overflow: hidden; }
+.block-card .b-parts { display: flex; flex-wrap: wrap; row-gap: 4px; margin-left: -21px; }
+.block-card .b-part { position: relative; padding-left: 21px; min-width: 0; }
+.block-card .b-part::before { content: "·"; position: absolute; left: 7px; color: var(--border); }
+.block-card .b-unknown { color: var(--accent); }
+.block-card .b-part.b-cut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .block-card .b-pool { color: var(--accent); }
-.block-card .b-pool.raw { color: var(--muted); font-style: italic; }
+.block-card .b-pool.raw { font-style: italic; }
 .block-body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 14px; }
 .block-body h3 {
   margin: 0 0 6px; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase;

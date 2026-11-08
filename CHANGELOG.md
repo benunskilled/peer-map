@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.7.0 – 2026-11-08
+
+The block card has one switch, This block or Typical (the last 100 blocks), for both the route and the compact-block line; this needs Bitcoin Lab 2.5.0. The block line names the pool in full, without "mined by". Every peer not on your chain, altcoins and Knots forks alike, gets one "other chain" chip, and filtered lists drop label lines that only repeat what's already shown.
+
 ## 2.6.0 – 2026-11-07
 
 The block card shows how your node rebuilt the block: from its mempool, after asking for missing transactions, with how much of the block that was, or downloaded whole. Switch to 24 hours or 7 days for the averages; this needs Bitcoin Lab 2.4.0. Pool nodes say whose block relay they are, a disguised peer only reads as a crawler when it asks for many addresses, and more clients are recognised.

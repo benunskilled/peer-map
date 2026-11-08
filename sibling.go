@@ -143,9 +143,9 @@ type lastBlock struct {
 	Recon             string `json:"recon,omitempty"`
 	ReconMissingBytes *int64 `json:"recon_missing_bytes,omitempty"`
 	// The block's size in bytes, to show what was missing as a share of it.
-	BlockSize *int64       `json:"block_size,omitempty"`
-	ReconDay  *reconWindow `json:"recon_day,omitempty"`
-	ReconWeek *reconWindow `json:"recon_week,omitempty"`
+	BlockSize *int64 `json:"block_size,omitempty"`
+	// The same over the last hundred blocks, the card's "typical" window.
+	ReconLast100 *reconWindow `json:"recon_last100,omitempty"`
 	// Every address Bitcoin Lab has ever credited with delivering a block
 	// first. The tables tint those rows.
 	DeliveredEver []string `json:"delivered_ever,omitempty"`
@@ -284,14 +284,10 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		Recon         *string  `json:"recon"`
 		ReconMissing  *int64   `json:"reconMissingBytes"`
 		BlockSize     *int64   `json:"blockSize"`
-		ReconDay      *struct {
+		ReconLast100  *struct {
 			Blocks, Mempool, Asked, Full int
 			AskedAvgBytes                *int64 `json:"askedAvgBytes"`
-		} `json:"reconDay"`
-		ReconWeek *struct {
-			Blocks, Mempool, Asked, Full int
-			AskedAvgBytes                *int64 `json:"askedAvgBytes"`
-		} `json:"reconWeek"`
+		} `json:"reconLast100"`
 		RouteMedian *struct {
 			Blocks   int         `json:"blocks"`
 			Core     *medianStop `json:"core"`
@@ -350,17 +346,14 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		}
 		return &reconWindow{Blocks: blocks, Mempool: mempool, Asked: asked, Full: full, AskedAvgBytes: avg}
 	}
-	var reconDay, reconWeek *reconWindow
-	if d := got.ReconDay; d != nil {
-		reconDay = window(d.Blocks, d.Mempool, d.Asked, d.Full, d.AskedAvgBytes)
-	}
-	if w := got.ReconWeek; w != nil {
-		reconWeek = window(w.Blocks, w.Mempool, w.Asked, w.Full, w.AskedAvgBytes)
+	var reconLast *reconWindow
+	if l := got.ReconLast100; l != nil {
+		reconLast = window(l.Blocks, l.Mempool, l.Asked, l.Full, l.AskedAvgBytes)
 	}
 	recon := ""
 	if got.Recon != nil {
 		switch *got.Recon {
-		case "mempool", "asked", "full":
+		case "mempool", "asked", "full", "unclear":
 			recon = *got.Recon
 		}
 	}
@@ -382,8 +375,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		Recon:             recon,
 		ReconMissingBytes: got.ReconMissing,
 		BlockSize:         got.BlockSize,
-		ReconDay:          reconDay,
-		ReconWeek:         reconWeek,
+		ReconLast100:      reconLast,
 		DeliveredEver:     got.DeliveredEver,
 		AgeMs:             age,
 		MarkForMs:         blockMarkFor.Milliseconds(),

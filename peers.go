@@ -442,7 +442,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 			p.Kind, p.Pool, p.About, p.Label = "Pool node", "ViaBTC", viaBitpeerAbout, "Probably ViaBTC's relay"
 			labelled = p.About
 			p.PoolProof = "Found by 0xB10C, b10c.me"
-		case libreKind != "":
+		case libreKind != "" && protocolMismatch(r.Subver, r.Version) == "":
 			p.Kind, p.About, p.Label = libreKind, libreAbout, libreLabel
 			labelled = p.About
 		case borrowedKind != "" &&
@@ -478,6 +478,12 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 					break
 				}
 			}
+		}
+		// "Relays no blocks" came from the name. Where the name turned out
+		// false - a "wallet" offering what no wallet can - it goes with it:
+		// only offering nothing at all still says so.
+		if kind == "Wallet" && p.Kind == fakeWalletKind {
+			p.NoRelay = p.NoServices
 		}
 		// A pool node or crawler no rule describes (/pydroid-pool:3/,
 		// /p2p-watcher:0.1.0/) gets the same line, rather than none. Where a

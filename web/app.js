@@ -319,16 +319,17 @@
     }
     // "Delivered first" is on the route only when this block's own route is.
     renderBlockBody(b, Boolean(own) && stops === own);
-    renderRecon($("blockRecon"), b);
+    // One switch for the whole card: where the route has one, it sets the
+    // compact block line too; without a route the line brings its own.
+    renderRecon($("blockRecon"), b, own && typical ? view : null);
   }
 
   // How Core put the block together from its compact form (BIP152), as
   // Bitcoin Lab read it from getpeerinfo: from the mempool alone, or after
   // asking a peer for the transactions it did not have - a full round trip -
-  // or downloaded in full. This block, or the share over the last day or week.
+  // or downloaded in full. This block, or the share over the last hundred
+  // blocks - the same "typical" as the route's, and the same switch.
   // Absent with a Bitcoin Lab from before it measured this.
-  const RECON_VIEW_KEY = "peermap.reconView";
-  state.reconView = (() => { try { return localStorage.getItem(RECON_VIEW_KEY) || "block"; } catch { return "block"; } })();
   const RECON_WHY = "A new block arrives as a compact block: short ids for its transactions, " +
     "which your node fills in from its own mempool. Whatever it does not have, it asks the peer for - " +
     "one more round trip before the block is complete.";
@@ -342,31 +343,33 @@
     return ", " + (p < 1 ? "under 1\u00a0%" : Math.round(p) + "\u00a0%") + " of the block";
   }
 
-  function renderRecon(box, b) {
-    const has = b.recon || b.recon_day || b.recon_week;
+  function renderRecon(box, b, routeView) {
+    const last = b.recon_last100;
+    const has = b.recon || last;
     box.hidden = !has;
     box.textContent = "";
     if (!has) return;
-    const views = [["block", "This block"], ["day", "24 h"], ["week", "7 days"]];
-    const view = views.some(([v]) => v === state.reconView) ? state.reconView : "block";
+    // The route's switch decides where there is one; otherwise the same
+    // choice, remembered the same way, on a switch of the line's own.
+    const view = (routeView || state.routeView) === "median" && last ? "median" : "block";
 
     const head = document.createElement("span");
     head.className = "recon-head";
     head.textContent = "Compact block";
     head.title = RECON_WHY;
-    const sw = document.createElement("div");
-    sw.className = "rt-switch";
-    for (const [v, label] of views) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.textContent = label;
-      btn.className = v === view ? "on" : "";
-      btn.addEventListener("click", () => {
-        state.reconView = v;
-        try { localStorage.setItem(RECON_VIEW_KEY, v); } catch { /* private window: fine */ }
-        renderRecon(box, b);
-      });
-      sw.appendChild(btn);
+    box.appendChild(head);
+    if (!routeView && last) {
+      const sw = document.createElement("div");
+      sw.className = "rt-switch";
+      for (const [v, label] of [["block", "This block"], ["median", "Last 100 blocks"]]) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.className = v === view ? "on" : "";
+        btn.addEventListener("click", () => setRouteView(v));
+        sw.appendChild(btn);
+      }
+      box.appendChild(sw);
     }
     const line = document.createElement("p");
     line.className = "recon-line";
@@ -376,56 +379,71 @@
         mempool: "Rebuilt from your mempool, nothing was missing",
         asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
         full: "Downloaded in full, not rebuilt from your mempool",
+        unclear: "Not clear for this block",
       }[b.recon] || "Not measured for this block";
     } else {
-      const w = view === "day" ? b.recon_day : b.recon_week;
-      if (!w || !w.blocks) {
-        line.textContent = "No blocks measured yet";
-      } else {
-        const pct = (n) => Math.round((100 * n) / w.blocks) + " %";
-        const parts = [`${pct(w.mempool)} rebuilt from your mempool`];
-        if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
-        if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
-        line.textContent = parts.join(" \u00b7 ") + " ";
-        const n = document.createElement("small");
-        n.textContent = `\u00b7 ${w.blocks.toLocaleString("en-US")} ${w.blocks === 1 ? "block" : "blocks"}`;
-        line.appendChild(n);
-      }
+      const w = last;
+      const pct = (n) => Math.round((100 * n) / w.blocks) + "\u00a0%";
+      const parts = [`${pct(w.mempool)} rebuilt from your mempool`];
+      if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
+      if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
+      line.textContent = parts.join(" \u00b7 ") + " ";
+      const n = document.createElement("small");
+      n.textContent = `\u00b7 ${w.blocks.toLocaleString("en-US")} of the last 100 blocks measured`;
+      if (w.blocks < 100) line.appendChild(n);
     }
-    box.append(head, sw, line);
+    box.appendChild(line);
   }
 
+  // The line is parts, not words: "mined by Foundry USA" moves to the next
+  // line as one, and the dot in front of a part that starts a line is clipped
+  // (see .b-parts), so no line begins with a stray "·" on a phone.
   function fillSummary(sum, b) {
     sum.textContent = "";
-    const add = (cls, text, title) => {
+    const line = document.createElement("span");
+    line.className = "b-line";
+    const parts = document.createElement("span");
+    parts.className = "b-parts";
+    line.appendChild(parts);
+    sum.appendChild(line);
+    const part = () => {
+      const el = document.createElement("span");
+      el.className = "b-part";
+      parts.appendChild(el);
+      return el;
+    };
+    const add = (into, cls, text, title) => {
       const el = document.createElement("span");
       if (cls) el.className = cls;
       el.textContent = text;
       if (title) el.title = title;
-      sum.appendChild(el);
+      into.appendChild(el);
       return el;
     };
-    const sep = () => add("b-sep", "·");
 
-    add("b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
+    add(part(), "b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
+    // Who mined it, without "mined by": the orange name says it, and on a
+    // phone the words were what pushed the line to wrap.
     if (b.pool || b.pool_tag) {
-      sep();
-      add("b-label", "mined by");
-      add("b-pool" + (b.pool ? "" : " raw"), b.pool || `"${b.pool_tag}"`,
-        b.pool ? b.pool_name : "No pool we know of - this is the text in its coinbase");
-    } else {
-      sep();
-      add("miss", "miner unknown", "Neither the payout address nor the coinbase text matched a known pool");
+      const mined = part();
+      // A miner's own text stays on one line and ends in … when it is too long.
+      if (!b.pool) mined.classList.add("b-cut");
+      // The full name, as on mempool.space: "Foundry USA", not "Foundry".
+      const name = b.pool_name || b.pool;
+      add(mined, "b-pool" + (name ? "" : " raw"), name || `"${b.pool_tag}"`,
+        name ? `Mined by ${name}` : `Mined by a pool we do not know - this is the text in its coinbase: "${b.pool_tag}"`);
+    } else if (b.pool_source === "none") {
+      // Only once the Lab has read the coinbase and found nothing: before
+      // that, or when it could not read it, nothing was checked yet.
+      add(part(), "b-unknown", "Unknown", "Mined by a pool we do not know: neither the payout address nor the coinbase text matched");
     }
     const n = (b.first_peers || []).length;
-    sep();
     // One peer and a known place: say where it came from, with its flag.
     const one = n === 1 && state.data.peers.find((p) => p.addr === b.first_peers[0]);
-    add(null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
+    add(part(), null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
       : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
       b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
-    sep();
-    add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
+    add(part(), "miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
   }
 
   const blockAgeMs = (b) => b.age_ms + Math.max(0, Date.now() - state.receivedAt);
@@ -815,6 +833,13 @@
   // ---------- render ----------
   // "syncing" is not a kind but is picked like one: the chip beside the count.
   const SYNCING = "syncing";
+  // Peers that can never bring you a block because they are not on your chain: altcoins and forks of
+  // their own, and Knots nodes on a chain split off from yours (BIP110, BLAKE2b). One filter for both,
+  // like syncing; the pill still says which is which.
+  const FORKED = "other chain";
+  const OTHER_CHAIN = "Other chain";
+  const offChain = (p) => !!p.fork || p.kind === OTHER_CHAIN;
+  const special = (g) => g === SYNCING || g === FORKED;
   // Under a kind its peers are picked the same way, one level down: pools by
   // name, nodes by version, everything else by the software it names.
   const POOL_KIND = "Pool node", UNKNOWN_POOL = "unknown pool", NO_NAME = "no name";
@@ -1010,7 +1035,7 @@
     : kind === "Wallet" || kind === "Lightning wallet" || kind === "Light client" || kind === "Indexer" ? "Wallets"
     : kind === "Crawler" || kind === "Research scanner" ? "Watchers"
     : kind;
-  const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb
+  const matchesKind = (p) => !state.group || (state.group === SYNCING ? !!p.sync_mb : state.group === FORKED ? offChain(p)
     : groupOf(p.kind) === state.group && (!state.kind || p.kind === state.kind) && (!state.sub || subOf(p) === state.sub) && (!state.label || labelOf(p) === state.label));
 
   const visiblePeers = () =>
@@ -1934,7 +1959,8 @@
   // here and on the map; clicking it again puts everyone back.
   function renderKindMix(el, peers) {
     const n = new Map();
-    for (const p of peers) n.set(groupOf(p.kind), (n.get(groupOf(p.kind)) || 0) + 1);
+    // Altcoins are in the "other chain" chip beside these, not a group of their own.
+    for (const p of peers) if (p.kind !== OTHER_CHAIN) n.set(groupOf(p.kind), (n.get(groupOf(p.kind)) || 0) + 1);
     const entries = [...n].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     // Five groups fit a phone in two lines: no "+ n more" here.
     entries.forEach(([group, count]) => {
@@ -2273,8 +2299,12 @@
           td.appendChild(fit(e, e.textContent));
         }
         // With a kind filter on, the question is why these peers are in it:
-        // the description is shown under the kind, only then.
-        if (state.group && p.about) {
+        // the description is shown under the kind, only then. Not for nodes:
+        // their label (FutureBit Apollo, Umbrel …) is a chip in the filter bar
+        // already, and in the panel a tap opens. Nor where the label only
+        // repeats the pool named in the line above ("AtlasPool block relay").
+        const repeatsPool = p.pool && p.label && p.label.includes(p.pool);
+        if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
           const about = document.createElement("div");
           about.className = "about";
           // The list says why in one or two lines; the claim is the name beside it,
@@ -2624,10 +2654,24 @@
         sc.addEventListener("click", () => steady(sc, () => setGroup(SYNCING)));
         mix.appendChild(sc);
       }
+      const forked = kindPool.filter(offChain);
+      if (forked.length && (!state.group || state.group === FORKED)) {
+        const fc = document.createElement("button");
+        fc.type = "button";
+        fc.className = "chip kind-pick forked" + (state.group === FORKED ? " on" : "");
+        fc.title = state.group === FORKED ? "Show every kind again"
+          : `${forked.length} not on your chain (${[...new Set(forked.map((p) => p.fork || OTHER_CHAIN))].join(", ")}) - click to show only these`;
+        fc.setAttribute("aria-pressed", String(state.group === FORKED));
+        const fi = document.createElement("i");
+        fi.textContent = forked.length;
+        fc.append(fi, " other chain");
+        fc.addEventListener("click", () => steady(fc, () => setGroup(FORKED)));
+        mix.appendChild(fc);
+      }
       if (kindPool.length) renderKindMix(mix, kindPool);
       summary.append(h, mix);
       card.appendChild(summary);
-      if (state.group && state.group !== SYNCING) {
+      if (state.group && !special(state.group)) {
         const inGroup = kindPool.filter((p) => groupOf(p.kind) === state.group);
         renderKindPicks(card, inGroup);
         // The names belong to one kind: the one picked, or the only one there is.
@@ -2797,7 +2841,7 @@
     // Asked of all cards together: the pick sits in one of them, and asked of
     // each card, any other card without its chips dropped every pick the
     // moment it was made (2.5.0).
-    if (state.group && state.group !== SYNCING && !picksShown && (state.sub || state.label)) {
+    if (state.group && !special(state.group) && !picksShown && (state.sub || state.label)) {
       state.sub = state.label = null;
       queueMicrotask(applyFilters);
     }
