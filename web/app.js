@@ -395,37 +395,53 @@
     box.appendChild(line);
   }
 
+  // The line is parts, not words: "mined by Foundry USA" moves to the next
+  // line as one, and the dot in front of a part that starts a line is clipped
+  // (see .b-parts), so no line begins with a stray "·" on a phone.
   function fillSummary(sum, b) {
     sum.textContent = "";
-    const add = (cls, text, title) => {
+    const line = document.createElement("span");
+    line.className = "b-line";
+    const parts = document.createElement("span");
+    parts.className = "b-parts";
+    line.appendChild(parts);
+    sum.appendChild(line);
+    const part = () => {
+      const el = document.createElement("span");
+      el.className = "b-part";
+      parts.appendChild(el);
+      return el;
+    };
+    const add = (into, cls, text, title) => {
       const el = document.createElement("span");
       if (cls) el.className = cls;
       el.textContent = text;
       if (title) el.title = title;
-      sum.appendChild(el);
+      into.appendChild(el);
       return el;
     };
-    const sep = () => add("b-sep", "·");
 
-    add("b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
+    add(part(), "b-height", b.height ? "Block " + b.height.toLocaleString("en-US") : "Last block", b.hash || "");
+    // Who mined it, without "mined by": the orange name says it, and on a
+    // phone the words were what pushed the line to wrap.
+    const mined = part();
+    // A miner's own text stays on one line and ends in … when it is too long.
+    if (!b.pool && b.pool_tag) mined.classList.add("b-cut");
     if (b.pool || b.pool_tag) {
-      sep();
-      add("b-label", "mined by");
-      add("b-pool" + (b.pool ? "" : " raw"), b.pool || `"${b.pool_tag}"`,
-        b.pool ? b.pool_name : "No pool we know of - this is the text in its coinbase");
+      // The full name, as on mempool.space: "Foundry USA", not "Foundry".
+      const name = b.pool_name || b.pool;
+      add(mined, "b-pool" + (name ? "" : " raw"), name || `"${b.pool_tag}"`,
+        name ? `Mined by ${name}` : `Mined by a pool we do not know - this is the text in its coinbase: "${b.pool_tag}"`);
     } else {
-      sep();
-      add("miss", "miner unknown", "Neither the payout address nor the coinbase text matched a known pool");
+      add(mined, "b-unknown", "Unknown", "Mined by a pool we do not know: neither the payout address nor the coinbase text matched");
     }
     const n = (b.first_peers || []).length;
-    sep();
     // One peer and a known place: say where it came from, with its flag.
     const one = n === 1 && state.data.peers.find((p) => p.addr === b.first_peers[0]);
-    add(null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
+    add(part(), null, n === 0 ? "nobody credited" : one && one.cc ? `delivered from ${flagOf(one.cc)} ${regionName(one.cc)}`
       : n === 1 ? "delivered by 1 peer" : `delivered by ${n} peers`,
       b.eligible ? `${b.eligible} peers were connected when it arrived` : "");
-    sep();
-    add("miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
+    add(part(), "miss", ago(blockAgeMs(b) / 1000) + " ago", "How long ago your node saw this block");
   }
 
   const blockAgeMs = (b) => b.age_ms + Math.max(0, Date.now() - state.receivedAt);
