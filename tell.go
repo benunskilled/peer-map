@@ -2,15 +2,19 @@ package main
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
-// tellOf is a disguised peer's first reason in a few words, for the line
-// under its pill (28.10.2026: the pill said Disguised, and only the opened
-// row said why). It reads the reasons disguise.go writes, so each of them has
-// a short form here; TestEveryDisguiseHasATell keeps the two together.
-// LinkingLion's own reason is the pill itself, so its first other evidence
-// is told, or that the address is a listed one.
+// tellOf is why a disguised peer is one, in a few words, for the line under
+// its pill (28.10.2026: the pill said Disguised, and only the opened row said
+// why). It reads the reasons disguise.go writes, so each of them has a short
+// form here; TestEveryDisguiseHasATell keeps the two together. What the peer
+// did - pinging every few seconds, asking for addresses again and again -
+// comes before what it says about itself, and two reasons are told where
+// there are two (09.11.2026: "misspelt name" alone said too little).
+// LinkingLion's own reason is the pill itself, so its other evidence is told,
+// or that the address is a listed one.
 func tellOf(about string, lion bool) string {
 	lines := strings.Split(about, "\n")
 	var reasons []string
@@ -25,10 +29,19 @@ func tellOf(about string, lion bool) string {
 	if m := tellClaim.FindStringSubmatch(about); m != nil {
 		claimed = m[1]
 	}
+	var did, said []string
 	for _, r := range reasons {
-		if t := shortReason(r, claimed); t != "" {
-			return t
+		t := shortReason(r, claimed)
+		switch {
+		case t == "" || slices.Contains(did, t) || slices.Contains(said, t):
+		case strings.HasPrefix(t, "asks for addresses") || strings.HasPrefix(t, "pings every"):
+			did = append(did, t)
+		default:
+			said = append(said, t)
 		}
+	}
+	if told := append(did, said...); len(told) > 0 {
+		return strings.Join(told[:min(2, len(told))], " \u00b7 ")
 	}
 	if lion {
 		return "listed address range"
@@ -68,9 +81,9 @@ func shortReason(r, claimed string) string {
 		{"lacks NETWORK_LIMITED", "no NETWORK_LIMITED"},
 		{"asked for nothing", "asks for nothing"},
 		{"newer protocol than this wallet", "newer protocol than the wallet"},
-		{"offers blocks, which no wallet does", "offers blocks"},
-		{"speaks v2, which no wallet", "offers v2"},
-		{"v2 connections, which that software never had", "offers v2"},
+		{"offers blocks, which no wallet does", "wallet offering blocks"},
+		{"speaks v2, which no wallet", "wallet offering v2"},
+		{"v2 connections, which that software never had", "v2, which it never had"},
 		{"which the Bitcore library does not offer", "more services than Bitcore"},
 		{"Sat0shi with a zero", "misspelt name"},
 		{"Core calls itself /Satoshi:", "misspelt name"},

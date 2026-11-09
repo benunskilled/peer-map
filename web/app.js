@@ -1935,6 +1935,27 @@
   // Core since 0.16 sets it next to NETWORK, so only a node without NETWORK is
   // pruned. Said of nodes only: a disguised peer's bits are as made up as its name.
   const PRUNED_WHY = "Keeps only recent blocks";
+  // The one line a filtered phone card has: the most important thing about
+  // the peer that the pill does not say already (09.11.2026). In the syncing
+  // filter, what put it there; else whose pool; why a disguise is one, what
+  // it did before what it says; for a node another chain, or the software
+  // where the pill says only "other", or whether it keeps every block; for the
+  // rest what it did, then what it is, and its user agent where nothing is
+  // known. Never empty, so every card in a filter is one height.
+  const probablyOf = (p) => ((p.about || "").split("\n").find((l) => l.startsWith("Probably: ")) || "").slice("Probably: ".length);
+  const cardLine = (p) => {
+    if (state.group === SYNCING && p.sync_mb) return "syncing " + mbText(p.sync_mb);
+    if (p.kind === POOL_KIND) return (p.pool || UNKNOWN_POOL) + (/block relay/i.test(p.about || "") ? " \u00b7 block relay" : "");
+    if (p.linking_lion) return p.tell || "listed address range";
+    if (p.kind === "Disguised") return p.tell || probablyOf(p);
+    if (p.kind.startsWith("Node")) {
+      if (p.fork) return p.fork;
+      if (p.kind === "Node (other)" && p.label) return p.label;
+      const s = p.services || [];
+      return s.includes("NETWORK") ? "full node" : s.includes("NETWORK_LIMITED") ? "pruned" : s.length ? "serves no blocks" : "";
+    }
+    return p.tell || p.label || probablyOf(p) || (p.about || "").split("\n")[0] || p.subver || "";
+  };
   const isPruned = (p) => p.kind.startsWith("Node") && !!p.services && p.services.includes("NETWORK_LIMITED") && !p.services.includes("NETWORK");
   const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
   function mbText(mb) {
@@ -2304,6 +2325,21 @@
         // already, and in the panel a tap opens. Nor where the label only
         // repeats the pool named in the line above ("AtlasPool block relay").
         const repeatsPool = p.pool && p.label && p.label.includes(p.pool);
+        // A phone card has no grey line. Unfiltered every card is one height;
+        // with a filter on, every card gets exactly one line more, the most
+        // important thing about that peer and nothing the pill already says
+        // (09.11.2026). The description below is the wide list's.
+        if (state.group) {
+          const e = document.createElement("small");
+          e.className = "card-line";
+          // Nothing known still takes its line, or the cards would differ.
+          const text = cardLine(p) || "\u00a0";
+          e.textContent = text;
+          // A second reason stays only where it fits whole (fitTables).
+          const two = text.split(" \u00b7 ");
+          if (p.tell && two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
+          td.appendChild(e);
+        }
         if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
           const about = document.createElement("div");
           about.className = "about";
@@ -2905,6 +2941,12 @@
       if (cards) unalign();
     }
     for (const w of wraps) w.classList.toggle("cards", cards);
+    // A card line's second reason only where it fits whole, never cut short
+    // (09.11.2026).
+    for (const e of document.querySelectorAll("#tables small.card-line[data-one]")) {
+      e.textContent = e.dataset.full;
+      if (cards && e.scrollWidth > e.clientWidth + 1) e.textContent = e.dataset.one;
+    }
     // A phone puts the kind beside the place. Reserve its actual width,
     // including either or both relay marks, instead of a fixed pill-sized gap.
     for (const w of wraps) for (const row of w.querySelectorAll("tr[data-anchor]")) {

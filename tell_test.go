@@ -38,7 +38,10 @@ func TestEveryDisguiseHasATell(t *testing.T) {
 func TestShortReasons(t *testing.T) {
 	for _, c := range []struct{ about, want string }{
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + skippedHandshakeAbout(map[string]int64{"sendaddrv2": 1}), "no wtxidrelay"},
-		{"Claims: Bitcoin Core 28.1.0\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services"},
+		{"Claims: Bitcoin Core 28.1.0\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services \u00b7 no wtxidrelay"},
+		// What it did first, whatever order the reasons came in.
+		{fakeAbout("/Sat0shi:25.0.0/", "", nil) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s \u00b7 misspelt name"},
+		{"Claims: x\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay\nAlso: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18\u00d7 \u00b7 offers no services"},
 		{"Claims: Bitcoin Core 31.1.0\nProbably: " + anachronism("/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS"}), "no NETWORK_LIMITED"},
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015), "protocol 70015 for Core 25.1.0"},
 		{"Claims: x\nProbably: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18×"},
@@ -55,7 +58,7 @@ func TestShortReasons(t *testing.T) {
 		}
 	}
 	lion := "Claims: bitcoinj 0.14.5\nProbably: " + linkingLionAbout + "\nAlso: it offers blocks, which no wallet does"
-	if got := tellOf(lion, true); got != "offers blocks" {
+	if got := tellOf(lion, true); got != "wallet offering blocks" {
 		t.Errorf("LinkingLion with blocks tells %q", got)
 	}
 	if got := tellOf("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); got != "listed address range" {

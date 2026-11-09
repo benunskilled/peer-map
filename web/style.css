@@ -688,6 +688,11 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 /* A phone card: place, address and pill, the same height for every peer.
    What Core saw is in the panel there (28.10.2026). */
 .cards.cards table tr td.k-kind small.ua { display: none; }
+/* A filtered card's one line (cardLine in app.js), on a card only: the wide
+   list has its grey line and the description, a card this instead. */
+.peers small.card-line { display: none; }
+.cards.cards table tr td.k-kind > small.card-line { display: block; max-width: none; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards.cards table tr td.k-kind > .about { display: none; }
 
 /* Every card folds to its title on a tap and stays so on this device; open
    unless the reader closed it (28.10.2026). The chevron is Storage's in the
