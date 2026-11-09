@@ -48,7 +48,7 @@ func TestOtherAbouts(t *testing.T) {
 // A name nothing knows still gets a line: a full node's if it offers blocks.
 func TestOtherAboutOffersBlocks(t *testing.T) {
 	got := convert([]rawPeer{{Addr: "1.0.0.1:8333", ConnectionType: "inbound", Inbound: true,
-		Subver: "/GrayersDad:1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS"}}})[0]
+		Subver: "/Dain:0.1.0/", Version: 70016, ServicesNames: []string{"NETWORK", "WITNESS"}}})[0]
 	if got.Kind != "Other" || got.About != "Probably a full node under a name its operator chose" {
 		t.Errorf("kind %q about %q", got.Kind, got.About)
 	}

@@ -13,6 +13,15 @@ import (
 // chip the peer is counted under, for one program under many names.
 var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)seeder|dnsseed`), "A DNS seeder: collects addresses of reachable nodes for new nodes to start from", "DNS seeder", ""},
+	// BTC Nodes (btcnodes.io), Rodrigo Martínez's successor to Bitnodes
+	// (bitcointalk.org topic 5582226). Its public crawler config still says
+	// /bitnodes.io:0.3/; that "/BTC-Nodes:<date>/Sonar/", ".../Probe/" and
+	// ".../Delegator/" are its own was not found in a source, so only the name.
+	// Before the census rule, which would take Sonar.
+	{regexp.MustCompile(`^/BTC-Nodes:`), "Named like BTC Nodes (btcnodes.io), the successor to Bitnodes that maps reachable nodes", "Named like BTC Nodes", ""},
+	// A Knots node under its operator's own name: only Knots defines service
+	// bits 27 and 28 (src/protocol.h, knots20260508), and these offer them.
+	{regexp.MustCompile(`^/GrayersDad:`), "Probably Bitcoin Knots under a name its operator chose", "Probably Knots", ""},
 	{regexp.MustCompile(`(?i)census|survey|observatory|monitor|sonar`), "A node census: counts and watches reachable nodes", "Node census", ""},
 	// One address, 142 sessions in four days, each gone after its version
 	// message. Elastum was an exchange; elastum.io no longer resolves.

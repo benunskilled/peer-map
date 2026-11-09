@@ -398,7 +398,7 @@ func TestOtherChainAbouts(t *testing.T) {
 // them do, nor a fixed sentence: the session decides what is said. A name
 // that says what it is does get the kind it names.
 func TestNoKindFromOneNode(t *testing.T) {
-	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/BTC-Nodes:2026/", "/Natasha:1.0/"} {
+	for _, ua := range []string{"/trinetra:0.1/", "/your-fork:0.1/", "/cryptexplorer:1.0/", "/BlockSail:1.0/", "/multiseed:0.1/", "/Prometheus:30.4.1/", "/Natasha:1.0/"} {
 		if got := kindOf(ua); got != "Other" {
 			t.Errorf("%s: kind %q, want Other", ua, got)
 		}
@@ -435,6 +435,28 @@ func TestScannersFromCodeAndList(t *testing.T) {
 		// Similar names are not evidence for a match.
 		{"/connector:1.0/", "Other", ""},
 		{"/Satoshi:31.1.0(bitcoinstats.com)/", "Node (Core)", ""},
+	} {
+		if got := kindOf(c.subver); got != c.kind {
+			t.Errorf("%s: kind %q, want %q", c.subver, got, c.kind)
+		}
+		if got := aboutOf(c.subver); !strings.Contains(got, c.about) || c.about == "" && got != "" {
+			t.Errorf("%s: about %q, want %q", c.subver, got, c.about)
+		}
+	}
+}
+
+func TestClientsCheckedOn9November(t *testing.T) {
+	for _, c := range []struct {
+		subver, kind, about string
+	}{
+		{"/GrayersDad:08.30.2026BLAKE2b/", "Node (Knots)", "Probably Bitcoin Knots"},
+		{"/GrayersDad:08.08.2026RDTS-in-Spirit (Node 1)/", "Node (Knots)", "Probably Bitcoin Knots"},
+		{"/BTC-Nodes:2026-10-31/Probe/", "Crawler", "Named like BTC Nodes"},
+		{"/BTC-Nodes:2026-07-14/Sonar/", "Crawler", "Named like BTC Nodes"},
+		{"/BTC-Nodes:2026-10-31/", "Other", "Named like BTC Nodes"},
+		// The code of these sets other names, so they stay unknown.
+		{"/chaingun:0.4/", "Other", ""},
+		{"/spynode:0.1/", "Other", ""},
 	} {
 		if got := kindOf(c.subver); got != c.kind {
 			t.Errorf("%s: kind %q, want %q", c.subver, got, c.kind)
