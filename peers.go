@@ -534,9 +534,9 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 				p.Kind, p.About = fakeWalletKind, "Claims: "+claimOf(r.Subver)+"\nProbably: "+lion
 			}
 		}
-		// One reason is enough for the list; the panel gets every other one, so
-		// a disguise - LinkingLion's too - stands on what the peer did, not on
-		// one rule or one list of addresses alone.
+		// The list tells one or two reasons (tellOf); the panel gets every
+		// other one, so a disguise - LinkingLion's too - stands on what the
+		// peer did, not on one rule or one list of addresses alone.
 		if p.Kind == fakeWalletKind {
 			p.About = withAlso(p.About, disguiseEvidence(r, kind, aboutOf(r.Subver), anyWtxid, now))
 			p.Tell = tellOf(p.About, p.LinkingLion)

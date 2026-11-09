@@ -97,8 +97,12 @@
       // What the reader looks at stays put while a card above opens or closes.
       const a = readAnchor();
       show();
-      // Folded, a chip row measured no width and was left whole: fit it now.
-      if (!folded.has(id)) for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
+      // Folded, a chip row measured no width and was left whole: fit it now,
+      // and the tables with it, whose lines were measured folded too.
+      if (!folded.has(id)) {
+        for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
+        fitTables();
+      }
       holdAnchor(a);
       if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
     };
@@ -1950,6 +1954,8 @@
     if (p.kind === "Disguised") return p.tell || probablyOf(p);
     if (p.kind.startsWith("Node")) {
       if (p.fork) return p.fork;
+      // A known block relay's address: whose relay it is (peers.go, relayOf).
+      if (p.tell) return p.tell;
       if (p.kind === "Node (other)" && p.label) return p.label;
       const s = p.services || [];
       return s.includes("NETWORK") ? "full node" : s.includes("NETWORK_LIMITED") ? "pruned" : s.length ? "serves no blocks" : "";
@@ -2289,6 +2295,8 @@
             const s = document.createElement("span");
             s.className = "no-tx";
             s.textContent = tell;
+            // A second reason stays only where it fits whole (fitTables).
+            if (tell.includes(" \u00b7 ")) Object.assign(s.dataset, { full: tell, one: tell.split(" \u00b7 ")[0] });
             if (probably) s.title = probably.slice("Probably: ".length);
             if (e.firstChild) e.append(" \u00b7 ");
             e.append(s);
@@ -2335,9 +2343,9 @@
           // Nothing known still takes its line, or the cards would differ.
           const text = cardLine(p) || "\u00a0";
           e.textContent = text;
-          // A second reason stays only where it fits whole (fitTables).
+          // A second part stays only where it fits whole (fitTables).
           const two = text.split(" \u00b7 ");
-          if (p.tell && two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
+          if (two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
           td.appendChild(e);
         }
         if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
@@ -2912,6 +2920,10 @@
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
+    // A second reason never decides which columns go: measured with the first
+    // alone, and put back below where it fits whole.
+    const seconds = [...document.querySelectorAll("#tables [data-one]")];
+    for (const e of seconds) e.textContent = e.dataset.one;
     const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
     for (const w of wraps) w.classList.remove("cards");
     // Tight when the shared widths (alignColumns) together are wider than
@@ -2941,11 +2953,12 @@
       if (cards) unalign();
     }
     for (const w of wraps) w.classList.toggle("cards", cards);
-    // A card line's second reason only where it fits whole, never cut short
-    // (09.11.2026).
-    for (const e of document.querySelectorAll("#tables small.card-line[data-one]")) {
+    // A second reason only where it fits whole, never cut short (09.11.2026):
+    // on a card its own line, in the wide list the grey line it sits in.
+    for (const e of seconds) {
+      const box = e.closest("small") || e;
       e.textContent = e.dataset.full;
-      if (cards && e.scrollWidth > e.clientWidth + 1) e.textContent = e.dataset.one;
+      if (box.scrollWidth > box.clientWidth + 1) e.textContent = e.dataset.one;
     }
     // A phone puts the kind beside the place. Reserve its actual width,
     // including either or both relay marks, instead of a fixed pill-sized gap.
