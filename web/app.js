@@ -414,8 +414,8 @@
   // blocks - the same "typical" as the route's, and the same switch.
   // Absent with a Bitcoin Lab from before it measured this.
   const RECON_WHY = "A new block arrives as a compact block: short ids for its transactions, " +
-    "which your node fills in from its own mempool. Whatever it does not have, it asks the peer for - " +
-    "one more round trip before the block is complete.";
+    "which your node fills in from its mempool and from transactions it recently turned down. " +
+    "Whatever it does not have, it asks the peer for - one more round trip before the block is complete.";
   // No-break spaces keep a number and its unit on one line on a phone.
   const kB = (bytes) => (bytes < 1000 ? "under 1\u00a0kB" : Math.round(bytes / 1000).toLocaleString("en-US") + "\u00a0kB");
 
@@ -459,15 +459,15 @@
     line.title = RECON_WHY;
     if (view === "block") {
       line.textContent = {
-        mempool: "Rebuilt from your mempool, nothing was missing",
+        mempool: "Rebuilt from what your node already had, nothing was missing",
         asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
-        full: "Downloaded in full, not rebuilt from your mempool",
+        full: "Downloaded in full, not rebuilt",
         unclear: "Not clear for this block",
       }[b.recon] || "Not measured for this block";
     } else {
       const w = last;
       const pct = (n) => Math.round((100 * n) / w.blocks) + "\u00a0%";
-      const parts = [`${pct(w.mempool)} rebuilt from your mempool`];
+      const parts = [`${pct(w.mempool)} rebuilt from what your node had`];
       if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
       if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
       line.textContent = parts.join(" \u00b7 ") + " ";
@@ -2048,7 +2048,7 @@
   const cardLine = (p) => {
     if (state.group === SYNCING && p.sync_mb) return "syncing " + mbText(p.sync_mb);
     if (p.kind === POOL_KIND) return (p.pool || UNKNOWN_POOL) + (/block relay/i.test(p.about || "") ? " \u00b7 block relay" : "");
-    if (p.linking_lion) return p.tell || "listed address range";
+    if (p.linking_lion) return p.tell || "on 0xB10C's list";
     if (p.kind === "Disguised") return p.tell || probablyOf(p);
     if (p.kind.startsWith("Node")) {
       if (p.fork) return p.fork;

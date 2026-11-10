@@ -12,9 +12,11 @@ import (
 // form here; TestEveryDisguiseHasATell keeps the two together. What the peer
 // did - pinging every few seconds, asking for addresses again and again -
 // comes before what it says about itself, and two reasons are told where
-// there are two (09.11.2026: "misspelt name" alone said too little).
-// LinkingLion's own reason is the pill itself, so its other evidence is told,
-// or that the address is a listed one.
+// there are two (09.11.2026: "misspelt name" alone said too little). A
+// protocol number only where nothing else tells (10.11.2026: beside a
+// behaviour it said nothing more, only made the line long). LinkingLion's
+// own reason is the pill itself, so one piece of its other evidence is told,
+// or that the address is on 0xB10C's list.
 func tellOf(about string, lion bool) string {
 	lines := strings.Split(about, "\n")
 	var reasons []string
@@ -29,22 +31,32 @@ func tellOf(about string, lion bool) string {
 	if m := tellClaim.FindStringSubmatch(about); m != nil {
 		claimed = m[1]
 	}
-	var did, said []string
+	var did, said, protocol []string
 	for _, r := range reasons {
 		t := shortReason(r, claimed)
 		switch {
-		case t == "" || slices.Contains(did, t) || slices.Contains(said, t):
+		case t == "" || slices.Contains(did, t) || slices.Contains(said, t) || slices.Contains(protocol, t):
 		case strings.HasPrefix(t, "asks for addresses") || strings.HasPrefix(t, "pings every"):
 			did = append(did, t)
+		case strings.HasPrefix(t, "protocol ") || strings.HasPrefix(t, "newer protocol"):
+			protocol = append(protocol, t)
 		default:
 			said = append(said, t)
 		}
 	}
-	if told := append(did, said...); len(told) > 0 {
-		return strings.Join(told[:min(2, len(told))], " \u00b7 ")
+	told := append(did, said...)
+	if len(told) == 0 {
+		told = protocol
+	}
+	n := 2
+	if lion {
+		n = 1
+	}
+	if len(told) > 0 {
+		return strings.Join(told[:min(n, len(told))], " \u00b7 ")
 	}
 	if lion {
-		return "listed address range"
+		return "on 0xB10C's list"
 	}
 	return ""
 }

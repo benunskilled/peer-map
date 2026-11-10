@@ -378,7 +378,7 @@ func TestGivesOwnAddress(t *testing.T) {
 	// A wallet offering blocks is Disguised already; the address comes on top.
 	p := convert([]rawPeer{{ID: 1, Addr: "35.242.187.91:40000", AddrLocal: "35.242.187.91:8333", ConnectionType: "inbound", Inbound: true,
 		Subver: "/bitcoinj:0.14.5/Bitcoin Wallet:5.33/", Version: 70015, ServicesNames: []string{"NETWORK"}}})[0]
-	if p.Kind != fakeWalletKind || !strings.Contains(p.About, "Also: "+ownAddressAbout) || p.Tell != "wallet offering blocks \u00b7 newer protocol than the wallet" {
+	if p.Kind != fakeWalletKind || !strings.Contains(p.About, "Also: "+ownAddressAbout) || p.Tell != "wallet offering blocks \u00b7 gives its own address as ours" {
 		t.Fatalf("got %q %q %q", p.Kind, p.About, p.Tell)
 	}
 	// Alone it decides nothing.

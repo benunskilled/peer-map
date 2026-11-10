@@ -47,6 +47,9 @@ func TestShortReasons(t *testing.T) {
 		{"Claims: x\nProbably: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18×"},
 		{"Claims: x\nProbably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s"},
 		{"Claims: x\nProbably: " + bitcoinjTooNewAbout, "newer protocol than the wallet"},
+		// A protocol number only where nothing else tells.
+		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s"},
+		{"Claims: Bitcoin Core 23.0.0\nProbably: " + protocolMismatch("/Satoshi:23.0.0/", 70002) + "\nAlso: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services \u00b7 no wtxidrelay"},
 		{"Claims: x\nProbably: " + anachronism("/Satoshi:0.15.0/Knots:20170914/", []string{"NETWORK", "P2P_V2"}), "v2 for Core 0.15"},
 		{fakeAbout("/Satoshi:0.11.0/", "", nil) + "\nAlso: " + protocolMismatch("/Satoshi:0.11.0/", 70016), "protocol 70016 for Core 0.11.0"},
 		{fakeAbout("/Sat0shi:25.0.0/", "", nil), "misspelt name"},
@@ -61,7 +64,11 @@ func TestShortReasons(t *testing.T) {
 	if got := tellOf(lion, true); got != "wallet offering blocks" {
 		t.Errorf("LinkingLion with blocks tells %q", got)
 	}
-	if got := tellOf("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); got != "listed address range" {
+	// One piece of evidence: the pill already says what it is.
+	if got := tellOf(lion+"\nAlso: it speaks v2, which no wallet does", true); got != "wallet offering blocks" {
+		t.Errorf("LinkingLion with two reasons tells %q", got)
+	}
+	if got := tellOf("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); got != "on 0xB10C's list" {
 		t.Errorf("bare LinkingLion tells %q", got)
 	}
 }
