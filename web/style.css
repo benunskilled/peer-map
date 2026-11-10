@@ -632,8 +632,6 @@ td .about.clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient
 /* Chips change state softly. */
 .chip { transition: border-color .12s ease, color .12s ease, background-color .12s ease; }
 /* A panel opened by a tap fades in; one redrawn by a refresh does not. */
-.detail-row.opening .pd { animation: pd-in .18s ease-out; }
-@keyframes pd-in { from { opacity: 0; transform: translateY(-4px); } }
 /* A peer that has just connected lights up once. */
 tr.arrived > td { animation: arrived 2.4s ease-out; }
 /* As a card the row is one box: it lights up whole. */
@@ -647,7 +645,7 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .jump-bar button:active { background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) {
   .chip, .jump-bar { transition: none; }
-  .detail-row.opening .pd, tr.arrived, tr.arrived > td { animation: none; }
+  tr.arrived, tr.arrived > td { animation: none; }
 }
 /* With a mouse: the row's place on the map lights up. */
 .marker.hover .sel { stroke: var(--accent); stroke-width: 2; }

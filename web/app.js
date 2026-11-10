@@ -97,7 +97,8 @@
       setRunway(Math.max(lent, window.scrollY + window.innerHeight - end));
     };
     const done = () => { pin(); giveBack(); pin(); requestAnimationFrame(() => { pin(); folding -= 1; freed(); }); };
-    set(open);
+    // A fold that fails half way must not leave refreshes held back.
+    try { set(open); } catch (err) { folding -= 1; throw err; }
     const b1 = find(box);
     const h1 = b1 ? b1.getBoundingClientRect().height : 0;
     // A whole list of peers is tens of thousands of pixels: rolled in a third
@@ -115,8 +116,7 @@
     let frame = requestAnimationFrame(function follow() { pin(); frame = requestAnimationFrame(follow); });
     anim.onfinish = anim.oncancel = () => {
       cancelAnimationFrame(frame);
-      if (!open) set(false);
-      done();
+      try { if (!open) set(false); } finally { done(); }
     };
   }
 
@@ -168,7 +168,8 @@
     };
     const flip = (e) => {
       if (e.target.closest("button, a")) return;
-      foldInPlace({ anchor: title, box: card, open: folded.has(id), set: (open) => {
+      const opening = folded.has(id);
+      foldInPlace({ anchor: title, box: card, open: opening, set: (open) => {
         if (open) folded.delete(id); else folded.add(id);
         show();
         // Folded, a chip row measured no width and was left whole: fit it
@@ -178,8 +179,11 @@
           fitTables();
         }
       } });
+      // Kept as the reader left it, not as it is half way: closing rolls up
+      // from open and is folded only at the end.
+      if (opening) folded.delete(id); else folded.add(id);
       store.set(FOLD_KEY, JSON.stringify([...folded]));
-      if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
+      if (id === "map" && opening) window.dispatchEvent(new Event("resize"));
     };
     title.addEventListener("click", flip);
     title.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(e); } });
