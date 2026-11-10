@@ -39,6 +39,8 @@ const blockMarkFor = 2 * time.Minute
 // the limit is a guard against a neighbour gone wrong, not a budget.
 const blockReplyLimit = 64 << 10
 
+const siblingMissEvery = 30 * time.Second
+
 type siblingCheck struct {
 	url      string
 	blockURL string
@@ -194,7 +196,13 @@ func (s *siblingCheck) installed(ctx context.Context) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.checkedAt.IsZero() && s.clock().Sub(s.checkedAt) < s.every {
+	// A miss is asked again sooner, as Bitcoin Lab does: updated together,
+	// the neighbour may still be starting when this app asks.
+	wait := s.every
+	if !s.present {
+		wait = siblingMissEvery
+	}
+	if !s.checkedAt.IsZero() && s.clock().Sub(s.checkedAt) < wait {
 		return s.present
 	}
 	// The probe is this app's, not the browser's: tied to the incoming request

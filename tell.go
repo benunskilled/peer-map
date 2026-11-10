@@ -2,7 +2,6 @@ package main
 
 import (
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -18,6 +17,16 @@ import (
 // own reason is the pill itself, so one piece of its other evidence is told,
 // or that the address is on 0xB10C's list.
 func tellOf(about string, lion bool) string {
+	tell, _ := tellAndWhy(about, lion)
+	return tell
+}
+
+// tellAndWhy is tellOf and, beside it, the whole sentence of the reason it
+// leads with, for the wide list's description line: the same reason first
+// in every view (10.11.2026: there the first "Probably:" stood, which could
+// be the protocol number the short line had left out). "" where nothing is
+// told but the list.
+func tellAndWhy(about string, lion bool) (string, string) {
 	lines := strings.Split(about, "\n")
 	var reasons []string
 	for _, l := range lines {
@@ -31,18 +40,21 @@ func tellOf(about string, lion bool) string {
 	if m := tellClaim.FindStringSubmatch(about); m != nil {
 		claimed = m[1]
 	}
-	var did, said, protocol []string
+	type reason struct{ short, long string }
+	var did, said, protocol []reason
+	seen := map[string]bool{}
 	for _, r := range reasons {
 		t := shortReason(r, claimed)
 		switch {
-		case t == "" || slices.Contains(did, t) || slices.Contains(said, t) || slices.Contains(protocol, t):
-		case strings.HasPrefix(t, "asks for addresses") || strings.HasPrefix(t, "pings every"):
-			did = append(did, t)
+		case t == "" || seen[t]:
+		case strings.HasPrefix(t, "asks for addresses") || strings.HasPrefix(t, "pings every") || t == "asks for nothing":
+			did = append(did, reason{t, r})
 		case strings.HasPrefix(t, "protocol ") || strings.HasPrefix(t, "newer protocol"):
-			protocol = append(protocol, t)
+			protocol = append(protocol, reason{t, r})
 		default:
-			said = append(said, t)
+			said = append(said, reason{t, r})
 		}
+		seen[t] = true
 	}
 	told := append(did, said...)
 	if len(told) == 0 {
@@ -53,12 +65,16 @@ func tellOf(about string, lion bool) string {
 		n = 1
 	}
 	if len(told) > 0 {
-		return strings.Join(told[:min(n, len(told))], " \u00b7 ")
+		var shorts []string
+		for _, r := range told[:min(n, len(told))] {
+			shorts = append(shorts, r.short)
+		}
+		return strings.Join(shorts, " \u00b7 "), "Probably: " + told[0].long
 	}
 	if lion {
-		return "on 0xB10C's list"
+		return "on 0xB10C's list", ""
 	}
-	return ""
+	return "", ""
 }
 
 var (

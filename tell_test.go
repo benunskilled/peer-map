@@ -64,6 +64,14 @@ func TestShortReasons(t *testing.T) {
 	if got := tellOf(lion, true); got != "wallet offering blocks" {
 		t.Errorf("LinkingLion with blocks tells %q", got)
 	}
+	// The wide list's sentence is the reason the short line leads with.
+	ping := "Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"
+	if _, why := tellAndWhy(ping, false); why != "Probably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes" {
+		t.Errorf("why leads with %q", why)
+	}
+	if _, why := tellAndWhy("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); why != "" {
+		t.Errorf("bare LinkingLion has why %q", why)
+	}
 	// One piece of evidence: the pill already says what it is.
 	if got := tellOf(lion+"\nAlso: it speaks v2, which no wallet does", true); got != "wallet offering blocks" {
 		t.Errorf("LinkingLion with two reasons tells %q", got)

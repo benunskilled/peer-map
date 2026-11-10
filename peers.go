@@ -168,6 +168,7 @@ type Peer struct {
 	// agent), what the peer does in a few words: the list shows it under the
 	// pill, the panel the whole sentence (tellOf, behaviourTell).
 	Tell    string `json:"tell,omitempty"`
+	Why     string `json:"why,omitempty"`      // the whole sentence of the reason Tell leads with
 	NoRelay bool   `json:"no_relay,omitempty"` // software that passes no blocks on
 	// LinkingLion: from the ranges the bnoc banlist names, whatever kind the
 	// user agent made it. The header counts these separately.
@@ -539,7 +540,7 @@ func convertAt(raw []rawPeer, now time.Time) []Peer {
 		// peer did, not on one rule or one list of addresses alone.
 		if p.Kind == fakeWalletKind {
 			p.About = withAlso(p.About, disguiseEvidence(r, kind, aboutOf(r.Subver), anyWtxid, now))
-			p.Tell = tellOf(p.About, p.LinkingLion)
+			p.Tell, p.Why = tellAndWhy(p.About, p.LinkingLion)
 		} else if p.Kind == "Other" || p.Kind == noAgentKind {
 			p.Tell = behaviourTell(p.About)
 		}

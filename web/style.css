@@ -719,11 +719,13 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
   position: absolute; left: -1px; right: -1px; top: 0; display: flex; align-items: center; gap: 8px;
   padding: 8px 12px 8px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 0 0 10px 10px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, .35); font-size: 15px; font-weight: 600;
-  opacity: 0; pointer-events: none; transition: opacity .15s;
+  opacity: 0; pointer-events: none; transition: opacity .15s, visibility .15s;
+  /* Hidden is out of the tab order too, not only invisible. */
+  visibility: hidden;
 }
 .stick > div .swatch { margin-right: 8px; }
 .stick > div .btn { margin-left: auto; }
-.stick.on > div { opacity: 1; pointer-events: auto; }
+.stick.on > div { opacity: 1; pointer-events: auto; visibility: visible; }
 /* A soft edge under the bar, so a row passing beneath fades out instead of
    showing half a line. */
 .stick > div::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 20px; background: linear-gradient(var(--panel) 35%, transparent); pointer-events: none; }

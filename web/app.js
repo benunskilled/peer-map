@@ -168,7 +168,9 @@
     };
     const flip = (e) => {
       if (e.target.closest("button, a")) return;
-      const opening = folded.has(id);
+      // What is on screen: a card opened for a peer link is open, whatever
+      // the stored state says.
+      const opening = card.classList.contains("folded");
       foldInPlace({ anchor: title, box: card, open: opening, set: (open) => {
         if (open) folded.delete(id); else folded.add(id);
         show();
@@ -868,7 +870,7 @@
     if (!b.stratum || !(b.stratum.entries || []).length) {
       const p = document.createElement("p");
       p.className = "note";
-      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off.";
+      p.textContent = "No race recorded for this block.";
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
@@ -1323,6 +1325,15 @@
     const row = document.querySelector("tr.focus");
     if (!row) return;
     state.focusDone = true;
+    // A card the reader folded opens for this visit, not for good: the peer
+    // asked for is in it, and a reload keeps it folded as before.
+    const shut = row.closest(".folded");
+    if (shut) {
+      shut.classList.remove("folded");
+      const title = shut.querySelector(".fold-title");
+      if (title) title.setAttribute("aria-expanded", "true");
+      fitTables();
+    }
     row.scrollIntoView({ block: "center", behavior: glide() });
   }
 
@@ -1383,7 +1394,9 @@
     const others = d.peers.length - nodes - disguised;
     const el = $("status");
     el.textContent = `${d.peers.length} peers: ${nodes} nodes, ${disguised} disguised, ${others} others`;
-    liveDot.classList.toggle("stale", state.paused || state.failed);
+    // Grey whenever what is shown is not fresh: paused, unreachable, or Core
+    // failing and the last good list standing in.
+    liveDot.classList.toggle("stale", state.paused || state.failed || !!d.error);
     el.prepend(liveDot);
     // The dot says it is live; when and how often only on hover.
     el.title = `Updated ${since} · ${mode}`;
@@ -2452,9 +2465,12 @@
           // The list says why in one or two lines; the claim is the name beside it,
           // and everything, the claim too, is in the panel that opens on a tap.
           // One line per peer: the label, where the server has one; what the
-          // session showed is left to the panel.
-          about.textContent = p.label || probably || p.about;
-          about.classList.add(probably ? "short" : "clip");
+          // session showed is left to the panel. A disguise says the reason
+          // its short line leads with, whole (why), not whichever came first;
+          // LinkingLion's label only repeated its pill.
+          const lead = p.kind === "Disguised" || p.linking_lion ? p.why || (p.linking_lion ? LION_CREDIT : "") : "";
+          about.textContent = lead || p.label || probably || p.about;
+          about.classList.add(lead || probably ? "short" : "clip");
           td.appendChild(about);
         }
       },
@@ -2493,7 +2509,7 @@
   const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
   const NO_TX_WHY = "Wants no transactions from your node";
-  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
+  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + "\u00a0GB" : n >= 1e6 ? Math.round(n / 1e6) + "\u00a0MB" : n >= 1e3 ? Math.round(n / 1e3) + "\u00a0kB" : n + "\u00a0B";
   function peerDetail(p) {
     const el = (tag, cls, text) => {
       const e = document.createElement(tag);
@@ -2657,7 +2673,8 @@
     who.appendChild(svc);
     if (p.version) who.appendChild(el("p", "pd-small", "Protocol " + p.version));
     if (state.data && state.data.sibling) {
-      const lab = el("a", "pd-lab", "Open this peer in Bitcoin Lab \u2197");
+      const lab = el("a", "pd-lab", "Bitcoin Lab \u2197");
+      lab.title = "Open this peer in Bitcoin Lab";
       lab.href = siblingURL(p.addr);
       lab.target = LAB_TARGET;
       who.appendChild(lab);
@@ -2745,8 +2762,10 @@
   window.addEventListener("scroll", stickOn, { passive: true });
 
   function renderTables() {
-    // A row reached with the arrow keys keeps the focus through a redraw.
+    // A row reached with the arrow keys keeps the focus through a redraw, and
+    // so does the button that redrew it (a sort, "Show all").
     const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.anchor;
+    const focusKey = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.focusKey;
     // A panel left open for a peer that is gone must not pop open when its address comes back.
     const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
@@ -2873,6 +2892,7 @@
         if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
         const b = document.createElement("button");
         b.textContent = c.label;
+        b.dataset.focusKey = "sort " + g + " " + c.key;
         b.addEventListener("click", () => steady(b, () => {
           state.sort[g] = { key: c.key, dir: c.key === col.key ? -s.dir : 1 };
           renderTables();
@@ -2954,6 +2974,7 @@
         const more = document.createElement("button");
         more.type = "button";
         more.className = "more";
+        more.dataset.focusKey = "more " + g;
         more.textContent = state.showAllInbound ? `Show top ${INBOUND_LIMIT} only` : `Show all ${peers.length}`;
         more.addEventListener("click", () => showAllInbound(!state.showAllInbound));
         card.appendChild(more);
@@ -2994,6 +3015,9 @@
     stickOn();
     if (focused) {
       const back = root.querySelector(`tr[data-anchor="${CSS.escape(focused)}"]`);
+      if (back) back.focus({ preventScroll: true });
+    } else if (focusKey) {
+      const back = root.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
       if (back) back.focus({ preventScroll: true });
     }
   }
