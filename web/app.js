@@ -44,6 +44,82 @@
   // Smooth scrolling, unless the reader asked the system for less motion.
   const glide = () => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 
+  // Folding in place (10.11.2026, the same in Bitcoin Lab): what was tapped
+  // stays where it is on the screen. What opens rolls out downwards and what
+  // closes rolls up, gently, and the page never jumps - not to bring
+  // something into view, not because the page got shorter at its end. Every
+  // fold goes through here: a card, a group, a peer's panel, "Show all", a
+  // legend.
+  //
+  //   anchor  what stays put, or a function finding it again (the tables
+  //           are rebuilt, and with them the button that was tapped)
+  //   box     what grows or shrinks, the same
+  //   set     puts the page in the open (true) or closed (false) state
+  const FOLD_MS = 300;
+  let folding = 0;
+  // Room below the page's end while something shrinks there; it goes as soon
+  // as the reader scrolls up far enough not to need it.
+  let runway = 0;
+  function setRunway(px) {
+    runway = Math.max(0, Math.ceil(px));
+    document.body.style.paddingBottom = runway ? `${runway}px` : "";
+  }
+  window.addEventListener("scroll", () => {
+    if (!runway || folding) return;
+    const spare = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+    if (spare > 0) setRunway(runway - spare);
+  }, { passive: true });
+  function foldInPlace({ anchor, box, set, open }) {
+    const find = (x) => (typeof x === "function" ? x() : x);
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const a0 = find(anchor);
+    if (!a0) { set(open); return; }
+    const top0 = a0.getBoundingClientRect().top;
+    // To where, not by how much: Safari reports a scroll a frame late, and
+    // moving by the difference moved twice and swung back and forth.
+    const pin = () => {
+      const a = find(anchor);
+      if (!a || !a.isConnected) return;
+      const want = a.getBoundingClientRect().top + window.scrollY - top0;
+      if (Math.abs(window.scrollY - want) >= 0.5) window.scrollTo(0, want);
+    };
+    folding += 1;
+    // Room at the end for as much as the box could lose, lent before anything
+    // is measured: measuring a page that got shorter is already enough for
+    // the browser to pull everything down. When the fold is over, only what
+    // the reader still needs stays.
+    const lent = runway;
+    const b0 = find(box);
+    const h0 = b0 ? b0.getBoundingClientRect().height : 0;
+    setRunway(lent + h0);
+    const giveBack = () => {
+      const end = document.documentElement.scrollHeight - runway;
+      setRunway(Math.max(lent, window.scrollY + window.innerHeight - end));
+    };
+    const done = () => { pin(); giveBack(); pin(); requestAnimationFrame(() => { pin(); folding -= 1; freed(); }); };
+    set(open);
+    const b1 = find(box);
+    const h1 = b1 ? b1.getBoundingClientRect().height : 0;
+    // A whole list of peers is tens of thousands of pixels: rolled in a third
+    // of a second that rushes past at a screen per frame. That opens and
+    // shuts in place at once, the rows fading in.
+    const huge = Math.abs(h1 - h0) > window.innerHeight * 1.5;
+    if (huge && open && !still && b1 && b1.animate) b1.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+    if (still || huge || !b1 || !b1.animate || Math.abs(h1 - h0) < 2) { pin(); done(); return; }
+    // Closing rolls up what is still there: back to open for the animation,
+    // closed at its end.
+    if (!open) set(true);
+    const b = find(box);
+    const anim = b.animate([{ height: `${h0}px`, overflow: "hidden" }, { height: `${h1}px`, overflow: "hidden" }],
+      { duration: FOLD_MS, easing: open ? "cubic-bezier(.2,.7,.3,1)" : "cubic-bezier(.5,0,.3,1)" });
+    let frame = requestAnimationFrame(function follow() { pin(); frame = requestAnimationFrame(follow); });
+    anim.onfinish = anim.oncancel = () => {
+      cancelAnimationFrame(frame);
+      if (!open) set(false);
+      done();
+    };
+  }
+
   const state = {
     data: null,           // last /api/peers reply
     world: null,          // world.json
@@ -92,18 +168,17 @@
     };
     const flip = (e) => {
       if (e.target.closest("button, a")) return;
-      if (folded.has(id)) folded.delete(id); else folded.add(id);
+      foldInPlace({ anchor: title, box: card, open: folded.has(id), set: (open) => {
+        if (open) folded.delete(id); else folded.add(id);
+        show();
+        // Folded, a chip row measured no width and was left whole: fit it
+        // now, and the tables with it, whose lines were measured folded too.
+        if (open) {
+          for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
+          fitTables();
+        }
+      } });
       store.set(FOLD_KEY, JSON.stringify([...folded]));
-      // What the reader looks at stays put while a card above opens or closes.
-      const a = readAnchor();
-      show();
-      // Folded, a chip row measured no width and was left whole: fit it now,
-      // and the tables with it, whose lines were measured folded too.
-      if (!folded.has(id)) {
-        for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
-        fitTables();
-      }
-      holdAnchor(a);
       if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
     };
     title.addEventListener("click", flip);
@@ -821,6 +896,16 @@
     body.appendChild(race);
   }
 
+  // Every <details> folds in place: its summary stays, its text rolls out
+  // below and back up.
+  document.addEventListener("click", (ev) => {
+    const summary = ev.target.closest && ev.target.closest("details > summary");
+    if (!summary || ev.target.closest("a, button, input")) return;
+    ev.preventDefault();
+    const box = summary.parentElement;
+    foldInPlace({ anchor: summary, box, open: !box.open, set: (open) => { box.open = open; } });
+  });
+
   // The legend and the block's pool list fold shut again with a tap anywhere
   // on them, not only on their title: on a phone the title has scrolled away
   // by then, and it comes back into view.
@@ -828,6 +913,13 @@
     box.addEventListener("click", (ev) => {
       if (!box.open || ev.target.closest("summary, a, button, input")) return;
       if (String(window.getSelection()).length > 0) return;
+      // Its title on screen: it rolls up into it, in place. Scrolled away:
+      // shut at once, and the title comes back to the top of the screen.
+      const summary = box.querySelector(":scope > summary");
+      if (summary && summary.getBoundingClientRect().top >= 0) {
+        foldInPlace({ anchor: summary, box, open: false, set: (open) => { box.open = open; } });
+        return;
+      }
       box.open = false;
       const top = box.getBoundingClientRect().top;
       if (top < 0) window.scrollBy(0, top - 8);
@@ -1075,6 +1167,8 @@
   window.addEventListener("scroll", () => { scrolledAt = Date.now(); settle(); }, { passive: true });
   function busy() {
     if (moving()) return true;
+    // A fold rolling: a refresh would rebuild what it is rolling (foldInPlace).
+    if (folding) return true;
     const sel = window.getSelection && window.getSelection();
     if (sel && !sel.isCollapsed) return true;
     if (pressedAt && Date.now() - pressedAt < 2000) return true;
@@ -1208,7 +1302,7 @@
     renderUnplaced();
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
-    holdAnchor(anchor);
+    if (!folding) holdAnchor(anchor);
     restoreReloadY();
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
@@ -2583,48 +2677,54 @@
     row.addEventListener("click", (ev) => {
       if (ev.target.closest("a, button, input, select, textarea")) return;
       if (String(window.getSelection()).length > 0) return;
-      toggleDetail(tr, p, key);
+      // Its row on screen: the panel rolls up into it, in place. Scrolled
+      // away: shut at once, and the row comes back to the top of the screen.
       const top = tr.getBoundingClientRect().top;
-      if (top < 0) window.scrollBy(0, top - 8);
+      if (top >= 0) toggleDetail(tr, p, key);
+      else {
+        setDetail(tr, p, key, false);
+        window.scrollBy(0, tr.getBoundingClientRect().top - 8);
+      }
       if (backY !== null) backY = window.scrollY;  // and the way back keeps this place
     });
     return row;
   }
   // One at a time: opening a peer closes the one that was open, so the list does
-  // not grow without end. What the reader tapped stays where it was on the
-  // screen, although a detail above it has just gone.
-  function toggleDetail(tr, p, key) {
-    const top = tr.getBoundingClientRect().top;
-    const open = tr.nextElementSibling?.classList.contains("detail-row");
+  // not grow without end. The row stays where it was on the screen, its panel
+  // rolls out below it (foldInPlace), although a panel above it has just gone.
+  function setDetail(tr, p, key, open) {
     for (const row of document.querySelectorAll("#tables tr.detail-row")) row.remove();
     for (const row of document.querySelectorAll("#tables tr.open")) {
       row.classList.remove("open");
       row.querySelector(".chev")?.setAttribute("aria-expanded", "false");
     }
     state.openRows.clear();
-    if (!open) {
-      const row = detailRow(tr, p, key);
-      row.classList.add("opening");
-      tr.after(row);
+    if (open) {
+      tr.after(detailRow(tr, p, key));
       tr.classList.add("open");
       tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
       state.openRows.add(key);
     }
-    const d = tr.getBoundingClientRect().top - top;
-    if (Math.abs(d) >= 1) window.scrollBy(0, d);
     layers();
-    // A panel that opens below the screen's edge is brought up, gently and
-    // only as far as needed - never so far that the tapped row leaves the top.
-    const panel = !open && tr.nextElementSibling;
-    if (panel) {
-      const rowTop = tr.getBoundingClientRect().top, bottom = panel.getBoundingClientRect().bottom;
-      const up = Math.min(bottom + 12 - window.innerHeight, rowTop - 8);
-      if (up > 0) window.scrollBy({ top: up, behavior: glide() });
-    }
+  }
+  function toggleDetail(tr, p, key) {
+    const open = !tr.nextElementSibling?.classList.contains("detail-row");
+    foldInPlace({ anchor: tr, box: tr.closest(".card") || tr.closest("table"), open, set: (o) => setDetail(tr, p, key, o) });
   }
 
-  // Back to the top ten. Closing takes away most of the page under the
-  // reader; bring the card back into view if it went off the top.
+  // All inbound peers or the top ten. Opening, what is above stays and the
+  // rest rolls out below it; closing from the button at the end, the button
+  // stays under the finger and the list rolls up into it. From the bar at
+  // the top there is no button there to keep: the list closes, and the
+  // card's head comes back to the top of the screen.
+  const inboundWrap = () => document.querySelector("#group-inbound .scroll");
+  const moreButton = () => document.querySelector("#group-inbound > button.more");
+  function showAllInbound(all) {
+    foldInPlace({ anchor: all ? inboundWrap : moreButton, box: inboundWrap, open: all, set: (o) => {
+      state.showAllInbound = o;
+      renderTables();
+    } });
+  }
   function topOnly() {
     state.showAllInbound = false;
     renderTables();
@@ -2851,11 +2951,7 @@
         more.type = "button";
         more.className = "more";
         more.textContent = state.showAllInbound ? `Show top ${INBOUND_LIMIT} only` : `Show all ${peers.length}`;
-        more.addEventListener("click", () => {
-          if (state.showAllInbound) return topOnly();
-          state.showAllInbound = true;
-          renderTables();
-        });
+        more.addEventListener("click", () => showAllInbound(!state.showAllInbound));
         card.appendChild(more);
         // The whole list open: its name and the way back to the top ten ride
         // along at the top of the screen once the head has scrolled away, so
