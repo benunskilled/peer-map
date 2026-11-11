@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.8.0 – 2026-11-11
+
+On a phone the block route is now a timeline with each stretch's time on the right. The hop into your node is counted as BIP152 does: half a ping from a high-bandwidth peer (⚡), more when the block was announced first, and at least one more when your node had to ask for missing transactions; this needs Bitcoin Lab 2.6.0. On a wide screen every peer has one grey line under its kind, such as which wallet it probably is. Bitflash, 21 Data Lab's crawler and Nebula are recognised.
+
 ## 2.7.0 – 2026-11-08
 
 The block card has one switch, This block or Typical (the last 100 blocks), for both the route and the compact-block line; this needs Bitcoin Lab 2.5.0. The block line names the pool in full, without "mined by". Every peer not on your chain, altcoins and Knots forks alike, gets one "other chain" chip, and filtered lists drop label lines that only repeat what's already shown.
