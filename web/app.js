@@ -796,8 +796,10 @@
       // it stands up here with how far before your node it was, and the
       // hop stays whole underneath.
       const win = stops.find((st) => st.kind === "win");
-      const peerStop = stops.find((st) => st.kind === "peer");
-      const line = win && peerStop && win.t > peerStop.t ? stops.filter((st) => st !== win) : stops;
+      // As on the wide route: the first job against the first station after
+      // it, the peer or - with no peer to place - Core (review 11.11.2026).
+      const firstStation = stops.find((st) => st.kind !== "win");
+      const line = win && firstStation && win.t > firstStation.t ? stops.filter((st) => st !== win) : stops;
       if (line !== stops) {
         li("gap lead", []);
         li("stop win", [[win.name, "name"], ["first job"]]);
@@ -2481,8 +2483,10 @@
           e.textContent = text;
           // Syncing keeps its turning arrow; a fork and pruned say why on hover.
           if (p.sync_mb) e.replaceChildren(syncSpan(p));
-          const why = p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : "";
-          if (why) e.title = why;
+          // On hover: the whole line where it is cut, and why - the reason's
+          // whole sentence (p.why), a fork's or pruned's meaning (fit).
+          const why = p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : p.why || "";
+          if (!p.sync_mb) fit(e, text, why);
           // A second part stays only where it fits whole (fitTables).
           const two = text.split(" \u00b7 ");
           if (two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });

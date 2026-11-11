@@ -771,7 +771,6 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .key .hb { font-size: 13px; }
 .key .star { color: var(--accent); }
 .key .never-mark { color: var(--muted); }
-.key b.key-grey { color: var(--muted); font-weight: 400; }
 .key .addr-txt.delivered { color: #56d364; }
 .key b { color: var(--text); font-weight: 600; }
 .key .kind { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); white-space: nowrap; }
