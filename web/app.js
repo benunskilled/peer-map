@@ -545,13 +545,21 @@
   // clock on one machine, except the last hop into Core, which is estimated
   // as the delivering peer's ping.
   //
-  // A whole ping rather than half: half is only the floor. A compact block
-  // that arrives complete costs half a round trip; one that is missing a few
-  // transactions costs another full one to ask for them. A whole ping sits in
-  // the middle; where Bitcoin Lab saw Core ask (recon "asked"), the round trip
-  // is added - one more ping. It only moves the peer's dot - Core and the
-  // pools stand where they were measured.
+  // How many pings, as BIP152 counts them (hopPings): a high-bandwidth peer
+  // sends the block unasked, half a ping; any other announces it and is
+  // asked, a ping and a half; asking for missing transactions adds one.
+  // Bitcoin Lab says which kind of peer it was just before the block. It
+  // only moves the peer's dot - Core and the pools stand where they were
+  // measured.
   const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
+  // Not known whether the peer was high-bandwidth (older blocks): one ping,
+  // the middle. Bitcoin Lab's typical route counts the same way.
+  const hopPings = (hb, recon) => (hb === 1 ? 0.5 : hb === 0 ? 1.5 : 1) + (recon === "asked" ? 1 : 0);
+  const pingWords = (n) => n === 0.5 ? "½ ping" : n === 1 ? "ping"
+    : `${Math.floor(n)}${n % 1 ? "½" : ""} pings`;
+  const HOP_WHY = "Estimated from the peer's ping, as BIP152 counts it: a high-bandwidth peer sends a new block " +
+    "without being asked, half a ping; any other announces it first, a ping and a half. Asking for missing " +
+    "transactions adds a ping. These are minimums - more missing data or a slow line take longer.";
   // Text cut off with an ellipsis is readable on hover - and only then, a
   // tooltip that repeats what is on screen says nothing. Whether it is cut
   // depends on the screen, so it is decided when the pointer gets there.
@@ -624,10 +632,8 @@
       const where = p ? p.region || (p.cc ? regionName(p.cc) : "") : "";
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
-        // Core had to ask this peer for missing transactions: one more
-        // round trip before the block was whole, so the peer had it a ping
-        // earlier (recon, measured by Bitcoin Lab).
-        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * (b.recon === "asked" ? 2 : 1), asked: b.recon === "asked",
+        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * hopPings(b.first_hb, b.recon),
+        pings: hopPings(b.first_hb, b.recon),
         name: hostOf(lead.addr) + more,
         sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
@@ -689,7 +695,7 @@
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return ["~" + d + (a.asked ? " · ping + round trip" : " · ping")];
+    if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · " + pingWords(a.pings || 1), HOP_WHY];
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
     if (a.kind === "core" && z.kind === "tpl") {
       return [d + " · template", "Core builds a new block template (getblocktemplate)"];
@@ -721,7 +727,7 @@
         asked: `+1 round trip · ${kB(b.recon_missing_bytes || 0)}`,
         full: "downloaded in full",
       }[b.recon];
-      return [how || "into your node", (a.kind === "peer" ? "~" : "") + ms, RECON_WHY];
+      return [how || "into your node", (a.kind === "peer" ? "~" : "") + ms, HOP_WHY];
     }
     if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {

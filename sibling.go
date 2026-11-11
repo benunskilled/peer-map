@@ -134,6 +134,10 @@ type lastBlock struct {
 	// that credited it. Absent on blocks recorded before the Lab measured them.
 	TemplateMs  *float64 `json:"template_ms,omitempty"`
 	FirstPingMs *float64 `json:"first_ping_ms,omitempty"`
+	// Whether that peer was one of Core's high-bandwidth peers just before
+	// the block (1 or 0): it decides how many pings the hop into Core takes.
+	// Absent where Bitcoin Lab did not know, or is older than this.
+	FirstHb *int `json:"first_hb,omitempty"`
 	// How many transactions that template carried: a pool spends time on
 	// every one, so this is why one block's job is slower than the next.
 	TemplateTx *int `json:"template_tx,omitempty"`
@@ -288,6 +292,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		TemplateMs    *float64 `json:"templateMs"`
 		TemplateTx    *int     `json:"templateTx"`
 		FirstPingMs   *float64 `json:"firstPingMs"`
+		FirstHb       *int     `json:"firstHb"`
 		DeliveredEver []string `json:"deliveredEver"`
 		Recon         *string  `json:"recon"`
 		ReconMissing  *int64   `json:"reconMissingBytes"`
@@ -379,6 +384,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		TemplateMs:        got.TemplateMs,
 		TemplateTx:        got.TemplateTx,
 		FirstPingMs:       got.FirstPingMs,
+		FirstHb:           got.FirstHb,
 		RouteMedian:       med,
 		Recon:             recon,
 		ReconMissingBytes: got.ReconMissing,
