@@ -59,7 +59,7 @@ Tested with Bitcoin Core 32.1.
 ## Data and attribution
 
 - Geolocation: [DB-IP](https://db-ip.com), IP to City Lite, CC BY 4.0, data from October 2026.
-- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0, data from October 2026.
+- Network providers: DB-IP, IP to ASN Lite, CC BY 4.0, data from November 2026.
 - World map: Natural Earth, public domain.
 - Tor exits: the Tor Project's [bulk exit list](https://check.torproject.org/torbulkexitlist), bundled at build time.
 
