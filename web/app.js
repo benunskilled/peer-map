@@ -633,7 +633,7 @@
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
         kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * hopPings(b.first_hb, b.recon),
-        pings: hopPings(b.first_hb, b.recon), asked: b.recon === "asked",
+        pings: hopPings(b.first_hb, b.recon), asked: b.recon === "asked", hb: b.first_hb,
         name: hostOf(lead.addr) + more,
         sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
@@ -695,7 +695,11 @@
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return [(a.asked ? "at least " : "~") + d + " · " + pingWords(a.pings || 1), HOP_WHY];
+    if (a.kind === "peer" && z.kind === "core") {
+      // Why that many pings: sent unasked (⚡) or announced first.
+      const how = a.hb === 1 ? " · ⚡" : a.hb === 0 ? " · announced first" : "";
+      return [(a.asked ? "at least " : "~") + d + " · " + pingWords(a.pings || 1) + how, HOP_WHY];
+    }
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
     if (a.kind === "core" && z.kind === "tpl") {
       return [d + " · template", "Core builds a new block template (getblocktemplate)"];
