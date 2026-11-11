@@ -38,12 +38,18 @@ func TestEveryDisguiseHasATell(t *testing.T) {
 func TestShortReasons(t *testing.T) {
 	for _, c := range []struct{ about, want string }{
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + skippedHandshakeAbout(map[string]int64{"sendaddrv2": 1}), "no wtxidrelay"},
-		{"Claims: Bitcoin Core 28.1.0\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services"},
+		{"Claims: Bitcoin Core 28.1.0\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services \u00b7 no wtxidrelay"},
+		// What it did first, whatever order the reasons came in.
+		{fakeAbout("/Sat0shi:25.0.0/", "", nil) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s \u00b7 misspelt name"},
+		{"Claims: x\nProbably: " + offersNothingAbout + "\nAlso: it left out wtxidrelay\nAlso: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18\u00d7 \u00b7 offers no services"},
 		{"Claims: Bitcoin Core 31.1.0\nProbably: " + anachronism("/Satoshi:31.1.0/", []string{"NETWORK", "WITNESS"}), "no NETWORK_LIMITED"},
 		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015), "protocol 70015 for Core 25.1.0"},
 		{"Claims: x\nProbably: a crawler - it asked for addresses 18 times, Core asks once", "asks for addresses 18×"},
 		{"Claims: x\nProbably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s"},
 		{"Claims: x\nProbably: " + bitcoinjTooNewAbout, "newer protocol than the wallet"},
+		// A protocol number only where nothing else tells.
+		{"Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes", "pings every 2 s"},
+		{"Claims: Bitcoin Core 23.0.0\nProbably: " + protocolMismatch("/Satoshi:23.0.0/", 70002) + "\nAlso: " + offersNothingAbout + "\nAlso: it left out wtxidrelay", "offers no services \u00b7 no wtxidrelay"},
 		{"Claims: x\nProbably: " + anachronism("/Satoshi:0.15.0/Knots:20170914/", []string{"NETWORK", "P2P_V2"}), "v2 for Core 0.15"},
 		{fakeAbout("/Satoshi:0.11.0/", "", nil) + "\nAlso: " + protocolMismatch("/Satoshi:0.11.0/", 70016), "protocol 70016 for Core 0.11.0"},
 		{fakeAbout("/Sat0shi:25.0.0/", "", nil), "misspelt name"},
@@ -55,10 +61,22 @@ func TestShortReasons(t *testing.T) {
 		}
 	}
 	lion := "Claims: bitcoinj 0.14.5\nProbably: " + linkingLionAbout + "\nAlso: it offers blocks, which no wallet does"
-	if got := tellOf(lion, true); got != "offers blocks" {
+	if got := tellOf(lion, true); got != "wallet offering blocks" {
 		t.Errorf("LinkingLion with blocks tells %q", got)
 	}
-	if got := tellOf("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); got != "listed address range" {
+	// The wide list's sentence is the reason the short line leads with.
+	ping := "Claims: Bitcoin Core 25.1.0\nProbably: " + protocolMismatch("/Satoshi:25.1.0/", 70015) + "\nAlso: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes"
+	if _, why := tellAndWhy(ping, false); why != "Probably: not Bitcoin Core - it pings every 2 seconds, Core every 2 minutes" {
+		t.Errorf("why leads with %q", why)
+	}
+	if _, why := tellAndWhy("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); why != "" {
+		t.Errorf("bare LinkingLion has why %q", why)
+	}
+	// One piece of evidence: the pill already says what it is.
+	if got := tellOf(lion+"\nAlso: it speaks v2, which no wallet does", true); got != "wallet offering blocks" {
+		t.Errorf("LinkingLion with two reasons tells %q", got)
+	}
+	if got := tellOf("Claims: Bitcoin Core 0.11.0\nProbably: "+linkingLionAbout, true); got != "on 0xB10C's list" {
 		t.Errorf("bare LinkingLion tells %q", got)
 	}
 }

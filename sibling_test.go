@@ -162,7 +162,7 @@ func TestSiblingLatestBlock(t *testing.T) {
 				{"label":"Public A","own":false,"latencyMs":0,"rank":1,"miss":false},
 				{"label":"My pool","own":true,"latencyMs":412.5,"rank":2,"miss":false},
 				{"label":"Quiet one","own":false,"latencyMs":null,"rank":null,"miss":true}]},
-			"templateMs":84.5,"firstPingMs":98,"deliveredEver":["1.2.3.4:8333","5.6.7.8:8333"],
+			"templateMs":84.5,"firstPingMs":98,"firstHb":0,"deliveredEver":["1.2.3.4:8333","5.6.7.8:8333"],
 			"recon":"asked","reconMissingBytes":38000,"blockSize":1520000,
 			"reconLast100":{"blocks":98,"mempool":60,"asked":35,"full":3,"askedAvgBytes":38200},
 			"routeMedian":{"blocks":100,"core":{"ms":210,"n":100},"peer":{"ms":120,"n":97},
@@ -199,6 +199,9 @@ func TestSiblingLatestBlock(t *testing.T) {
 	// The three roles arrive separately and stay separate: mined, delivered,
 	// and turned into work.
 	// How the block was rebuilt rides along; an empty window is left out.
+	if got.FirstHb == nil || *got.FirstHb != 0 {
+		t.Errorf("first_hb %v, want 0 (known, and not high-bandwidth)", got.FirstHb)
+	}
 	if got.Recon != "asked" || got.ReconMissingBytes == nil || *got.ReconMissingBytes != 38000 {
 		t.Errorf("recon %q %v", got.Recon, got.ReconMissingBytes)
 	}

@@ -44,6 +44,82 @@
   // Smooth scrolling, unless the reader asked the system for less motion.
   const glide = () => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
 
+  // Folding in place (10.11.2026, the same in Bitcoin Lab): what was tapped
+  // stays where it is on the screen. What opens rolls out downwards and what
+  // closes rolls up, gently, and the page never jumps - not to bring
+  // something into view, not because the page got shorter at its end. Every
+  // fold goes through here: a card, a group, a peer's panel, "Show all", a
+  // legend.
+  //
+  //   anchor  what stays put, or a function finding it again (the tables
+  //           are rebuilt, and with them the button that was tapped)
+  //   box     what grows or shrinks, the same
+  //   set     puts the page in the open (true) or closed (false) state
+  const FOLD_MS = 300;
+  let folding = 0;
+  // Room below the page's end while something shrinks there; it goes as soon
+  // as the reader scrolls up far enough not to need it.
+  let runway = 0;
+  function setRunway(px) {
+    runway = Math.max(0, Math.ceil(px));
+    document.body.style.paddingBottom = runway ? `${runway}px` : "";
+  }
+  window.addEventListener("scroll", () => {
+    if (!runway || folding) return;
+    const spare = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+    if (spare > 0) setRunway(runway - spare);
+  }, { passive: true });
+  function foldInPlace({ anchor, box, set, open }) {
+    const find = (x) => (typeof x === "function" ? x() : x);
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const a0 = find(anchor);
+    if (!a0) { set(open); return; }
+    const top0 = a0.getBoundingClientRect().top;
+    // To where, not by how much: Safari reports a scroll a frame late, and
+    // moving by the difference moved twice and swung back and forth.
+    const pin = () => {
+      const a = find(anchor);
+      if (!a || !a.isConnected) return;
+      const want = a.getBoundingClientRect().top + window.scrollY - top0;
+      if (Math.abs(window.scrollY - want) >= 0.5) window.scrollTo(0, want);
+    };
+    folding += 1;
+    // Room at the end for as much as the box could lose, lent before anything
+    // is measured: measuring a page that got shorter is already enough for
+    // the browser to pull everything down. When the fold is over, only what
+    // the reader still needs stays.
+    const lent = runway;
+    const b0 = find(box);
+    const h0 = b0 ? b0.getBoundingClientRect().height : 0;
+    setRunway(lent + h0);
+    const giveBack = () => {
+      const end = document.documentElement.scrollHeight - runway;
+      setRunway(Math.max(lent, window.scrollY + window.innerHeight - end));
+    };
+    const done = () => { pin(); giveBack(); pin(); requestAnimationFrame(() => { pin(); folding -= 1; freed(); }); };
+    // A fold that fails half way must not leave refreshes held back.
+    try { set(open); } catch (err) { folding -= 1; throw err; }
+    const b1 = find(box);
+    const h1 = b1 ? b1.getBoundingClientRect().height : 0;
+    // A whole list of peers is tens of thousands of pixels: rolled in a third
+    // of a second that rushes past at a screen per frame. That opens and
+    // shuts in place at once, the rows fading in.
+    const huge = Math.abs(h1 - h0) > window.innerHeight * 1.5;
+    if (huge && open && !still && b1 && b1.animate) b1.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 220, easing: "ease-out" });
+    if (still || huge || !b1 || !b1.animate || Math.abs(h1 - h0) < 2) { pin(); done(); return; }
+    // Closing rolls up what is still there: back to open for the animation,
+    // closed at its end.
+    if (!open) set(true);
+    const b = find(box);
+    const anim = b.animate([{ height: `${h0}px`, overflow: "hidden" }, { height: `${h1}px`, overflow: "hidden" }],
+      { duration: FOLD_MS, easing: open ? "cubic-bezier(.2,.7,.3,1)" : "cubic-bezier(.5,0,.3,1)" });
+    let frame = requestAnimationFrame(function follow() { pin(); frame = requestAnimationFrame(follow); });
+    anim.onfinish = anim.oncancel = () => {
+      cancelAnimationFrame(frame);
+      try { if (!open) set(false); } finally { done(); }
+    };
+  }
+
   const state = {
     data: null,           // last /api/peers reply
     world: null,          // world.json
@@ -92,15 +168,24 @@
     };
     const flip = (e) => {
       if (e.target.closest("button, a")) return;
-      if (folded.has(id)) folded.delete(id); else folded.add(id);
+      // What is on screen: a card opened for a peer link is open, whatever
+      // the stored state says.
+      const opening = card.classList.contains("folded");
+      foldInPlace({ anchor: title, box: card, open: opening, set: (open) => {
+        if (open) folded.delete(id); else folded.add(id);
+        show();
+        // Folded, a chip row measured no width and was left whole: fit it
+        // now, and the tables with it, whose lines were measured folded too.
+        if (open) {
+          for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
+          fitTables();
+        }
+      } });
+      // Kept as the reader left it, not as it is half way: closing rolls up
+      // from open and is folded only at the end.
+      if (opening) folded.delete(id); else folded.add(id);
       store.set(FOLD_KEY, JSON.stringify([...folded]));
-      // What the reader looks at stays put while a card above opens or closes.
-      const a = readAnchor();
-      show();
-      // Folded, a chip row measured no width and was left whole: fit it now.
-      if (!folded.has(id)) for (const row of card.querySelectorAll(".one-line")) fitOneLine(row);
-      holdAnchor(a);
-      if (id === "map" && !folded.has(id)) window.dispatchEvent(new Event("resize"));
+      if (id === "map" && opening) window.dispatchEvent(new Event("resize"));
     };
     title.addEventListener("click", flip);
     title.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(e); } });
@@ -331,8 +416,8 @@
   // blocks - the same "typical" as the route's, and the same switch.
   // Absent with a Bitcoin Lab from before it measured this.
   const RECON_WHY = "A new block arrives as a compact block: short ids for its transactions, " +
-    "which your node fills in from its own mempool. Whatever it does not have, it asks the peer for - " +
-    "one more round trip before the block is complete.";
+    "which your node fills in from its mempool and from transactions it recently turned down. " +
+    "Whatever it does not have, it asks the peer for - one more round trip before the block is complete.";
   // No-break spaces keep a number and its unit on one line on a phone.
   const kB = (bytes) => (bytes < 1000 ? "under 1\u00a0kB" : Math.round(bytes / 1000).toLocaleString("en-US") + "\u00a0kB");
 
@@ -376,15 +461,15 @@
     line.title = RECON_WHY;
     if (view === "block") {
       line.textContent = {
-        mempool: "Rebuilt from your mempool, nothing was missing",
+        mempool: "Rebuilt from what your node already had, nothing was missing",
         asked: `Your node had to ask for missing transactions: ${kB(b.recon_missing_bytes || 0)}` + shareOfBlock(b),
-        full: "Downloaded in full, not rebuilt from your mempool",
+        full: "Downloaded in full, not rebuilt",
         unclear: "Not clear for this block",
       }[b.recon] || "Not measured for this block";
     } else {
       const w = last;
       const pct = (n) => Math.round((100 * n) / w.blocks) + "\u00a0%";
-      const parts = [`${pct(w.mempool)} rebuilt from your mempool`];
+      const parts = [`${pct(w.mempool)} rebuilt from what your node had`];
       if (w.asked) parts.push(`${pct(w.asked)} needed missing transactions` + (w.asked_avg_bytes != null ? `, ${kB(w.asked_avg_bytes)} on average` : ""));
       if (w.full) parts.push(`${pct(w.full)} downloaded in full`);
       line.textContent = parts.join(" \u00b7 ") + " ";
@@ -458,12 +543,21 @@
   // clock on one machine, except the last hop into Core, which is estimated
   // as the delivering peer's ping.
   //
-  // A whole ping rather than half: half is only the floor. A compact block
-  // that arrives complete costs half a round trip; one that is missing a few
-  // transactions costs another full one to ask for them. Which happened is not
-  // visible from here, and a whole ping sits in the middle. It only moves the
-  // peer's dot - Core and the pools stand where they were measured.
+  // How many pings, as BIP152 counts them (hopPings): a high-bandwidth peer
+  // sends the block unasked, half a ping; any other announces it and is
+  // asked, a ping and a half; asking for missing transactions adds one.
+  // Bitcoin Lab says which kind of peer it was just before the block. It
+  // only moves the peer's dot - Core and the pools stand where they were
+  // measured.
   const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
+  // Not known whether the peer was high-bandwidth (older blocks): one ping,
+  // the middle. Bitcoin Lab's typical route counts the same way.
+  const hopPings = (hb, recon) => (hb === 1 ? 0.5 : hb === 0 ? 1.5 : 1) + (recon === "asked" ? 1 : 0);
+  const HOP_WHY = "Estimated from the peer's ping, as BIP152 counts it: a high-bandwidth peer sends a new block " +
+    "without being asked, half a ping; any other announces it first, a ping and a half. Asking for missing " +
+    "transactions adds a ping. These are minimums - more missing data or a slow line take longer, and a peer " +
+    "still busy with the block - checking it, sending it to others - answers only after that. Measured elsewhere (0xB10C, 2024), asking " +
+    "added about 115 ms in the median.";
   // Text cut off with an ellipsis is readable on hover - and only then, a
   // tooltip that repeats what is on screen says nothing. Whether it is cut
   // depends on the screen, so it is decided when the pointer gets there.
@@ -536,7 +630,8 @@
       const where = p ? p.region || (p.cc ? regionName(p.cc) : "") : "";
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
-        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping,
+        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * hopPings(b.first_hb, b.recon),
+        pings: hopPings(b.first_hb, b.recon), asked: b.recon === "asked", hb: b.first_hb,
         name: hostOf(lead.addr) + more,
         sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
@@ -587,37 +682,69 @@
   // sit nearer than ROUTE_GAP to the one before is pushed along, and the
   // whole row pulled back in from the right. Too narrow for that at all - a
   // phone - and it is a list instead, which says the same thing.
-  function placeStops(stops, left, right) {
+  function placeStops(stops, left, right, need) {
+    const gap = (i) => (need && need[i]) || ROUTE_GAP;
     const t0 = stops[0].t, span = Math.max(1, stops[stops.length - 1].t - t0);
     const x = stops.map((s) => left + ((s.t - t0) / span) * (right - left));
-    for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + ROUTE_GAP);
+    for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + gap(i));
     x[x.length - 1] = Math.min(x[x.length - 1], right);
-    for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - ROUTE_GAP);
+    for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - gap(i + 1));
     return x;
   }
-
-  function segLabel(a, z) {
-    const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · ping"];
-    if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
-    if (a.kind === "core" && z.kind === "tpl") {
-      return [d + " · template", "Core builds a new block template (getblocktemplate)"];
+  // How far apart two stops must be for the stretch label between them.
+  let measureCtx = null;
+  function segNeeds(box, stops) {
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = "12px " + getComputedStyle(box).fontFamily;
+    const need = stops.map(() => ROUTE_GAP);
+    const journey = stops.filter((st) => st.kind !== "win");
+    const win = stops.find((st) => st.kind === "win");
+    const pairs = [];
+    if (win && journey.length && win.t <= journey[0].t) pairs.push([win, journey[0]]);
+    for (let i = 1; i < journey.length; i++) pairs.push([journey[i - 1], journey[i]]);
+    for (const [a, z] of pairs) {
+      const w = measureCtx.measureText(segLabel(a, z)[0]).width + 24;
+      const ia = stops.indexOf(a), iz = stops.indexOf(z);
+      for (let k = ia + 1; k <= iz; k++) need[k] = Math.max(need[k], w / (iz - ia));
     }
+    return need;
+  }
+
+  // One stretch, the same words on every width: what happens on it, how
+  // long it took, and the longer why for the tooltip. The hop into Core says
+  // why it is that long - sent unasked (⚡) or announced first, and whether
+  // Core had to ask for missing transactions; "at least" then, because the
+  // round trip is only the floor.
+  function stretch(a, z) {
+    const ms = Math.round(z.t - a.t).toLocaleString("en-US") + "\u00a0ms";
+    if (a.kind === "peer" && z.kind === "core") {
+      const kind = a.hb === 1 ? "⚡" : a.hb === 0 ? "announced" : "";
+      const what = kind && a.asked ? kind + " + asked" : kind || (a.asked ? "asked" : "ping");
+      return [what, (a.asked ? "at least\u00a0" : "~") + ms, HOP_WHY];
+    }
+    if (a.kind === "win" && z.kind === "peer") return ["reaches your peer", ms, ""];
+    if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {
       // The template's size is most of the reason this stretch varies: the
       // pool handles every transaction in it before it can send the job.
       const tx = a.tx != null ? " · " + Math.round(a.tx).toLocaleString("en-US") + " tx" : "";
-      return [d + " · job" + tx,
-        "Your pool notices the block and turns the template into a job" +
+      return ["job" + tx, ms, "Your pool notices the block and turns the template into a job" +
         (tx ? " - the more transactions the template carries, the longer that takes" : "")];
     }
     // No template timing for this block: the two are one stretch.
     if (a.kind === "core" && z.kind === "own") {
-      return [d + " · template + job",
-        "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
+      return ["template + job", ms, "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
     }
-    return [d];
+    return ["", ms, ""];
   }
+  // The wide route's label: first what, then how long - as on a phone.
+  function segLabel(a, z) {
+    const [what, time, why] = stretch(a, z);
+    return [what ? what + " · " + time : time, why];
+  }
+
+
+
 
   function renderRoute(box, b, stops, { view, canSwitch, noRaceHere }) {
     box.textContent = "";
@@ -642,35 +769,68 @@
     // room for half of it - at the edge it looked squeezed.
     const left = ROUTE_STUB, right = W - 60;
 
-    if ((stops.length - 1) * ROUTE_GAP > right - left) {
-      // Narrow: the same stops as rows.
-      const t = document.createElement("table");
-      t.className = "rt-list";
-      const row = (cls, name, time, sub) => {
-        const tr = document.createElement("tr");
-        tr.className = cls;
-        for (const [c, v] of [["n", name], ["miss", sub], ["num", time]]) {
-          const td = document.createElement("td");
-          td.className = c;
-          td.textContent = v;
-          if (c === "miss" && v) td.title = v;
-          tr.appendChild(td);
+    const need = segNeeds(box, stops);
+    if (need.slice(1).reduce((x, y) => x + y, 0) > right - left) {
+      // Narrow: the same stops down a line. Between two stops, what that
+      // stretch is and - on the right, flush - how long it took. One rule
+      // for every stretch: from the stop above, so never negative. The hop
+      // into Core says in short how the compact block went; the compact
+      // block line under the route says it in full, as on a wide screen.
+      const ol = document.createElement("ol");
+      ol.className = "rt-v";
+      const li = (cls, parts, title) => {
+        const e = document.createElement("li");
+        e.className = cls;
+        for (const [text, c] of parts) {
+          const s = document.createElement(c === "name" ? "b" : "span");
+          s.textContent = text;
+          if (c && c !== "name") s.className = c;
+          e.appendChild(s);
         }
-        t.appendChild(tr);
+        if (title) e.title = title;
+        ol.appendChild(e);
       };
-      row("pool", miner, "", "mined it");
-      // One rule for every row: the time is from the row above, so it is
-      // never negative. The first job is a row like the others here; the
-      // template's transactions go with the job built from it.
-      const tx = stops.find((st) => st.kind === "tpl")?.tx;
-      stops.forEach((s, i) => {
-        const prev = stops[i - 1];
-        const gap = prev ? Math.round(s.t - prev.t) : null;
-        const time = gap == null ? "" : (prev.kind === "peer" && s.kind === "core" ? "~" : "+") + gap + " ms";
-        const sub = s.kind === "own" && tx != null ? [...s.sub, Math.round(tx).toLocaleString("en-US") + " tx"] : s.sub;
-        row(s.kind, s.name, time, sub.join(" · "));
+      li("stop pool", [[miner, "name"], ["mined it"]]);
+      // The first job is the zero, not a station (as on the wide route):
+      // when it falls inside the hop into Core - a far peer, a long hop -
+      // it stands up here with how far before your node it was, and the
+      // hop stays whole underneath.
+      const win = stops.find((st) => st.kind === "win");
+      // As on the wide route: the first job against the first station after
+      // it, the peer or - with no peer to place - Core (review 11.11.2026).
+      const firstStation = stops.find((st) => st.kind !== "win");
+      const line = win && firstStation && win.t > firstStation.t ? stops.filter((st) => st !== win) : stops;
+      if (line !== stops) {
+        li("gap lead", []);
+        li("stop win", [[win.name, "name"], ["first job"]]);
+        li("gap lead", [[firstJobWords(win, stops)]]);
+      } else li("gap lead", []);
+      line.forEach((s, i) => {
+        if (i > 0) {
+          const prev = line[i - 1];
+          // The first job's stretch to the peer says only its time here:
+          // the first job's own line says what it is.
+          const [what, time, why] = prev.kind === "win" ? ["", ...stretch(prev, s).slice(1)] : stretch(prev, s);
+          li("gap", [[what || " "], [time, "t"]], why);
+        }
+        // Where the peer is stands on the card's first line; here only
+        // which one, so every stop fits one line.
+        const peer = s.kind === "peer" && !median;
+        li("stop " + s.kind + (s.group ? " " + s.group : ""),
+          [[peer ? "Your peer" : s.name, "name"], peer ? [s.name, "addr"] : [s.sub.join(" · ")]], s.title);
       });
-      box.appendChild(t);
+      box.appendChild(ol);
+      // "at least" in words; where it would squeeze its stretch's text past
+      // two lines, the sign - a bare number would read as the estimate.
+      for (const t of ol.querySelectorAll(".gap .t")) {
+        if (!t.textContent.startsWith("at least")) continue;
+        const what = t.previousElementSibling;
+        const cs = getComputedStyle(what);
+        const lh = parseFloat(cs.lineHeight) || 1.3 * parseFloat(cs.fontSize);
+        if (what.getBoundingClientRect().height > 2.5 * lh) {
+          t.textContent = t.textContent.replace("at least\u00a0", "≥");
+        }
+      }
     } else {
       const rt = document.createElement("div");
       rt.className = "rt";
@@ -689,7 +849,7 @@
         if (cls) e.className = cls;
         return e;
       };
-      const xs = placeStops(stops, left, right);
+      const xs = placeStops(stops, left, right, need);
 
       const stub = el("rt-stub", 6);
       stub.style.width = (xs[0] - 6) + "px";
@@ -785,7 +945,7 @@
     if (!b.stratum || !(b.stratum.entries || []).length) {
       const p = document.createElement("p");
       p.className = "note";
-      p.textContent = "No race recorded for this block - Bitcoin Lab's Stratum Race is off.";
+      p.textContent = "No race recorded for this block.";
       race.appendChild(p);
     } else {
       const t = document.createElement("table");
@@ -817,6 +977,16 @@
     body.appendChild(race);
   }
 
+  // Every <details> folds in place: its summary stays, its text rolls out
+  // below and back up.
+  document.addEventListener("click", (ev) => {
+    const summary = ev.target.closest && ev.target.closest("details > summary");
+    if (!summary || ev.target.closest("a, button, input")) return;
+    ev.preventDefault();
+    const box = summary.parentElement;
+    foldInPlace({ anchor: summary, box, open: !box.open, set: (open) => { box.open = open; } });
+  });
+
   // The legend and the block's pool list fold shut again with a tap anywhere
   // on them, not only on their title: on a phone the title has scrolled away
   // by then, and it comes back into view.
@@ -824,6 +994,13 @@
     box.addEventListener("click", (ev) => {
       if (!box.open || ev.target.closest("summary, a, button, input")) return;
       if (String(window.getSelection()).length > 0) return;
+      // Its title on screen: it rolls up into it, in place. Scrolled away:
+      // shut at once, and the title comes back to the top of the screen.
+      const summary = box.querySelector(":scope > summary");
+      if (summary && summary.getBoundingClientRect().top >= 0) {
+        foldInPlace({ anchor: summary, box, open: false, set: (open) => { box.open = open; } });
+        return;
+      }
       box.open = false;
       const top = box.getBoundingClientRect().top;
       if (top < 0) window.scrollBy(0, top - 8);
@@ -1071,6 +1248,8 @@
   window.addEventListener("scroll", () => { scrolledAt = Date.now(); settle(); }, { passive: true });
   function busy() {
     if (moving()) return true;
+    // A fold rolling: a refresh would rebuild what it is rolling (foldInPlace).
+    if (folding) return true;
     const sel = window.getSelection && window.getSelection();
     if (sel && !sel.isCollapsed) return true;
     if (pressedAt && Date.now() - pressedAt < 2000) return true;
@@ -1204,7 +1383,7 @@
     renderUnplaced();
     renderTables();
     if (window.scrollY !== y) window.scrollTo(0, y);
-    holdAnchor(anchor);
+    if (!folding) holdAnchor(anchor);
     restoreReloadY();
     focusOnce();
     const hash = d.last_block && d.last_block.hash;
@@ -1221,6 +1400,15 @@
     const row = document.querySelector("tr.focus");
     if (!row) return;
     state.focusDone = true;
+    // A card the reader folded opens for this visit, not for good: the peer
+    // asked for is in it, and a reload keeps it folded as before.
+    const shut = row.closest(".folded");
+    if (shut) {
+      shut.classList.remove("folded");
+      const title = shut.querySelector(".fold-title");
+      if (title) title.setAttribute("aria-expanded", "true");
+      fitTables();
+    }
     row.scrollIntoView({ block: "center", behavior: glide() });
   }
 
@@ -1281,7 +1469,9 @@
     const others = d.peers.length - nodes - disguised;
     const el = $("status");
     el.textContent = `${d.peers.length} peers: ${nodes} nodes, ${disguised} disguised, ${others} others`;
-    liveDot.classList.toggle("stale", state.paused || state.failed);
+    // Grey whenever what is shown is not fresh: paused, unreachable, or Core
+    // failing and the last good list standing in.
+    liveDot.classList.toggle("stale", state.paused || state.failed || !!d.error);
     el.prepend(liveDot);
     // The dot says it is live; when and how often only on hover.
     el.title = `Updated ${since} · ${mode}`;
@@ -1935,6 +2125,29 @@
   // Core since 0.16 sets it next to NETWORK, so only a node without NETWORK is
   // pruned. Said of nodes only: a disguised peer's bits are as made up as its name.
   const PRUNED_WHY = "Keeps only recent blocks";
+  // The one line a filtered phone card has: the most important thing about
+  // the peer that the pill does not say already (09.11.2026). In the syncing
+  // filter, what put it there; else whose pool; why a disguise is one, what
+  // it did before what it says; for a node another chain, or the software
+  // where the pill says only "other", or whether it keeps every block; for the
+  // rest what it did, then what it is, and its user agent where nothing is
+  // known. Never empty, so every card in a filter is one height.
+  const probablyOf = (p) => ((p.about || "").split("\n").find((l) => l.startsWith("Probably: ")) || "").slice("Probably: ".length);
+  const cardLine = (p) => {
+    if (p.sync_mb) return "syncing " + mbText(p.sync_mb);
+    if (p.kind === POOL_KIND) return (p.pool || UNKNOWN_POOL) + (/block relay/i.test(p.about || "") ? " \u00b7 block relay" : "");
+    if (p.linking_lion) return p.tell || "on 0xB10C's list";
+    if (p.kind === "Disguised") return p.tell || probablyOf(p);
+    if (p.kind.startsWith("Node")) {
+      if (p.fork) return p.fork;
+      // A known block relay's address: whose relay it is (peers.go, relayOf).
+      if (p.tell) return p.tell;
+      if (p.kind === "Node (other)" && p.label) return p.label;
+      const s = p.services || [];
+      return s.includes("NETWORK") ? "full node" : s.includes("NETWORK_LIMITED") ? "pruned" : s.length ? "serves no blocks" : "";
+    }
+    return p.tell || p.label || probablyOf(p) || (p.about || "").split("\n")[0] || p.subver || "";
+  };
   const isPruned = (p) => p.kind.startsWith("Node") && !!p.services && p.services.includes("NETWORK_LIMITED") && !p.services.includes("NETWORK");
   const NO_HEADERS_WHY = "This peer has never sent Core a block header, so Core cannot tell which chain it follows";
   function mbText(mb) {
@@ -2256,64 +2469,28 @@
         // is normal for many peers and only in the panel, with why
         // (28.10.2026: one line for the reason, not a list of flags). A phone
         // card is the place, the address and the pill and nothing more.
-        const probably = p.about ? p.about.split("\n").find((l) => l.startsWith("Probably:")) : "";
-        // With a kind filter on, the sentence below says the reason already.
-        const tell = p.tell && !(state.group && p.about) ? p.tell : "";
-        const syncing = !!p.sync_mb;
-        const pruned = isPruned(p);
-        if (tell || p.pool || syncing || pruned || p.fork) {
-          const e = line("sub ua", "");
-          if (syncing) e.append(syncSpan(p));
-          if (tell) {
-            const s = document.createElement("span");
-            s.className = "no-tx";
-            s.textContent = tell;
-            if (probably) s.title = probably.slice("Probably: ".length);
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          if (p.fork) {
-            const s = document.createElement("span");
-            s.className = "no-tx fork";
-            s.textContent = p.fork;
-            if (p.fork_why) s.title = p.fork_why;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          if (pruned) {
-            const s = document.createElement("span");
-            s.className = "no-tx";
-            s.textContent = "pruned";
-            s.title = PRUNED_WHY;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          // Whose pool it is, where an address proved it or the agent names it.
-          if (p.pool) {
-            const pool = document.createElement("span");
-            pool.className = "pool-name";
-            pool.textContent = p.pool;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(pool);
-          }
-          td.appendChild(fit(e, e.textContent));
-        }
-        // With a kind filter on, the question is why these peers are in it:
-        // the description is shown under the kind, only then. Not for nodes:
-        // their label (FutureBit Apollo, Umbrel …) is a chip in the filter bar
-        // already, and in the panel a tap opens. Nor where the label only
-        // repeats the pool named in the line above ("AtlasPool block relay").
-        const repeatsPool = p.pool && p.label && p.label.includes(p.pool);
-        if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
-          const about = document.createElement("div");
-          about.className = "about";
-          // The list says why in one or two lines; the claim is the name beside it,
-          // and everything, the claim too, is in the panel that opens on a tap.
-          // One line per peer: the label, where the server has one; what the
-          // session showed is left to the panel.
-          about.textContent = p.label || probably || p.about;
-          about.classList.add(probably ? "short" : "clip");
-          td.appendChild(about);
+        // One grey line under the pill, the same words on every width: the
+        // most important thing about the peer that the pill does not say
+        // (cardLine). A wide table always has it (11.11.2026: "Wallet" alone
+        // did not say which); a phone card only with a filter on, so that
+        // unfiltered every card stays two lines (09.11.2026). One line,
+        // never wrapped - a kind cell is two lines at most.
+        {
+          const e = document.createElement("small");
+          e.className = "card-line" + (state.group ? "" : " unfiltered");
+          // Nothing known still takes its line, or the cards would differ.
+          const text = cardLine(p) || "\u00a0";
+          e.textContent = text;
+          // Syncing keeps its turning arrow; a fork and pruned say why on hover.
+          if (p.sync_mb) e.replaceChildren(syncSpan(p));
+          // On hover: the whole line where it is cut, and why - the reason's
+          // whole sentence (p.why), a fork's or pruned's meaning (fit).
+          const why = p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : p.why || "";
+          if (!p.sync_mb) fit(e, text, why);
+          // A second part stays only where it fits whole (fitTables).
+          const two = text.split(" \u00b7 ");
+          if (two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
+          td.appendChild(e);
         }
       },
     },
@@ -2351,7 +2528,7 @@
   const andList = (xs) => xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1];
   const NO_SERVICES_WHY = "This peer announced no services at all: it has nothing to offer other nodes";
   const NO_TX_WHY = "Wants no transactions from your node";
-  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + " GB" : n >= 1e6 ? Math.round(n / 1e6) + " MB" : n >= 1e3 ? Math.round(n / 1e3) + " kB" : n + " B";
+  const bytesText = (n) => n >= 1e9 ? (n / 1e9).toFixed(1) + "\u00a0GB" : n >= 1e6 ? Math.round(n / 1e6) + "\u00a0MB" : n >= 1e3 ? Math.round(n / 1e3) + "\u00a0kB" : n + "\u00a0B";
   function peerDetail(p) {
     const el = (tag, cls, text) => {
       const e = document.createElement(tag);
@@ -2515,7 +2692,8 @@
     who.appendChild(svc);
     if (p.version) who.appendChild(el("p", "pd-small", "Protocol " + p.version));
     if (state.data && state.data.sibling) {
-      const lab = el("a", "pd-lab", "Open this peer in Bitcoin Lab \u2197");
+      const lab = el("a", "pd-lab", "Bitcoin Lab \u2197");
+      lab.title = "Open this peer in Bitcoin Lab";
       lab.href = siblingURL(p.addr);
       lab.target = LAB_TARGET;
       who.appendChild(lab);
@@ -2539,48 +2717,54 @@
     row.addEventListener("click", (ev) => {
       if (ev.target.closest("a, button, input, select, textarea")) return;
       if (String(window.getSelection()).length > 0) return;
-      toggleDetail(tr, p, key);
+      // Its row on screen: the panel rolls up into it, in place. Scrolled
+      // away: shut at once, and the row comes back to the top of the screen.
       const top = tr.getBoundingClientRect().top;
-      if (top < 0) window.scrollBy(0, top - 8);
+      if (top >= 0) toggleDetail(tr, p, key);
+      else {
+        setDetail(tr, p, key, false);
+        window.scrollBy(0, tr.getBoundingClientRect().top - 8);
+      }
       if (backY !== null) backY = window.scrollY;  // and the way back keeps this place
     });
     return row;
   }
   // One at a time: opening a peer closes the one that was open, so the list does
-  // not grow without end. What the reader tapped stays where it was on the
-  // screen, although a detail above it has just gone.
-  function toggleDetail(tr, p, key) {
-    const top = tr.getBoundingClientRect().top;
-    const open = tr.nextElementSibling?.classList.contains("detail-row");
+  // not grow without end. The row stays where it was on the screen, its panel
+  // rolls out below it (foldInPlace), although a panel above it has just gone.
+  function setDetail(tr, p, key, open) {
     for (const row of document.querySelectorAll("#tables tr.detail-row")) row.remove();
     for (const row of document.querySelectorAll("#tables tr.open")) {
       row.classList.remove("open");
       row.querySelector(".chev")?.setAttribute("aria-expanded", "false");
     }
     state.openRows.clear();
-    if (!open) {
-      const row = detailRow(tr, p, key);
-      row.classList.add("opening");
-      tr.after(row);
+    if (open) {
+      tr.after(detailRow(tr, p, key));
       tr.classList.add("open");
       tr.querySelector(".chev")?.setAttribute("aria-expanded", "true");
       state.openRows.add(key);
     }
-    const d = tr.getBoundingClientRect().top - top;
-    if (Math.abs(d) >= 1) window.scrollBy(0, d);
     layers();
-    // A panel that opens below the screen's edge is brought up, gently and
-    // only as far as needed - never so far that the tapped row leaves the top.
-    const panel = !open && tr.nextElementSibling;
-    if (panel) {
-      const rowTop = tr.getBoundingClientRect().top, bottom = panel.getBoundingClientRect().bottom;
-      const up = Math.min(bottom + 12 - window.innerHeight, rowTop - 8);
-      if (up > 0) window.scrollBy({ top: up, behavior: glide() });
-    }
+  }
+  function toggleDetail(tr, p, key) {
+    const open = !tr.nextElementSibling?.classList.contains("detail-row");
+    foldInPlace({ anchor: tr, box: tr.closest(".card") || tr.closest("table"), open, set: (o) => setDetail(tr, p, key, o) });
   }
 
-  // Back to the top ten. Closing takes away most of the page under the
-  // reader; bring the card back into view if it went off the top.
+  // All inbound peers or the top ten. Opening, what is above stays and the
+  // rest rolls out below it; closing from the button at the end, the button
+  // stays under the finger and the list rolls up into it. From the bar at
+  // the top there is no button there to keep: the list closes, and the
+  // card's head comes back to the top of the screen.
+  const inboundWrap = () => document.querySelector("#group-inbound .scroll");
+  const moreButton = () => document.querySelector("#group-inbound > button.more");
+  function showAllInbound(all) {
+    foldInPlace({ anchor: all ? inboundWrap : moreButton, box: inboundWrap, open: all, set: (o) => {
+      state.showAllInbound = o;
+      renderTables();
+    } });
+  }
   function topOnly() {
     state.showAllInbound = false;
     renderTables();
@@ -2597,8 +2781,10 @@
   window.addEventListener("scroll", stickOn, { passive: true });
 
   function renderTables() {
-    // A row reached with the arrow keys keeps the focus through a redraw.
+    // A row reached with the arrow keys keeps the focus through a redraw, and
+    // so does the button that redrew it (a sort, "Show all").
     const focused = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.anchor;
+    const focusKey = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.focusKey;
     // A panel left open for a peer that is gone must not pop open when its address comes back.
     const live = new Set(state.data.peers.map((p) => p.group + " " + p.addr));
     for (const k of state.openRows) if (!live.has(k)) state.openRows.delete(k);
@@ -2725,6 +2911,7 @@
         if (c.key === col.key) th.setAttribute("aria-sort", s.dir > 0 ? "ascending" : "descending");
         const b = document.createElement("button");
         b.textContent = c.label;
+        b.dataset.focusKey = "sort " + g + " " + c.key;
         b.addEventListener("click", () => steady(b, () => {
           state.sort[g] = { key: c.key, dir: c.key === col.key ? -s.dir : 1 };
           renderTables();
@@ -2806,12 +2993,9 @@
         const more = document.createElement("button");
         more.type = "button";
         more.className = "more";
+        more.dataset.focusKey = "more " + g;
         more.textContent = state.showAllInbound ? `Show top ${INBOUND_LIMIT} only` : `Show all ${peers.length}`;
-        more.addEventListener("click", () => {
-          if (state.showAllInbound) return topOnly();
-          state.showAllInbound = true;
-          renderTables();
-        });
+        more.addEventListener("click", () => showAllInbound(!state.showAllInbound));
         card.appendChild(more);
         // The whole list open: its name and the way back to the top ten ride
         // along at the top of the screen once the head has scrolled away, so
@@ -2851,6 +3035,9 @@
     if (focused) {
       const back = root.querySelector(`tr[data-anchor="${CSS.escape(focused)}"]`);
       if (back) back.focus({ preventScroll: true });
+    } else if (focusKey) {
+      const back = root.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+      if (back) back.focus({ preventScroll: true });
     }
   }
 
@@ -2876,6 +3063,10 @@
   function fitTables() {
     const y = window.scrollY;
     const wraps = [...document.querySelectorAll("#tables .scroll")];
+    // A second reason never decides which columns go: measured with the first
+    // alone, and put back below where it fits whole.
+    const seconds = [...document.querySelectorAll("#tables [data-one]")];
+    for (const e of seconds) e.textContent = e.dataset.one;
     const unalign = () => { for (const w of wraps) w.querySelector("table.peers")?.classList.remove("aligned"); };
     for (const w of wraps) w.classList.remove("cards");
     // Tight when the shared widths (alignColumns) together are wider than
@@ -2905,6 +3096,13 @@
       if (cards) unalign();
     }
     for (const w of wraps) w.classList.toggle("cards", cards);
+    // A second reason only where it fits whole, never cut short (09.11.2026):
+    // on a card its own line, in the wide list the grey line it sits in.
+    for (const e of seconds) {
+      const box = e.closest("small") || e;
+      e.textContent = e.dataset.full;
+      if (box.scrollWidth > box.clientWidth + 1) e.textContent = e.dataset.one;
+    }
     // A phone puts the kind beside the place. Reserve its actual width,
     // including either or both relay marks, instead of a fixed pill-sized gap.
     for (const w of wraps) for (const row of w.querySelectorAll("tr[data-anchor]")) {

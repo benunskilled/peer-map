@@ -128,16 +128,37 @@ body {
 .rt-lab.first small { margin-right: auto; }
 .rt-lab.pool b, .rt-lab.own b, .rt-lab.own .t { color: var(--accent); }
 .rt-lab.peer b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.rt-list { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
-.rt-list td { padding: 3px 10px 3px 0; border-bottom: 1px solid var(--border); }
-.rt-list tr:last-child td { border-bottom: 0; }
-.rt-list .n { font-weight: 600; color: var(--text); white-space: nowrap; }
-.rt-list .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
-/* One line on a phone too: a long provider ("Hesse · Amazon.com, Inc.") is cut
-   with … and kept whole in the tooltip. max-width: 0 lets the cell take the
-   rest of the row instead of widening the table. */
-.rt-list .miss { color: var(--muted); max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rt-list tr.pool .n, .rt-list tr.own .n, .rt-list tr.own .num { color: var(--accent); }
+/* The route on a phone: the same stops down a line, each stretch between two
+   of them with its time on the right. Three columns - line, name, what - so
+   every name and every time sits flush. */
+.rt-v { list-style: none; margin: 2px 0 12px; padding: 0; font-size: 14px; }
+.rt-v li { position: relative; display: grid; grid-template-columns: 24px 108px minmax(0, 1fr) auto; align-items: baseline; }
+.rt-v li::after { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; border-left: 2px solid var(--faint); }
+/* The miner's lead-in is dashed, as on the wide route: not measured. */
+.rt-v li:first-child::after { top: 12px; border-left-style: dashed; }
+.rt-v li.lead::after { border-left-style: dashed; }
+.rt-v li:last-child::after { bottom: auto; height: 8px; }
+.rt-v li.stop { padding: 3px 0; line-height: 1.35; }
+.rt-v li.stop::before { content: ""; position: absolute; z-index: 1; left: 3px; top: 7px; width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; background: var(--text); }
+.rt-v li.stop b { grid-column: 2; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-v li.stop span { grid-column: 3 / 5; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-v li.stop .addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.rt-v li.pool::before, .rt-v li.win::before { background: var(--panel); border: 2px solid var(--text); }
+.rt-v li.pool::before { border-color: var(--accent); }
+.rt-v li.pool b, .rt-v li.own b { color: var(--accent); }
+.rt-v li.tpl::before { left: 4px; top: 8px; width: 8px; height: 8px; border-radius: 2px; background: var(--panel); border: 2px solid var(--text); }
+.rt-v li.peer::before { background: var(--muted); }
+.rt-v li.peer.manual::before { background: var(--manual); }
+.rt-v li.peer.inbound::before { background: var(--inbound); }
+.rt-v li.peer.outbound::before { background: var(--outbound); }
+.rt-v li.own::before { background: var(--accent); box-shadow: 0 0 0 4px rgba(247, 147, 26, .22); }
+.rt-v li.gap { padding: 1px 0 2px; font-size: 12px; color: var(--muted); }
+.rt-v li.lead { min-height: 12px; }
+/* A stretch's text may wrap (a long "+1 round trip · 1,234 kB" at 320 px);
+   its time never does. */
+.rt-v li.gap span { grid-column: 2 / 4; padding-right: 10px; }
+.rt-v li.gap .t { white-space: nowrap; }
+.rt-v li.gap .t { grid-column: 4; padding-right: 0; text-align: right; color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
 .block-route .note { margin: 0; font-size: 13px; color: var(--muted); }
 .block-recon { padding: 0 16px 10px; }
 .block-recon .rt-switch { margin: 0 8px 0 0; vertical-align: middle; }
@@ -632,8 +653,6 @@ td .about.clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient
 /* Chips change state softly. */
 .chip { transition: border-color .12s ease, color .12s ease, background-color .12s ease; }
 /* A panel opened by a tap fades in; one redrawn by a refresh does not. */
-.detail-row.opening .pd { animation: pd-in .18s ease-out; }
-@keyframes pd-in { from { opacity: 0; transform: translateY(-4px); } }
 /* A peer that has just connected lights up once. */
 tr.arrived > td { animation: arrived 2.4s ease-out; }
 /* As a card the row is one box: it lights up whole. */
@@ -647,7 +666,7 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .jump-bar button:active { background: var(--panel-2); }
 @media (prefers-reduced-motion: reduce) {
   .chip, .jump-bar { transition: none; }
-  .detail-row.opening .pd, tr.arrived, tr.arrived > td { animation: none; }
+  tr.arrived, tr.arrived > td { animation: none; }
 }
 /* With a mouse: the row's place on the map lights up. */
 .marker.hover .sel { stroke: var(--accent); stroke-width: 2; }
@@ -688,6 +707,14 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 /* A phone card: place, address and pill, the same height for every peer.
    What Core saw is in the panel there (28.10.2026). */
 .cards.cards table tr td.k-kind small.ua { display: none; }
+/* A filtered card's one line (cardLine in app.js), on a card only: the wide
+   list has its grey line and the description, a card this instead. */
+/* The kind cell's grey line (cardLine): on a wide table always, one line
+   under the pill; on a phone card only with a filter on. */
+.peers small.card-line { display: block; max-width: 318px; margin-top: 2px; padding-left: 38px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards.cards table tr td.k-kind > small.card-line.unfiltered { display: none; }
+.cards.cards table tr td.k-kind > small.card-line { display: block; max-width: none; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards.cards table tr td.k-kind > .about { display: none; }
 
 /* Every card folds to its title on a tap and stays so on this device; open
    unless the reader closed it (28.10.2026). The chevron is Storage's in the
@@ -716,11 +743,13 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
   position: absolute; left: -1px; right: -1px; top: 0; display: flex; align-items: center; gap: 8px;
   padding: 8px 12px 8px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 0 0 10px 10px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, .35); font-size: 15px; font-weight: 600;
-  opacity: 0; pointer-events: none; transition: opacity .15s;
+  opacity: 0; pointer-events: none; transition: opacity .15s, visibility .15s;
+  /* Hidden is out of the tab order too, not only invisible. */
+  visibility: hidden;
 }
 .stick > div .swatch { margin-right: 8px; }
 .stick > div .btn { margin-left: auto; }
-.stick.on > div { opacity: 1; pointer-events: auto; }
+.stick.on > div { opacity: 1; pointer-events: auto; visibility: visible; }
 /* A soft edge under the bar, so a row passing beneath fades out instead of
    showing half a line. */
 .stick > div::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 20px; background: linear-gradient(var(--panel) 35%, transparent); pointer-events: none; }
@@ -745,5 +774,5 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .key .addr-txt.delivered { color: #56d364; }
 .key b { color: var(--text); font-weight: 600; }
 .key .kind { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #1a2430; color: var(--text); white-space: nowrap; }
-.key .kind.disg { background: rgba(248,81,73,.12); color: #e5534b; }
+.key .kind.disg, .key .kind.lion { background: rgba(248,81,73,.12); color: #e5534b; }
 @media (max-width: 600px) { .key { display: block; } }

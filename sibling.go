@@ -39,6 +39,8 @@ const blockMarkFor = 2 * time.Minute
 // the limit is a guard against a neighbour gone wrong, not a budget.
 const blockReplyLimit = 64 << 10
 
+const siblingMissEvery = 30 * time.Second
+
 type siblingCheck struct {
 	url      string
 	blockURL string
@@ -132,6 +134,10 @@ type lastBlock struct {
 	// that credited it. Absent on blocks recorded before the Lab measured them.
 	TemplateMs  *float64 `json:"template_ms,omitempty"`
 	FirstPingMs *float64 `json:"first_ping_ms,omitempty"`
+	// Whether that peer was one of Core's high-bandwidth peers just before
+	// the block (1 or 0): it decides how many pings the hop into Core takes.
+	// Absent where Bitcoin Lab did not know, or is older than this.
+	FirstHb *int `json:"first_hb,omitempty"`
 	// How many transactions that template carried: a pool spends time on
 	// every one, so this is why one block's job is slower than the next.
 	TemplateTx *int `json:"template_tx,omitempty"`
@@ -194,7 +200,13 @@ func (s *siblingCheck) installed(ctx context.Context) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.checkedAt.IsZero() && s.clock().Sub(s.checkedAt) < s.every {
+	// A miss is asked again sooner, as Bitcoin Lab does: updated together,
+	// the neighbour may still be starting when this app asks.
+	wait := s.every
+	if !s.present {
+		wait = siblingMissEvery
+	}
+	if !s.checkedAt.IsZero() && s.clock().Sub(s.checkedAt) < wait {
 		return s.present
 	}
 	// The probe is this app's, not the browser's: tied to the incoming request
@@ -280,6 +292,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		TemplateMs    *float64 `json:"templateMs"`
 		TemplateTx    *int     `json:"templateTx"`
 		FirstPingMs   *float64 `json:"firstPingMs"`
+		FirstHb       *int     `json:"firstHb"`
 		DeliveredEver []string `json:"deliveredEver"`
 		Recon         *string  `json:"recon"`
 		ReconMissing  *int64   `json:"reconMissingBytes"`
@@ -371,6 +384,7 @@ func (s *siblingCheck) latest(ctx context.Context) *lastBlock {
 		TemplateMs:        got.TemplateMs,
 		TemplateTx:        got.TemplateTx,
 		FirstPingMs:       got.FirstPingMs,
+		FirstHb:           got.FirstHb,
 		RouteMedian:       med,
 		Recon:             recon,
 		ReconMissingBytes: got.ReconMissing,
