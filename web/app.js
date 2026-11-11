@@ -407,8 +407,6 @@
     // One switch for the whole card: where the route has one, it sets the
     // compact block line too; without a route the line brings its own.
     renderRecon($("blockRecon"), b, own && typical ? view : null);
-    // A phone's route already says it on the hop into Core.
-    if (stops && stops === own && $("blockRoute").querySelector(".rt-v")) $("blockRecon").hidden = true;
   }
 
   // How Core put the block together from its compact form (BIP152), as
@@ -765,8 +763,8 @@
       // Narrow: the same stops down a line. Between two stops, what that
       // stretch is and - on the right, flush - how long it took. One rule
       // for every stretch: from the stop above, so never negative. The hop
-      // into Core says how the compact block went, so this block's own
-      // route needs no separate compact block line (renderBlockCard).
+      // into Core says in short how the compact block went; the compact
+      // block line under the route says it in full, as on a wide screen.
       const ol = document.createElement("ol");
       ol.className = "rt-v";
       const li = (cls, parts, title) => {
