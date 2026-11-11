@@ -2132,7 +2132,7 @@
   // known. Never empty, so every card in a filter is one height.
   const probablyOf = (p) => ((p.about || "").split("\n").find((l) => l.startsWith("Probably: ")) || "").slice("Probably: ".length);
   const cardLine = (p) => {
-    if (state.group === SYNCING && p.sync_mb) return "syncing " + mbText(p.sync_mb);
+    if (p.sync_mb) return "syncing " + mbText(p.sync_mb);
     if (p.kind === POOL_KIND) return (p.pool || UNKNOWN_POOL) + (/block relay/i.test(p.about || "") ? " \u00b7 block relay" : "");
     if (p.linking_lion) return p.tell || "on 0xB10C's list";
     if (p.kind === "Disguised") return p.tell || probablyOf(p);
@@ -2467,84 +2467,26 @@
         // is normal for many peers and only in the panel, with why
         // (28.10.2026: one line for the reason, not a list of flags). A phone
         // card is the place, the address and the pill and nothing more.
-        const probably = p.about ? p.about.split("\n").find((l) => l.startsWith("Probably:")) : "";
-        // With a kind filter on, the sentence below says the reason already.
-        const tell = p.tell && !(state.group && p.about) ? p.tell : "";
-        const syncing = !!p.sync_mb;
-        const pruned = isPruned(p);
-        if (tell || p.pool || syncing || pruned || p.fork) {
-          const e = line("sub ua", "");
-          if (syncing) e.append(syncSpan(p));
-          if (tell) {
-            const s = document.createElement("span");
-            s.className = "no-tx";
-            s.textContent = tell;
-            // A second reason stays only where it fits whole (fitTables).
-            if (tell.includes(" \u00b7 ")) Object.assign(s.dataset, { full: tell, one: tell.split(" \u00b7 ")[0] });
-            if (probably) s.title = probably.slice("Probably: ".length);
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          if (p.fork) {
-            const s = document.createElement("span");
-            s.className = "no-tx fork";
-            s.textContent = p.fork;
-            if (p.fork_why) s.title = p.fork_why;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          if (pruned) {
-            const s = document.createElement("span");
-            s.className = "no-tx";
-            s.textContent = "pruned";
-            s.title = PRUNED_WHY;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(s);
-          }
-          // Whose pool it is, where an address proved it or the agent names it.
-          if (p.pool) {
-            const pool = document.createElement("span");
-            pool.className = "pool-name";
-            pool.textContent = p.pool;
-            if (e.firstChild) e.append(" \u00b7 ");
-            e.append(pool);
-          }
-          td.appendChild(fit(e, e.textContent));
-        }
-        // With a kind filter on, the question is why these peers are in it:
-        // the description is shown under the kind, only then. Not for nodes:
-        // their label (FutureBit Apollo, Umbrel …) is a chip in the filter bar
-        // already, and in the panel a tap opens. Nor where the label only
-        // repeats the pool named in the line above ("AtlasPool block relay").
-        const repeatsPool = p.pool && p.label && p.label.includes(p.pool);
-        // A phone card has no grey line. Unfiltered every card is one height;
-        // with a filter on, every card gets exactly one line more, the most
-        // important thing about that peer and nothing the pill already says
-        // (09.11.2026). The description below is the wide list's.
-        if (state.group) {
+        // One grey line under the pill, the same words on every width: the
+        // most important thing about the peer that the pill does not say
+        // (cardLine). A wide table always has it (11.11.2026: "Wallet" alone
+        // did not say which); a phone card only with a filter on, so that
+        // unfiltered every card stays two lines (09.11.2026). One line,
+        // never wrapped - a kind cell is two lines at most.
+        {
           const e = document.createElement("small");
-          e.className = "card-line";
+          e.className = "card-line" + (state.group ? "" : " unfiltered");
           // Nothing known still takes its line, or the cards would differ.
           const text = cardLine(p) || "\u00a0";
           e.textContent = text;
+          // Syncing keeps its turning arrow; a fork and pruned say why on hover.
+          if (p.sync_mb) e.replaceChildren(syncSpan(p));
+          const why = p.fork && text === p.fork ? p.fork_why : text === "pruned" ? PRUNED_WHY : "";
+          if (why) e.title = why;
           // A second part stays only where it fits whole (fitTables).
           const two = text.split(" \u00b7 ");
           if (two.length > 1) Object.assign(e.dataset, { full: text, one: two[0] });
           td.appendChild(e);
-        }
-        if (state.group && p.about && !String(p.kind || "").startsWith("Node") && !repeatsPool) {
-          const about = document.createElement("div");
-          about.className = "about";
-          // The list says why in one or two lines; the claim is the name beside it,
-          // and everything, the claim too, is in the panel that opens on a tap.
-          // One line per peer: the label, where the server has one; what the
-          // session showed is left to the panel. A disguise says the reason
-          // its short line leads with, whole (why), not whichever came first;
-          // LinkingLion's label only repeated its pill.
-          const lead = p.kind === "Disguised" || p.linking_lion ? p.why || (p.linking_lion ? LION_CREDIT : "") : "";
-          about.textContent = lead || p.label || probably || p.about;
-          about.classList.add(lead || probably ? "short" : "clip");
-          td.appendChild(about);
         }
       },
     },

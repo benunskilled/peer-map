@@ -709,7 +709,10 @@ tr.arrived > td { animation: arrived 2.4s ease-out; }
 .cards.cards table tr td.k-kind small.ua { display: none; }
 /* A filtered card's one line (cardLine in app.js), on a card only: the wide
    list has its grey line and the description, a card this instead. */
-.peers small.card-line { display: none; }
+/* The kind cell's grey line (cardLine): on a wide table always, one line
+   under the pill; on a phone card only with a filter on. */
+.peers small.card-line { display: block; max-width: 318px; margin-top: 2px; padding-left: 38px; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cards.cards table tr td.k-kind > small.card-line.unfiltered { display: none; }
 .cards.cards table tr td.k-kind > small.card-line { display: block; max-width: none; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cards.cards table tr td.k-kind > .about { display: none; }
 
