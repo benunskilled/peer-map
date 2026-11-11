@@ -710,55 +710,41 @@
     return need;
   }
 
-  function segLabel(a, z) {
-    const d = Math.round(z.t - a.t) + " ms";
+  // One stretch, the same words on every width: what happens on it, how
+  // long it took, and the longer why for the tooltip. The hop into Core says
+  // why it is that long - sent unasked (⚡) or announced first, and whether
+  // Core had to ask for missing transactions; "at least" then, because the
+  // round trip is only the floor.
+  function stretch(a, z) {
+    const ms = Math.round(z.t - a.t).toLocaleString("en-US") + "\u00a0ms";
     if (a.kind === "peer" && z.kind === "core") {
-      // Why that many pings: sent unasked (⚡) or announced first.
       const kind = a.hb === 1 ? "⚡" : a.hb === 0 ? "announced" : "";
-      const why = kind && a.asked ? kind + " + asked" : kind || (a.asked ? "asked" : "ping");
-      return [(a.asked ? "at least " : "~") + d + " · " + why, HOP_WHY];
+      const what = kind && a.asked ? kind + " + asked" : kind || (a.asked ? "asked" : "ping");
+      return [what, (a.asked ? "at least\u00a0" : "~") + ms, HOP_WHY];
     }
-    if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
-    if (a.kind === "core" && z.kind === "tpl") {
-      return [d + " · template", "Core builds a new block template (getblocktemplate)"];
-    }
+    if (a.kind === "win" && z.kind === "peer") return ["reaches your peer", ms, ""];
+    if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {
       // The template's size is most of the reason this stretch varies: the
       // pool handles every transaction in it before it can send the job.
       const tx = a.tx != null ? " · " + Math.round(a.tx).toLocaleString("en-US") + " tx" : "";
-      return [d + " · job" + tx,
-        "Your pool notices the block and turns the template into a job" +
+      return ["job" + tx, ms, "Your pool notices the block and turns the template into a job" +
         (tx ? " - the more transactions the template carries, the longer that takes" : "")];
     }
     // No template timing for this block: the two are one stretch.
     if (a.kind === "core" && z.kind === "own") {
-      return [d + " · template + job",
-        "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
+      return ["template + job", ms, "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
     }
-    return [d];
-  }
-
-  // One stretch of the narrow route: what happens on it, how long, and the
-  // longer why for the tooltip. `b` only for this block's own route - the
-  // typical one has no single compact block to speak of.
-  function narrowStretch(a, z, stops, b) {
-    const ms = Math.round(z.t - a.t).toLocaleString("en-US") + " ms";
-    if (z.kind === "core" && stops.some((st) => st.kind === "peer")) {
-      const hb = b && b.first_hb;
-      const asked = b && b.recon === "asked" ? `asked for ${kB(b.recon_missing_bytes || 0)}` : null;
-      const how = !b ? "" : hb === 1 ? "⚡ " + (asked || (b.recon === "mempool" ? "nothing missing" : ""))
-        : hb === 0 ? "announced" + (asked ? ", " + asked : "")
-        : asked || (b.recon === "mempool" ? "nothing missing" : "");
-      return [how.trim() || "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "at least\u00a0" : "~") : "") + ms, HOP_WHY];
-    }
-    if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
-    if (a.kind === "tpl" && z.kind === "own") {
-      const tx = a.tx != null ? " · " + Math.round(a.tx).toLocaleString("en-US") + " tx" : "";
-      return ["job" + tx, ms, "Your pool notices the block and turns the template into a job"];
-    }
-    if (a.kind === "core" && z.kind === "own") return ["template + job", ms, "Core builds a new block template, your pool turns it into a job"];
     return ["", ms, ""];
   }
+  // The wide route's label: first what, then how long - as on a phone.
+  function segLabel(a, z) {
+    const [what, time, why] = stretch(a, z);
+    return [what ? what + " · " + time : time, why];
+  }
+
+
+
 
   function renderRoute(box, b, stops, { view, canSwitch, noRaceHere }) {
     box.textContent = "";
@@ -819,7 +805,10 @@
       } else li("gap lead", []);
       line.forEach((s, i) => {
         if (i > 0) {
-          const [what, time, why] = narrowStretch(line[i - 1], s, line, median ? null : b);
+          const prev = line[i - 1];
+          // The first job's stretch to the peer says only its time here:
+          // the first job's own line says what it is.
+          const [what, time, why] = prev.kind === "win" ? ["", ...stretch(prev, s).slice(1)] : stretch(prev, s);
           li("gap", [[what || " "], [time, "t"]], why);
         }
         // Where the peer is stands on the card's first line; here only
