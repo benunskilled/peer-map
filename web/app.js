@@ -2458,19 +2458,6 @@
         pill.append(label);
         fit(pill, label, [p.about, p.seen ? "In this session: " + p.seen : "", p.linking_lion ? LION_CREDIT : "", neverNote(p), p.fork_why].filter(Boolean).join("\n"));
         head.appendChild(pill);
-        // On a phone the same mark as Bitcoin Lab's First % cell: a small
-        // "⊘ never first" beside the kind, which has the room there. A wide
-        // table keeps the ⊘ in the pill - its columns stay as wide as they
-        // are, and the kind column has no room for a second pill.
-        if (p.no_relay) {
-          const row = document.createElement("span");
-          row.className = "nf-row";
-          const nf = document.createElement("span");
-          nf.className = "nf-pill";
-          nf.textContent = "⊘ never first";
-          row.appendChild(nf);
-          head.appendChild(row);
-        }
         td.appendChild(head);
         // The grey line under the pill, on a wide screen only, is for what
         // the pill cannot say: why a peer is Disguised, or what an unknown or
