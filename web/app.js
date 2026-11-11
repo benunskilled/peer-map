@@ -731,7 +731,9 @@
         asked: `+1 round trip · ${kB(b.recon_missing_bytes || 0)}`,
         full: "downloaded in full",
       }[b.recon];
-      return [how || "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "at least\u00a0" : "~") : "") + ms, HOP_WHY];
+      // Sent unasked (⚡) or announced first - why the hop is that long.
+      const kind = b && b.first_hb === 1 ? "⚡ " : b && b.first_hb === 0 ? "announced · " : "";
+      return [how ? kind + how : "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "at least\u00a0" : "~") : "") + ms, HOP_WHY];
     }
     if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {
