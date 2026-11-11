@@ -154,7 +154,10 @@ body {
 .rt-v li.own::before { background: var(--accent); box-shadow: 0 0 0 4px rgba(247, 147, 26, .22); }
 .rt-v li.gap { padding: 1px 0 2px; font-size: 12px; color: var(--muted); }
 .rt-v li.lead { min-height: 12px; }
-.rt-v li.gap span { grid-column: 2 / 4; padding-right: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A stretch's text may wrap (a long "+1 round trip · 1,234 kB" at 320 px);
+   its time never does. */
+.rt-v li.gap span { grid-column: 2 / 4; padding-right: 10px; }
+.rt-v li.gap .t { white-space: nowrap; }
 .rt-v li.gap .t { grid-column: 4; padding-right: 0; text-align: right; color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
 .block-route .note { margin: 0; font-size: 13px; color: var(--muted); }
 .block-recon { padding: 0 16px 10px; }

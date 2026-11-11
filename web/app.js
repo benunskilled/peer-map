@@ -782,10 +782,21 @@
         ol.appendChild(e);
       };
       li("stop pool", [[miner, "name"], ["mined it"]]);
-      li("gap lead", []);
-      stops.forEach((s, i) => {
+      // The first job is the zero, not a station (as on the wide route):
+      // when it falls inside the hop into Core - a far peer, a long hop -
+      // it stands up here with how far before your node it was, and the
+      // hop stays whole underneath.
+      const win = stops.find((st) => st.kind === "win");
+      const peerStop = stops.find((st) => st.kind === "peer");
+      const line = win && peerStop && win.t > peerStop.t ? stops.filter((st) => st !== win) : stops;
+      if (line !== stops) {
+        li("gap lead", []);
+        li("stop win", [[win.name, "name"], ["first job"]]);
+        li("gap lead", [[firstJobWords(win, stops)]]);
+      } else li("gap lead", []);
+      line.forEach((s, i) => {
         if (i > 0) {
-          const [what, time, why] = narrowStretch(stops[i - 1], s, stops, median ? null : b);
+          const [what, time, why] = narrowStretch(line[i - 1], s, line, median ? null : b);
           li("gap", [[what || " "], [time, "t"]], why);
         }
         // Where the peer is stands on the card's first line; here only
@@ -795,6 +806,17 @@
           [[peer ? "Your peer" : s.name, "name"], peer ? [s.name, "addr"] : [s.sub.join(" · ")]], s.title);
       });
       box.appendChild(ol);
+      // "at least" in words; where it would squeeze its stretch's text past
+      // two lines, the sign - a bare number would read as the estimate.
+      for (const t of ol.querySelectorAll(".gap .t")) {
+        if (!t.textContent.startsWith("at least")) continue;
+        const what = t.previousElementSibling;
+        const cs = getComputedStyle(what);
+        const lh = parseFloat(cs.lineHeight) || 1.3 * parseFloat(cs.fontSize);
+        if (what.getBoundingClientRect().height > 2.5 * lh) {
+          t.textContent = t.textContent.replace("at least\u00a0", "≥");
+        }
+      }
     } else {
       const rt = document.createElement("div");
       rt.className = "rt";
