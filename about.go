@@ -19,6 +19,14 @@ var aboutRules = []aboutRule{
 	// ".../Delegator/" are its own was not found in a source, so only the name.
 	// Before the census rule, which would take Sonar.
 	{regexp.MustCompile(`^/BTC-Nodes:`), "Named like BTC Nodes (btcnodes.io), the successor to Bitnodes that maps reachable nodes", "Named like BTC Nodes", ""},
+	// 21 Data Lab's own crawler speaks Bitcoin P2P and asks nodes for their
+	// peer lists (21datalab.com/de/methodik); its user agent is not given
+	// there, so only the name (11.11.2026).
+	{regexp.MustCompile(`^/21datalab-crawler:`), "Named like 21 Data Lab's crawler, which counts reachable Bitcoin nodes (21datalab.com)", "Named like 21 Data Lab", ""},
+	// Nebula, Dennis Trautwein's network crawler (ProbeLab), crawls Bitcoin
+	// since 2.4.0 (github.com/dennis-tra/nebula/releases). Who runs a given
+	// crawl it does not say. "nebula/2.4.1-…" and "/nebula:v3.0.0-…/".
+	{regexp.MustCompile(`(?i)^/?nebula[/:]`), "Nebula, a network crawler by Dennis Trautwein (ProbeLab) that also maps Bitcoin nodes", "Nebula crawler", ""},
 	// A Knots node under its operator's own name: only Knots defines service
 	// bits 27 and 28 (src/protocol.h, knots20260508), and these offer them.
 	{regexp.MustCompile(`^/GrayersDad:`), "Probably Bitcoin Knots under a name its operator chose", "Probably Knots", ""},
@@ -118,6 +126,7 @@ var aboutRules = []aboutRule{
 	{regexp.MustCompile(`(?i)/neutrino:0\.12\.0-beta/`), "Older lnd, without a node of its own (neutrino), e.g. Blixt or an older Zeus", "Older lnd (neutrino)", "older lnd"},
 	{regexp.MustCompile(`(?i)neutrino`), "Neutrino: Lightning wallets on lnd, such as Blixt or Zeus", "lnd wallet (neutrino)", ""},
 	{regexp.MustCompile(`(?i)BIP-157|kyoto`), "Kyoto, a light client for wallets built with BDK", "Kyoto light client (BDK)", ""},
+	{regexp.MustCompile(`^/Bitflash:btc-light/`), "Named like Bitflash's wallet, which follows the chain by headers and compact filters (docs.bitflash.network)", "Named like Bitflash", ""},
 	{regexp.MustCompile(`(?i)floresta`), "Floresta, a lightweight Utreexo node", "Floresta Utreexo node", ""},
 	{regexp.MustCompile(`(?i)electrs`), "electrs, the address index behind Electrum-style wallets", "electrs address index", ""},
 	{regexp.MustCompile(`(?i)^/CKCoinD:`), "ckcoind, a mining fork of Bitcoin Core used with ckpool", "ckcoind (ckpool fork)", ""},
