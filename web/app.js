@@ -407,6 +407,8 @@
     // One switch for the whole card: where the route has one, it sets the
     // compact block line too; without a route the line brings its own.
     renderRecon($("blockRecon"), b, own && typical ? view : null);
+    // A phone's route already says it on the hop into Core.
+    if (stops && stops === own && $("blockRoute").querySelector(".rt-v")) $("blockRecon").hidden = true;
   }
 
   // How Core put the block together from its compact form (BIP152), as
@@ -545,9 +547,10 @@
   //
   // A whole ping rather than half: half is only the floor. A compact block
   // that arrives complete costs half a round trip; one that is missing a few
-  // transactions costs another full one to ask for them. Which happened is not
-  // visible from here, and a whole ping sits in the middle. It only moves the
-  // peer's dot - Core and the pools stand where they were measured.
+  // transactions costs another full one to ask for them. A whole ping sits in
+  // the middle; where Bitcoin Lab saw Core ask (recon "asked"), the round trip
+  // is added - one more ping. It only moves the peer's dot - Core and the
+  // pools stand where they were measured.
   const ROUTE_STUB = 140;  // the miner's dashed lead-in, not to scale
   // Text cut off with an ellipsis is readable on hover - and only then, a
   // tooltip that repeats what is on screen says nothing. Whether it is cut
@@ -621,7 +624,10 @@
       const where = p ? p.region || (p.cc ? regionName(p.cc) : "") : "";
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
-        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping,
+        // Core had to ask this peer for missing transactions: one more
+        // round trip before the block was whole, so the peer had it a ping
+        // earlier (recon, measured by Bitcoin Lab).
+        kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * (b.recon === "asked" ? 2 : 1), asked: b.recon === "asked",
         name: hostOf(lead.addr) + more,
         sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
@@ -683,7 +689,7 @@
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · ping"];
+    if (a.kind === "peer" && z.kind === "core") return ["~" + d + (a.asked ? " · ping + round trip" : " · ping")];
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
     if (a.kind === "core" && z.kind === "tpl") {
       return [d + " · template", "Core builds a new block template (getblocktemplate)"];
@@ -702,6 +708,28 @@
         "Core builds a new block template (getblocktemplate), your pool notices the block and turns it into a job"];
     }
     return [d];
+  }
+
+  // One stretch of the narrow route: what happens on it, how long, and the
+  // longer why for the tooltip. `b` only for this block's own route - the
+  // typical one has no single compact block to speak of.
+  function narrowStretch(a, z, stops, b) {
+    const ms = Math.round(z.t - a.t) + " ms";
+    if (z.kind === "core" && stops.some((st) => st.kind === "peer")) {
+      const how = b && {
+        mempool: "nothing missing",
+        asked: `+1 round trip · ${kB(b.recon_missing_bytes || 0)}`,
+        full: "downloaded in full",
+      }[b.recon];
+      return [how || "into your node", (a.kind === "peer" ? "~" : "") + ms, RECON_WHY];
+    }
+    if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
+    if (a.kind === "tpl" && z.kind === "own") {
+      const tx = a.tx != null ? " · " + Math.round(a.tx).toLocaleString("en-US") + " tx" : "";
+      return ["job" + tx, ms, "Your pool notices the block and turns the template into a job"];
+    }
+    if (a.kind === "core" && z.kind === "own") return ["template + job", ms, "Core builds a new block template, your pool turns it into a job"];
+    return ["", ms, ""];
   }
 
   function renderRoute(box, b, stops, { view, canSwitch, noRaceHere }) {
@@ -728,34 +756,39 @@
     const left = ROUTE_STUB, right = W - 60;
 
     if ((stops.length - 1) * ROUTE_GAP > right - left) {
-      // Narrow: the same stops as rows.
-      const t = document.createElement("table");
-      t.className = "rt-list";
-      const row = (cls, name, time, sub) => {
-        const tr = document.createElement("tr");
-        tr.className = cls;
-        for (const [c, v] of [["n", name], ["miss", sub], ["num", time]]) {
-          const td = document.createElement("td");
-          td.className = c;
-          td.textContent = v;
-          if (c === "miss" && v) td.title = v;
-          tr.appendChild(td);
+      // Narrow: the same stops down a line. Between two stops, what that
+      // stretch is and - on the right, flush - how long it took. One rule
+      // for every stretch: from the stop above, so never negative. The hop
+      // into Core says how the compact block went, so this block's own
+      // route needs no separate compact block line (renderBlockCard).
+      const ol = document.createElement("ol");
+      ol.className = "rt-v";
+      const li = (cls, parts, title) => {
+        const e = document.createElement("li");
+        e.className = cls;
+        for (const [text, c] of parts) {
+          const s = document.createElement(c === "name" ? "b" : "span");
+          s.textContent = text;
+          if (c && c !== "name") s.className = c;
+          e.appendChild(s);
         }
-        t.appendChild(tr);
+        if (title) e.title = title;
+        ol.appendChild(e);
       };
-      row("pool", miner, "", "mined it");
-      // One rule for every row: the time is from the row above, so it is
-      // never negative. The first job is a row like the others here; the
-      // template's transactions go with the job built from it.
-      const tx = stops.find((st) => st.kind === "tpl")?.tx;
+      li("stop pool", [[miner, "name"], ["mined it"]]);
+      li("gap lead", []);
       stops.forEach((s, i) => {
-        const prev = stops[i - 1];
-        const gap = prev ? Math.round(s.t - prev.t) : null;
-        const time = gap == null ? "" : (prev.kind === "peer" && s.kind === "core" ? "~" : "+") + gap + " ms";
-        const sub = s.kind === "own" && tx != null ? [...s.sub, Math.round(tx).toLocaleString("en-US") + " tx"] : s.sub;
-        row(s.kind, s.name, time, sub.join(" · "));
+        if (i > 0) {
+          const [what, time, why] = narrowStretch(stops[i - 1], s, stops, median ? null : b);
+          li("gap", [[what || " "], [time, "t"]], why);
+        }
+        // Where the peer is stands on the card's first line; here only
+        // which one, so every stop fits one line.
+        const peer = s.kind === "peer" && !median;
+        li("stop " + s.kind + (s.group ? " " + s.group : ""),
+          [[peer ? "Your peer" : s.name, "name"], peer ? [s.name, "addr"] : [s.sub.join(" · ")]], s.title);
       });
-      box.appendChild(t);
+      box.appendChild(ol);
     } else {
       const rt = document.createElement("div");
       rt.className = "rt";

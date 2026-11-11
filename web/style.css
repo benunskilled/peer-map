@@ -128,16 +128,34 @@ body {
 .rt-lab.first small { margin-right: auto; }
 .rt-lab.pool b, .rt-lab.own b, .rt-lab.own .t { color: var(--accent); }
 .rt-lab.peer b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
-.rt-list { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
-.rt-list td { padding: 3px 10px 3px 0; border-bottom: 1px solid var(--border); }
-.rt-list tr:last-child td { border-bottom: 0; }
-.rt-list .n { font-weight: 600; color: var(--text); white-space: nowrap; }
-.rt-list .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; width: 1%; }
-/* One line on a phone too: a long provider ("Hesse · Amazon.com, Inc.") is cut
-   with … and kept whole in the tooltip. max-width: 0 lets the cell take the
-   rest of the row instead of widening the table. */
-.rt-list .miss { color: var(--muted); max-width: 0; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rt-list tr.pool .n, .rt-list tr.own .n, .rt-list tr.own .num { color: var(--accent); }
+/* The route on a phone: the same stops down a line, each stretch between two
+   of them with its time on the right. Three columns - line, name, what - so
+   every name and every time sits flush. */
+.rt-v { list-style: none; margin: 2px 0 12px; padding: 0; font-size: 14px; }
+.rt-v li { position: relative; display: grid; grid-template-columns: 24px 108px minmax(0, 1fr) auto; align-items: baseline; }
+.rt-v li::after { content: ""; position: absolute; left: 7px; top: 0; bottom: 0; border-left: 2px solid var(--faint); }
+/* The miner's lead-in is dashed, as on the wide route: not measured. */
+.rt-v li:first-child::after { top: 12px; border-left-style: dashed; }
+.rt-v li.lead::after { border-left-style: dashed; }
+.rt-v li:last-child::after { bottom: auto; height: 8px; }
+.rt-v li.stop { padding: 3px 0; line-height: 1.35; }
+.rt-v li.stop::before { content: ""; position: absolute; z-index: 1; left: 3px; top: 7px; width: 10px; height: 10px; border-radius: 50%; box-sizing: border-box; background: var(--text); }
+.rt-v li.stop b { grid-column: 2; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-v li.stop span { grid-column: 3 / 5; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-v li.stop .addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.rt-v li.pool::before, .rt-v li.win::before { background: var(--panel); border: 2px solid var(--text); }
+.rt-v li.pool::before { border-color: var(--accent); }
+.rt-v li.pool b, .rt-v li.own b { color: var(--accent); }
+.rt-v li.tpl::before { left: 4px; top: 8px; width: 8px; height: 8px; border-radius: 2px; background: var(--panel); border: 2px solid var(--text); }
+.rt-v li.peer::before { background: var(--muted); }
+.rt-v li.peer.manual::before { background: var(--manual); }
+.rt-v li.peer.inbound::before { background: var(--inbound); }
+.rt-v li.peer.outbound::before { background: var(--outbound); }
+.rt-v li.own::before { background: var(--accent); box-shadow: 0 0 0 4px rgba(247, 147, 26, .22); }
+.rt-v li.gap { padding: 1px 0 2px; font-size: 12px; color: var(--muted); }
+.rt-v li.lead { min-height: 12px; }
+.rt-v li.gap span { grid-column: 2 / 4; padding-right: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-v li.gap .t { grid-column: 4; padding-right: 0; text-align: right; color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; }
 .block-route .note { margin: 0; font-size: 13px; color: var(--muted); }
 .block-recon { padding: 0 16px 10px; }
 .block-recon .rt-switch { margin: 0 8px 0 0; vertical-align: middle; }
