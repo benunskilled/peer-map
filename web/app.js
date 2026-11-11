@@ -553,8 +553,6 @@
   // Not known whether the peer was high-bandwidth (older blocks): one ping,
   // the middle. Bitcoin Lab's typical route counts the same way.
   const hopPings = (hb, recon) => (hb === 1 ? 0.5 : hb === 0 ? 1.5 : 1) + (recon === "asked" ? 1 : 0);
-  const pingWords = (n) => n === 0.5 ? "½ ping" : n === 1 ? "ping"
-    : `${Math.floor(n)}${n % 1 ? "½" : ""} pings`;
   const HOP_WHY = "Estimated from the peer's ping, as BIP152 counts it: a high-bandwidth peer sends a new block " +
     "without being asked, half a ping; any other announces it first, a ping and a half. Asking for missing " +
     "transactions adds a ping. These are minimums - more missing data or a slow line take longer, and a peer " +
@@ -684,21 +682,41 @@
   // sit nearer than ROUTE_GAP to the one before is pushed along, and the
   // whole row pulled back in from the right. Too narrow for that at all - a
   // phone - and it is a list instead, which says the same thing.
-  function placeStops(stops, left, right) {
+  function placeStops(stops, left, right, need) {
+    const gap = (i) => (need && need[i]) || ROUTE_GAP;
     const t0 = stops[0].t, span = Math.max(1, stops[stops.length - 1].t - t0);
     const x = stops.map((s) => left + ((s.t - t0) / span) * (right - left));
-    for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + ROUTE_GAP);
+    for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + gap(i));
     x[x.length - 1] = Math.min(x[x.length - 1], right);
-    for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - ROUTE_GAP);
+    for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - gap(i + 1));
     return x;
+  }
+  // How far apart two stops must be for the stretch label between them.
+  let measureCtx = null;
+  function segNeeds(box, stops) {
+    measureCtx = measureCtx || document.createElement("canvas").getContext("2d");
+    measureCtx.font = "12px " + getComputedStyle(box).fontFamily;
+    const need = stops.map(() => ROUTE_GAP);
+    const journey = stops.filter((st) => st.kind !== "win");
+    const win = stops.find((st) => st.kind === "win");
+    const pairs = [];
+    if (win && journey.length && win.t <= journey[0].t) pairs.push([win, journey[0]]);
+    for (let i = 1; i < journey.length; i++) pairs.push([journey[i - 1], journey[i]]);
+    for (const [a, z] of pairs) {
+      const w = measureCtx.measureText(segLabel(a, z)[0]).width + 24;
+      const ia = stops.indexOf(a), iz = stops.indexOf(z);
+      for (let k = ia + 1; k <= iz; k++) need[k] = Math.max(need[k], w / (iz - ia));
+    }
+    return need;
   }
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
     if (a.kind === "peer" && z.kind === "core") {
       // Why that many pings: sent unasked (⚡) or announced first.
-      const how = a.hb === 1 ? " · ⚡" : a.hb === 0 ? " · announced first" : "";
-      return [(a.asked ? "at least " : "~") + d + " · " + pingWords(a.pings || 1) + how, HOP_WHY];
+      const kind = a.hb === 1 ? "⚡" : a.hb === 0 ? "announced" : "";
+      const why = kind && a.asked ? kind + " + asked" : kind || (a.asked ? "asked" : "ping");
+      return [(a.asked ? "at least " : "~") + d + " · " + why, HOP_WHY];
     }
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
     if (a.kind === "core" && z.kind === "tpl") {
@@ -726,14 +744,12 @@
   function narrowStretch(a, z, stops, b) {
     const ms = Math.round(z.t - a.t).toLocaleString("en-US") + " ms";
     if (z.kind === "core" && stops.some((st) => st.kind === "peer")) {
-      const how = b && {
-        mempool: "nothing missing",
-        asked: `+1 round trip · ${kB(b.recon_missing_bytes || 0)}`,
-        full: "downloaded in full",
-      }[b.recon];
-      // Sent unasked (⚡) or announced first - why the hop is that long.
-      const kind = b && b.first_hb === 1 ? "⚡ " : b && b.first_hb === 0 ? "announced · " : "";
-      return [how ? kind + how : "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "at least\u00a0" : "~") : "") + ms, HOP_WHY];
+      const hb = b && b.first_hb;
+      const asked = b && b.recon === "asked" ? `asked for ${kB(b.recon_missing_bytes || 0)}` : null;
+      const how = !b ? "" : hb === 1 ? "⚡ " + (asked || (b.recon === "mempool" ? "nothing missing" : ""))
+        : hb === 0 ? "announced" + (asked ? ", " + asked : "")
+        : asked || (b.recon === "mempool" ? "nothing missing" : "");
+      return [how.trim() || "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "at least\u00a0" : "~") : "") + ms, HOP_WHY];
     }
     if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {
@@ -767,7 +783,8 @@
     // room for half of it - at the edge it looked squeezed.
     const left = ROUTE_STUB, right = W - 60;
 
-    if ((stops.length - 1) * ROUTE_GAP > right - left) {
+    const need = segNeeds(box, stops);
+    if (need.slice(1).reduce((x, y) => x + y, 0) > right - left) {
       // Narrow: the same stops down a line. Between two stops, what that
       // stretch is and - on the right, flush - how long it took. One rule
       // for every stretch: from the stop above, so never negative. The hop
@@ -841,7 +858,7 @@
         if (cls) e.className = cls;
         return e;
       };
-      const xs = placeStops(stops, left, right);
+      const xs = placeStops(stops, left, right, need);
 
       const stub = el("rt-stub", 6);
       stub.style.width = (xs[0] - 6) + "px";
