@@ -720,7 +720,7 @@
   // longer why for the tooltip. `b` only for this block's own route - the
   // typical one has no single compact block to speak of.
   function narrowStretch(a, z, stops, b) {
-    const ms = Math.round(z.t - a.t) + " ms";
+    const ms = Math.round(z.t - a.t).toLocaleString("en-US") + " ms";
     if (z.kind === "core" && stops.some((st) => st.kind === "peer")) {
       const how = b && {
         mempool: "nothing missing",
