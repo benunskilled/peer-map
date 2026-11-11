@@ -557,7 +557,9 @@
     : `${Math.floor(n)}${n % 1 ? "½" : ""} pings`;
   const HOP_WHY = "Estimated from the peer's ping, as BIP152 counts it: a high-bandwidth peer sends a new block " +
     "without being asked, half a ping; any other announces it first, a ping and a half. Asking for missing " +
-    "transactions adds a ping. These are minimums - more missing data or a slow line take longer.";
+    "transactions adds a ping. These are minimums - more missing data or a slow line take longer, and a peer " +
+    "that has not finished checking the block yet answers only then. Measured elsewhere (0xB10C, 2024), asking " +
+    "added about 115 ms in the median.";
   // Text cut off with an ellipsis is readable on hover - and only then, a
   // tooltip that repeats what is on screen says nothing. Whether it is cut
   // depends on the screen, so it is decided when the pointer gets there.
@@ -631,7 +633,7 @@
       const more = credited.length > 1 ? ` +${credited.length - 1}` : "";
       stops.push({
         kind: "peer", group: p ? p.group : "", t: s.core_ms - ping * hopPings(b.first_hb, b.recon),
-        pings: hopPings(b.first_hb, b.recon),
+        pings: hopPings(b.first_hb, b.recon), asked: b.recon === "asked",
         name: hostOf(lead.addr) + more,
         sub: p ? [where, p.operator, p.tor_exit ? "Tor exit" : ""].filter(Boolean) : ["no longer connected"],
         title: credited.map((c) => c.addr).join("\n"),
@@ -693,7 +695,7 @@
 
   function segLabel(a, z) {
     const d = Math.round(z.t - a.t) + " ms";
-    if (a.kind === "peer" && z.kind === "core") return ["~" + d + " · " + pingWords(a.pings || 1), HOP_WHY];
+    if (a.kind === "peer" && z.kind === "core") return [(a.asked ? "≥" : "~") + d + " · " + pingWords(a.pings || 1), HOP_WHY];
     if (a.kind === "win" && z.kind === "peer") return ["reaches your peer · " + d];
     if (a.kind === "core" && z.kind === "tpl") {
       return [d + " · template", "Core builds a new block template (getblocktemplate)"];
@@ -725,7 +727,7 @@
         asked: `+1 round trip · ${kB(b.recon_missing_bytes || 0)}`,
         full: "downloaded in full",
       }[b.recon];
-      return [how || "into your node", (a.kind === "peer" ? "~" : "") + ms, HOP_WHY];
+      return [how || "into your node", (a.kind === "peer" ? (b && b.recon === "asked" ? "≥" : "~") : "") + ms, HOP_WHY];
     }
     if (a.kind === "core" && z.kind === "tpl") return ["template", ms, "Core builds a new block template (getblocktemplate)"];
     if (a.kind === "tpl" && z.kind === "own") {
