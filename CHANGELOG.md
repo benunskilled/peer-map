@@ -2,6 +2,10 @@
 
 The release notes of every Peer Map version published on GitHub, newest first, as on the [releases page](https://github.com/benunskilled/peer-map/releases). GitHub releases start at 0.3.0.
 
+## 2.8.1 – 2026-11-16
+
+A thank-you banner at the top: Peer Lab replaces this app, in the same store. Thank you for running it!
+
 ## 2.8.0 – 2026-11-11
 
 On a phone the block route is now a timeline with each stretch's time on the right. The hop into your node is counted as BIP152 does: half a ping from a high-bandwidth peer (⚡), more when the block was announced first, and at least one more when your node had to ask for missing transactions; this needs Bitcoin Lab 2.6.0. On a wide screen every peer has one grey line under its kind, such as which wallet it probably is. Bitflash, 21 Data Lab's crawler and Nebula are recognised.
