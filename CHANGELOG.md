@@ -4,7 +4,7 @@ The release notes of every Peer Map version published on GitHub, newest first, a
 
 ## 2.8.1 – 2026-11-16
 
-A thank-you banner at the top: Peer Lab replaces this app, in the same store. Thank you for running it!
+Peer Lab replaces this app, in the same store. Thank you for running it!
 
 ## 2.8.0 – 2026-11-11
 
