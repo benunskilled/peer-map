@@ -56,7 +56,7 @@ func TestKnownRows(t *testing.T) {
 			t.Errorf("%s: region without a position", ip)
 		}
 	}
-	for _, ip := range []string{"10.21.0.1", "192.168.178.124", "fd00::1"} {
+	for _, ip := range []string{"10.21.0.1", "192.168.1.50", "fd00::1"} {
 		if loc, ok := Lookup(netip.MustParseAddr(ip)); ok {
 			t.Errorf("%s: private address located in %+v", ip, loc)
 		}
