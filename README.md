@@ -2,6 +2,8 @@
 
 [![Tests](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml/badge.svg)](https://github.com/benunskilled/peer-map/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/benunskilled/peer-map)](https://github.com/benunskilled/peer-map/releases)
 
+> **Peer Map is now Peer Lab.** Peer Map and Bitcoin Lab are one app now, [Peer Lab](https://github.com/benunskilled/peer-lab), in the same community store. Peer Map gets no more updates or support. Install Peer Lab, then uninstall Peer Map. Thank you for running it! 🧡
+
 Your node talks to strangers all day. Each one says what software it runs, but is it telling the truth? Peer Map takes a closer look: what the peer offers, whether it wants your transactions, how often it pings or asks for addresses, which chain it is on. A normal node, a wallet, a crawler, or a spy in disguise? Find out.
 
 The map shows where your peers are, who hosts them and whether they are really spread out. Even your own outbound slots can hold a surprise, like a node that left Bitcoin for another chain. No open port needed, but open 8333 and more strangers come knocking.
